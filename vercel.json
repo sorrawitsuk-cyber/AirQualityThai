@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api-air/:path*",
+      "destination": "http://air4thai.pcd.go.th/:path*"
+    }
+  ]
+}
