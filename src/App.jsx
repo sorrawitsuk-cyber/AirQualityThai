@@ -272,7 +272,7 @@ export default function App() {
             });
           }
 
-          // 2. ดึงพยากรณ์ PM2.5 + ทำ Calibration (เย็บตะเข็บกราฟ)
+          // 2. ดึงพยากรณ์ PM2.5 + ทำ Calibration
           const urlAqi = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${activeStation.lat}&longitude=${activeStation.long}&hourly=pm2_5&timezone=auto&forecast_days=2`;
           const resAqi = await fetch(urlAqi);
           const aData = await resAqi.json();
@@ -282,30 +282,23 @@ export default function App() {
             let startIndex = aData.hourly.time.findIndex(tStr => new Date(tStr).getTime() >= nowTime);
             if (startIndex === -1) startIndex = 0;
             
-            // --- เริ่มต้นระบบ Calibration ---
-            // ดึงค่าฝุ่นจริงจาก Air4Thai
             const currentRealPm25 = Number(activeStation.AQILast?.PM25?.value);
             let offset = 0;
             
-            // ตรวจสอบว่ามีค่าจริงและค่าพยากรณ์เริ่มต้นไหม
             if (!isNaN(currentRealPm25) && aData.hourly.pm2_5[startIndex] !== undefined) {
               const firstForecastPm25 = aData.hourly.pm2_5[startIndex];
-              // หาค่าส่วนต่าง (ความจริง - พยากรณ์)
               offset = currentRealPm25 - firstForecastPm25;
             }
-            // -----------------------------
             
             const pmForecastList = [];
             for (let i = startIndex; i < aData.hourly.time.length && pmForecastList.length < 12; i += 2) {
               let rawVal = aData.hourly.pm2_5[i] || 0;
-              
-              // ปรับจูนกราฟด้วยค่าส่วนต่าง (Calibration) และป้องกันไม่ให้ค่าติดลบ
               let calibratedVal = Math.max(0, rawVal + offset);
               
               const tDate = new Date(aData.hourly.time[i]);
               pmForecastList.push({
                 time: `${tDate.getHours().toString().padStart(2, '0')}:00`,
-                val: Math.round(calibratedVal), // ใช้ค่าที่ผ่านการปรับจูนแล้ว
+                val: Math.round(calibratedVal), 
                 color: getPM25Color(calibratedVal)
               });
             }
@@ -320,19 +313,26 @@ export default function App() {
     }
   }, [activeStation]);
 
+  // ฟังก์ชันสำหรับรีเซ็ตหน้าจอ
+  const handleReset = () => {
+    setSelectedProvince('');
+    setSelectedStationId('');
+    setActiveStation(null);
+  };
+
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem', color: '#555' }}>กำลังโหลดข้อมูลสถานีทั่วประเทศ...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#f4f6f9', fontFamily: "'Kanit', sans-serif" }}>
       
       {/* ------------------------------------------- */}
-      {/* แถบด้านบน (Filter) */}
+      {/* แถบด้านบน (Filter & Reset) */}
       {/* ------------------------------------------- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '15px 30px', backgroundColor: '#ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <label style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>🗺️ เลือกจังหวัด:</label>
           <select 
-            style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', fontSize: '0.95rem', minWidth: '250px', outline: 'none', cursor: 'pointer' }}
+            style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', fontSize: '0.95rem', minWidth: '220px', outline: 'none', cursor: 'pointer' }}
             value={selectedProvince} 
             onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); }}
           >
@@ -344,7 +344,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <label style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>📍 เลือกสถานี:</label>
           <select 
-            style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', fontSize: '0.95rem', minWidth: '250px', outline: 'none', cursor: 'pointer' }}
+            style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', fontSize: '0.95rem', minWidth: '220px', outline: 'none', cursor: 'pointer' }}
             value={selectedStationId} 
             onChange={(e) => {
               setSelectedStationId(e.target.value);
@@ -357,6 +357,28 @@ export default function App() {
             {filteredStations.map(station => (<option key={station.stationID} value={station.stationID}>{station.nameTH}</option>))}
           </select>
         </div>
+
+        {/* ปุ่ม Reset ซูมออกและล้างค่าทั้งหมด */}
+        <button 
+          onClick={handleReset}
+          style={{ 
+            padding: '8px 16px', 
+            backgroundColor: '#f1f2f6', 
+            color: '#2f3542', 
+            border: '1px solid #ced6e0', 
+            borderRadius: '8px', 
+            fontWeight: 'bold', 
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px'
+          }}
+          onMouseOver={(e) => e.target.style.backgroundColor = '#dfe4ea'}
+          onMouseOut={(e) => e.target.style.backgroundColor = '#f1f2f6'}
+        >
+          🔄 รีเซ็ต
+        </button>
 
         <div style={{ marginLeft: 'auto', fontSize: '0.95rem', color: '#555', fontWeight: 'bold' }}>
           ข้อมูลอัปเดตล่าสุด: <span style={{ color: '#0984e3' }}>{lastUpdateText || 'กำลังโหลด...'}</span>
@@ -524,22 +546,25 @@ export default function App() {
                       
                       {isAqiMode ? (
                         // ============================
-                        // Expanded: โหมด AQI (กราฟฝุ่น) ปรับ Calibration แล้ว!
+                        // Expanded: โหมด AQI (กราฟฝุ่น) 
+                        // แก้ไข CSS กราฟให้แข็งแรง ไม่เพี้ยนแน่นอน
                         // ============================
                         <div>
                           <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 24 ชม.</h5>
                           {activeForecast === null ? (
                             <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>กำลังดึงข้อมูลพยากรณ์ฝุ่น...</p>
                           ) : (
-                            <div style={{ height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '3px', borderBottom: '1px solid #ddd', paddingBottom: '2px' }}>
+                            <div style={{ height: '110px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '4px', paddingTop: '10px' }}>
                               {(() => {
                                 const maxVal = Math.max(...activeForecast.map(d => d.val)) + 15;
                                 return activeForecast.map((data, index) => {
                                   const heightPercent = Math.max((data.val / maxVal) * 100, 5); 
                                   return (
-                                    <div key={index} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', cursor: 'pointer' }} title={`เวลา ${data.time} = ${data.val} µg/m³`}>
-                                      <div style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.color, borderRadius: '2px 2px 0 0', opacity: 0.85, transition: '0.3s' }}></div>
-                                      <span style={{ fontSize: '9px', color: '#999', marginTop: '4px', display: index % 2 === 0 ? 'block' : 'none' }}>{data.time.split(':')[0]}</span>
+                                    <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
+                                      <div title={`เวลา ${data.time} = ${data.val} µg/m³`} style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.color, borderRadius: '4px 4px 0 0', cursor: 'pointer', transition: 'height 0.3s ease' }}></div>
+                                      <div style={{ fontSize: '9px', color: '#888', marginTop: '4px', height: '12px', display: 'flex', alignItems: 'center' }}>
+                                        {index % 2 === 0 ? data.time.split(':')[0] : ''}
+                                      </div>
                                     </div>
                                   );
                                 });
@@ -550,6 +575,7 @@ export default function App() {
                       ) : (
                         // ============================
                         // Expanded: โหมดอุณหภูมิ (Feels Like + กราฟความร้อน)
+                        // แก้ไข CSS กราฟความร้อนเช่นเดียวกัน
                         // ============================
                         <div>
                           {activeWeather === null ? (
@@ -585,15 +611,17 @@ export default function App() {
 
                               <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '10px' }}>📈 คาดการณ์ความร้อน (Feels Like) ล่วงหน้า 24 ชม.</h5>
                               {activeWeather.heatForecast && activeWeather.heatForecast.length > 0 && (
-                                <div style={{ height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '3px', borderBottom: '1px solid #ddd', paddingBottom: '2px' }}>
+                                <div style={{ height: '110px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '4px', paddingTop: '10px' }}>
                                   {(() => {
                                     const maxVal = Math.max(...activeWeather.heatForecast.map(d => d.val)) + 5;
                                     return activeWeather.heatForecast.map((data, index) => {
                                       const heightPercent = Math.max((data.val / maxVal) * 100, 5); 
                                       return (
-                                        <div key={index} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', cursor: 'pointer' }} title={`รู้สึกเหมือน: ${data.val}°C`}>
-                                          <div style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.colorInfo.bar, borderRadius: '2px 2px 0 0', opacity: 0.85, transition: '0.3s' }}></div>
-                                          <span style={{ fontSize: '9px', color: '#999', marginTop: '4px', display: index % 2 === 0 ? 'block' : 'none' }}>{data.time.split(':')[0]}</span>
+                                        <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
+                                          <div title={`รู้สึกเหมือน: ${data.val}°C`} style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.colorInfo.bar, borderRadius: '4px 4px 0 0', cursor: 'pointer', transition: 'height 0.3s ease' }}></div>
+                                          <div style={{ fontSize: '9px', color: '#888', marginTop: '4px', height: '12px', display: 'flex', alignItems: 'center' }}>
+                                            {index % 2 === 0 ? data.time.split(':')[0] : ''}
+                                          </div>
                                         </div>
                                       );
                                     });
