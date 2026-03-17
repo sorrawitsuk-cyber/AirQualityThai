@@ -170,9 +170,10 @@ export default function App() {
     }
   };
 
+  // ✅ แก้ไขฟังก์ชันดึงอุณหภูมิ: เพิ่ม Delay ป้องกัน API Block
   const fetchAdvancedTemperatures = async (stations) => {
     const newTemps = {};
-    const chunkSize = 40; 
+    const chunkSize = 35; // ลดขนาดกลุ่มลงนิดหน่อย
     
     for (let i = 0; i < stations.length; i += chunkSize) {
       const chunk = stations.slice(i, i + chunkSize);
@@ -180,15 +181,22 @@ export default function App() {
       const lons = chunk.map(s => s.long).join(',');
       
       try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current_weather=true&daily=temperature_2m_max,temperature_2m_min&past_days=1&forecast_days=1&timezone=Asia%2FBangkok`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m&daily=temperature_2m_max,temperature_2m_min&past_days=1&forecast_days=1&timezone=Asia%2FBangkok`;
         const res = await fetch(url);
-        const weatherData = await res.json();
         
+        if (!res.ok) {
+          console.warn(`API Limit Hit for chunk ${i}`);
+          continue; // ข้ามกลุ่มนี้ไปถ้าโดนบล็อก
+        }
+        
+        const weatherData = await res.json();
         const results = Array.isArray(weatherData) ? weatherData : [weatherData];
+        
         results.forEach((r, idx) => {
-          if (r && r.current_weather && r.daily) {
+          if (r && (r.current || r.current_weather) && r.daily) {
+            const currentTemp = r.current ? r.current.temperature_2m : r.current_weather.temperature;
             newTemps[chunk[idx].stationID] = {
-              temp: r.current_weather.temperature,
+              temp: currentTemp,
               tempMin: r.daily.temperature_2m_min[1],
               tempMax: r.daily.temperature_2m_max[1],
               tempYesterdayMax: r.daily.temperature_2m_max[0]
@@ -198,6 +206,9 @@ export default function App() {
       } catch (err) {
         console.error("Batch Temp fetch error", err);
       }
+      
+      // ⏳ หน่วงเวลา 300 มิลลิวินาทีก่อนดึงกลุ่มต่อไป (ไม้ตายแก้ API โดนบล็อก)
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
     setStationTemps(prev => ({...prev, ...newTemps}));
   };
@@ -240,10 +251,7 @@ export default function App() {
 
       const fetchDetails = async () => {
         try {
-          // =========================================================
-          // 1. ดึงพยากรณ์ความร้อน (Feels Like) 72 ชั่วโมง (ดึงทีละ 3 ชม. = 24 จุด)
-          // เปลี่ยน forecast_days=4 เพื่อให้ครอบคลุม 72 ชม.
-          // =========================================================
+          // 1. ดึงพยากรณ์ความร้อน (Feels Like) 72 ชั่วโมง
           const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m&hourly=apparent_temperature&timezone=auto&forecast_days=4`;
           const resW = await fetch(urlWeather);
           const wData = await resW.json();
@@ -254,12 +262,10 @@ export default function App() {
             let startIndex = wData.hourly.time.findIndex(tStr => new Date(tStr).getTime() >= nowTime);
             if (startIndex === -1) startIndex = 0;
             
-            // ดึง 24 จุด (ก้าวทีละ 3 ชั่วโมง)
             for (let i = startIndex; i < wData.hourly.time.length && heatForecastList.length < 24; i += 3) {
               const val = wData.hourly.apparent_temperature[i] || 0;
               const tDate = new Date(wData.hourly.time[i]);
               
-              // ทำฉลากเวลาให้เข้าใจง่าย (ถ้าเป็นเที่ยงคืน โชว์ตัวย่อวัน)
               let timeLabel = `${tDate.getHours().toString().padStart(2, '0')}:00`;
               if (tDate.getHours() === 0) {
                 const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
@@ -285,9 +291,7 @@ export default function App() {
             });
           }
 
-          // =========================================================
-          // 2. ดึงพยากรณ์ PM2.5 ล่วงหน้า 72 ชั่วโมง (ทีละ 3 ชม. = 24 จุด)
-          // =========================================================
+          // 2. ดึงพยากรณ์ PM2.5 ล่วงหน้า 72 ชั่วโมง + Calibration
           const urlAqi = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${activeStation.lat}&longitude=${activeStation.long}&hourly=pm2_5&timezone=auto&forecast_days=4`;
           const resAqi = await fetch(urlAqi);
           const aData = await resAqi.json();
@@ -297,7 +301,6 @@ export default function App() {
             let startIndex = aData.hourly.time.findIndex(tStr => new Date(tStr).getTime() >= nowTime);
             if (startIndex === -1) startIndex = 0;
             
-            // หาค่าส่วนต่างเพื่อเย็บตะเข็บกราฟกับปัจจุบัน (Calibration)
             const currentRealPm25 = Number(activeStation.AQILast?.PM25?.value);
             let offset = 0;
             if (!isNaN(currentRealPm25) && aData.hourly.pm2_5[startIndex] !== undefined) {
@@ -348,57 +351,47 @@ export default function App() {
   const renderLineChart = (data, isAQI) => {
     if (!data || data.length === 0) return null;
     
-    // ตั้งค่าขนาดกระดาษวาดรูป SVG
     const width = 350;
     const height = 70;
-    const maxVal = Math.max(...data.map(d => d.val)) + (isAQI ? 10 : 3); // เผื่อพื้นที่ด้านบนนิดหน่อย
+    const maxVal = Math.max(...data.map(d => d.val)) + (isAQI ? 10 : 3);
     
-    // สร้างตำแหน่งจุด (x, y) สำหรับวาดเส้น
     const points = data.map((d, index) => {
       const x = (index / (data.length - 1)) * width;
       const y = height - ((d.val / maxVal) * height);
       return `${x},${y}`;
     }).join(' ');
 
-    // สร้างพื้นที่แรเงาใต้กราฟ
     const areaPoints = `0,${height} ${points} ${width},${height}`;
     
-    // กำหนดสีหลักของเส้น
     const mainStrokeColor = isAQI ? '#3498db' : '#e67e22';
     const mainFillColor = isAQI ? 'rgba(52, 152, 219, 0.15)' : 'rgba(230, 126, 34, 0.15)';
 
     return (
       <div style={{ marginTop: '10px' }}>
         <svg viewBox={`0 -10 ${width} ${height + 30}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
-          {/* แรเงาใต้กราฟ */}
           <polygon points={areaPoints} fill={mainFillColor} />
-          
-          {/* เส้นกราฟ */}
           <polyline points={points} fill="none" stroke={mainStrokeColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           
-          {/* จุด Data Points และ ข้อความบอกเวลา */}
           {data.map((d, index) => {
             const x = (index / (data.length - 1)) * width;
             const y = height - ((d.val / maxVal) * height);
             
-            // เลือกจุดที่จะโชว์ข้อความ (ไม่ให้รกเกินไป)
             const showText = d.isMidnight || index === 0 || index === data.length - 1;
             const textWeight = d.isMidnight ? 'bold' : 'normal';
             const textColor = d.isMidnight ? '#333' : '#999';
+            // ✅ เปลี่ยนสีจุดตามระดับมลพิษ/ความร้อนจริงๆ (ถ้าเป็นฝุ่นใช้ d.color ถ้าเป็นความร้อนใช้ d.colorInfo.bar)
+            const dotColor = isAQI ? d.color : d.colorInfo.bar;
 
             return (
               <g key={index}>
-                {/* วงกลมบนจุด */}
-                <circle cx={x} cy={y} r="3.5" fill={isAQI ? d.color : d.colorInfo.bar} stroke="#fff" strokeWidth="1.5" style={{ transition: 'all 0.3s' }} />
+                <circle cx={x} cy={y} r="3.5" fill={dotColor} stroke="#fff" strokeWidth="1.5" style={{ transition: 'all 0.3s' }} />
                 
-                {/* ตัวเลขบนจุด (เฉพาะบางจุด) */}
                 {showText && (
                   <text x={x} y={y - 8} fontSize="9" fill="#555" fontWeight="bold" textAnchor="middle">
                     {d.val}
                   </text>
                 )}
 
-                {/* ข้อความบอกเวลาด้านล่าง */}
                 {showText && (
                   <text x={x} y={height + 15} fontSize="9" fill={textColor} fontWeight={textWeight} textAnchor="middle">
                     {d.time}
@@ -624,7 +617,7 @@ export default function App() {
                       
                       {isAqiMode ? (
                         // ============================
-                        // โหมด AQI: กราฟเส้น 72 ชั่วโมง
+                        // โหมด AQI: กราฟเส้น 72 ชั่วโมง (ดึงฟังก์ชันมาใช้ได้เลย)
                         // ============================
                         <div>
                           <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
