@@ -170,10 +170,9 @@ export default function App() {
     }
   };
 
-  // ✅ แก้ไขฟังก์ชันดึงอุณหภูมิ: เพิ่ม Delay ป้องกัน API Block
   const fetchAdvancedTemperatures = async (stations) => {
     const newTemps = {};
-    const chunkSize = 35; // ลดขนาดกลุ่มลงนิดหน่อย
+    const chunkSize = 35; 
     
     for (let i = 0; i < stations.length; i += chunkSize) {
       const chunk = stations.slice(i, i + chunkSize);
@@ -183,11 +182,7 @@ export default function App() {
       try {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m&daily=temperature_2m_max,temperature_2m_min&past_days=1&forecast_days=1&timezone=Asia%2FBangkok`;
         const res = await fetch(url);
-        
-        if (!res.ok) {
-          console.warn(`API Limit Hit for chunk ${i}`);
-          continue; // ข้ามกลุ่มนี้ไปถ้าโดนบล็อก
-        }
+        if (!res.ok) continue; 
         
         const weatherData = await res.json();
         const results = Array.isArray(weatherData) ? weatherData : [weatherData];
@@ -206,8 +201,6 @@ export default function App() {
       } catch (err) {
         console.error("Batch Temp fetch error", err);
       }
-      
-      // ⏳ หน่วงเวลา 300 มิลลิวินาทีก่อนดึงกลุ่มต่อไป (ไม้ตายแก้ API โดนบล็อก)
       await new Promise(resolve => setTimeout(resolve, 300));
     }
     setStationTemps(prev => ({...prev, ...newTemps}));
@@ -251,32 +244,29 @@ export default function App() {
 
       const fetchDetails = async () => {
         try {
-          // 1. ดึงพยากรณ์ความร้อน (Feels Like) 72 ชั่วโมง
-          const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m&hourly=apparent_temperature&timezone=auto&forecast_days=4`;
+          // =========================================================
+          // 1. ดึงข้อมูลอุณหภูมิปัจจุบัน + พยากรณ์ดัชนีความร้อนสูงสุดรายวัน 7 วัน (Daily Max)
+          // =========================================================
+          const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m&daily=apparent_temperature_max&timezone=auto&forecast_days=7`;
           const resW = await fetch(urlWeather);
           const wData = await resW.json();
           
           let heatForecastList = [];
-          if (wData.hourly) {
-            const nowTime = new Date().getTime();
-            let startIndex = wData.hourly.time.findIndex(tStr => new Date(tStr).getTime() >= nowTime);
-            if (startIndex === -1) startIndex = 0;
-            
-            for (let i = startIndex; i < wData.hourly.time.length && heatForecastList.length < 24; i += 3) {
-              const val = wData.hourly.apparent_temperature[i] || 0;
-              const tDate = new Date(wData.hourly.time[i]);
+          if (wData.daily && wData.daily.time) {
+            for (let i = 0; i < wData.daily.time.length; i++) {
+              const val = wData.daily.apparent_temperature_max[i] || 0;
+              const tDate = new Date(wData.daily.time[i]);
               
-              let timeLabel = `${tDate.getHours().toString().padStart(2, '0')}:00`;
-              if (tDate.getHours() === 0) {
-                const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-                timeLabel = days[tDate.getDay()];
-              }
+              // ทำฉลากชื่อวัน
+              const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+              let timeLabel = days[tDate.getDay()];
+              if (i === 0) timeLabel = 'วันนี้';
+              else if (i === 1) timeLabel = 'พรุ่งนี้';
 
               heatForecastList.push({
                 time: timeLabel,
                 val: Math.round(val),
-                colorInfo: getHeatIndexAlert(val),
-                isMidnight: tDate.getHours() === 0
+                colorInfo: getHeatIndexAlert(val)
               });
             }
           }
@@ -291,7 +281,9 @@ export default function App() {
             });
           }
 
-          // 2. ดึงพยากรณ์ PM2.5 ล่วงหน้า 72 ชั่วโมง + Calibration
+          // =========================================================
+          // 2. ดึงพยากรณ์ PM2.5 ล่วงหน้า 72 ชั่วโมง (ทีละ 3 ชม. = 24 จุด) + Calibration
+          // =========================================================
           const urlAqi = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${activeStation.lat}&longitude=${activeStation.long}&hourly=pm2_5&timezone=auto&forecast_days=4`;
           const resAqi = await fetch(urlAqi);
           const aData = await resAqi.json();
@@ -314,18 +306,12 @@ export default function App() {
               let calibratedVal = Math.max(0, rawVal + offset);
               
               const tDate = new Date(aData.hourly.time[i]);
-              
-              let timeLabel = `${tDate.getHours().toString().padStart(2, '0')}:00`;
-              if (tDate.getHours() === 0) {
-                const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-                timeLabel = days[tDate.getDay()];
-              }
+              let timeLabel = `${tDate.getHours().toString().padStart(2, '0')}`;
 
               pmForecastList.push({
                 time: timeLabel,
                 val: Math.round(calibratedVal), 
-                color: getPM25Color(calibratedVal),
-                isMidnight: tDate.getHours() === 0
+                color: getPM25Color(calibratedVal)
               });
             }
             setActiveForecast(pmForecastList);
@@ -344,67 +330,6 @@ export default function App() {
     setSelectedStationId('');
     setActiveStation(null);
   };
-
-  // =========================================================
-  // ฟังก์ชันวาดกราฟเส้นด้วย SVG (ใช้ได้ทั้งฝุ่นและความร้อน)
-  // =========================================================
-  const renderLineChart = (data, isAQI) => {
-    if (!data || data.length === 0) return null;
-    
-    const width = 350;
-    const height = 70;
-    const maxVal = Math.max(...data.map(d => d.val)) + (isAQI ? 10 : 3);
-    
-    const points = data.map((d, index) => {
-      const x = (index / (data.length - 1)) * width;
-      const y = height - ((d.val / maxVal) * height);
-      return `${x},${y}`;
-    }).join(' ');
-
-    const areaPoints = `0,${height} ${points} ${width},${height}`;
-    
-    const mainStrokeColor = isAQI ? '#3498db' : '#e67e22';
-    const mainFillColor = isAQI ? 'rgba(52, 152, 219, 0.15)' : 'rgba(230, 126, 34, 0.15)';
-
-    return (
-      <div style={{ marginTop: '10px' }}>
-        <svg viewBox={`0 -10 ${width} ${height + 30}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
-          <polygon points={areaPoints} fill={mainFillColor} />
-          <polyline points={points} fill="none" stroke={mainStrokeColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          
-          {data.map((d, index) => {
-            const x = (index / (data.length - 1)) * width;
-            const y = height - ((d.val / maxVal) * height);
-            
-            const showText = d.isMidnight || index === 0 || index === data.length - 1;
-            const textWeight = d.isMidnight ? 'bold' : 'normal';
-            const textColor = d.isMidnight ? '#333' : '#999';
-            // ✅ เปลี่ยนสีจุดตามระดับมลพิษ/ความร้อนจริงๆ (ถ้าเป็นฝุ่นใช้ d.color ถ้าเป็นความร้อนใช้ d.colorInfo.bar)
-            const dotColor = isAQI ? d.color : d.colorInfo.bar;
-
-            return (
-              <g key={index}>
-                <circle cx={x} cy={y} r="3.5" fill={dotColor} stroke="#fff" strokeWidth="1.5" style={{ transition: 'all 0.3s' }} />
-                
-                {showText && (
-                  <text x={x} y={y - 8} fontSize="9" fill="#555" fontWeight="bold" textAnchor="middle">
-                    {d.val}
-                  </text>
-                )}
-
-                {showText && (
-                  <text x={x} y={height + 15} fontSize="9" fill={textColor} fontWeight={textWeight} textAnchor="middle">
-                    {d.time}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
-  };
-
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem', color: '#555' }}>กำลังโหลดข้อมูลสถานีทั่วประเทศ...</div>;
 
@@ -617,23 +542,44 @@ export default function App() {
                       
                       {isAqiMode ? (
                         // ============================
-                        // โหมด AQI: กราฟเส้น 72 ชั่วโมง (ดึงฟังก์ชันมาใช้ได้เลย)
+                        // โหมด AQI: กราฟแท่ง 72 ชม. (มีตัวเลขบนหัว)
                         // ============================
                         <div>
                           <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
                           {activeForecast === null ? (
-                            <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center', padding: '20px 0' }}>กำลังคำนวณกราฟเส้น...</p>
+                            <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center', padding: '20px 0' }}>กำลังดึงข้อมูลพยากรณ์ฝุ่น...</p>
                           ) : (
-                            renderLineChart(activeForecast, true)
+                            <div style={{ height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '2px', paddingTop: '10px' }}>
+                              {(() => {
+                                const maxVal = Math.max(...activeForecast.map(d => d.val)) + 15;
+                                return activeForecast.map((data, index) => {
+                                  const heightPercent = Math.max((data.val / maxVal) * 100, 5); 
+                                  return (
+                                    <div key={index} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', cursor: 'pointer' }} title={`เวลา ${data.time} = ${data.val} µg/m³`}>
+                                      {/* ตัวเลขบนหัวแท่ง */}
+                                      <span style={{ fontSize: '8.5px', color: '#555', marginBottom: '3px', fontWeight: 'bold', letterSpacing: '-0.5px' }}>
+                                        {data.val}
+                                      </span>
+                                      {/* แท่งสี */}
+                                      <div style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.color, borderRadius: '2px 2px 0 0', opacity: 0.85, transition: '0.3s' }}></div>
+                                      {/* เวลาด้านล่าง (โชว์แบบเว้นระยะเพื่อไม่ให้รก) */}
+                                      <div style={{ fontSize: '8px', color: '#999', marginTop: '4px', height: '12px', display: 'flex', alignItems: 'center' }}>
+                                        {index % 3 === 0 ? data.time : ''}
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
                           )}
                         </div>
                       ) : (
                         // ============================
-                        // โหมดอุณหภูมิ: กราฟเส้นความร้อน 72 ชั่วโมง
+                        // โหมดอุณหภูมิ: กราฟแท่งความร้อน 7 วัน (Daily Max)
                         // ============================
                         <div>
                           {activeWeather === null ? (
-                            <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center', padding: '20px 0' }}>กำลังคำนวณอุณหภูมิเชิงลึก...</p>
+                            <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center', padding: '20px 0' }}>กำลังดึงข้อมูลพยากรณ์...</p>
                           ) : activeWeather === 'error' ? (
                             <p style={{ fontSize: '0.8rem', color: 'red', textAlign: 'center' }}>ดึงข้อมูลล้มเหลว</p>
                           ) : (
@@ -663,9 +609,30 @@ export default function App() {
                                 })()}
                               </div>
 
-                              <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>📈 คาดการณ์ความร้อน (Feels Like) ล่วงหน้า 72 ชม.</h5>
+                              <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>📈 คาดการณ์ความร้อนสูงสุด (Feels Like) 7 วัน</h5>
                               {activeWeather.heatForecast && activeWeather.heatForecast.length > 0 && (
-                                renderLineChart(activeWeather.heatForecast, false)
+                                <div style={{ height: '110px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '6px', paddingTop: '10px' }}>
+                                  {(() => {
+                                    const maxVal = Math.max(...activeWeather.heatForecast.map(d => d.val)) + 5;
+                                    return activeWeather.heatForecast.map((data, index) => {
+                                      const heightPercent = Math.max((data.val / maxVal) * 100, 5); 
+                                      return (
+                                        <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
+                                          {/* ตัวเลขบนหัวแท่ง */}
+                                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: data.colorInfo.color, marginBottom: '4px' }}>
+                                            {data.val}°
+                                          </span>
+                                          {/* แท่งสี */}
+                                          <div title={`${data.time}: รู้สึกเหมือน ${data.val}°C`} style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.colorInfo.bar, borderRadius: '4px 4px 0 0', cursor: 'pointer', transition: 'height 0.3s ease' }}></div>
+                                          {/* ชื่อวัน */}
+                                          <div style={{ fontSize: '11px', color: index <= 1 ? '#0984e3' : '#666', marginTop: '6px', fontWeight: index <= 1 ? 'bold' : 'normal' }}>
+                                            {data.time}
+                                          </div>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
                               )}
                             </>
                           )}
