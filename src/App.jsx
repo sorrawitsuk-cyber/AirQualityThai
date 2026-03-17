@@ -136,9 +136,7 @@ export default function App() {
   const [stationTemps, setStationTemps] = useState({});
   const [activeStation, setActiveStation] = useState(null);
   
-  // เก็บข้อมูลสภาพอากาศปัจจุบัน + กราฟดัชนีความร้อน
   const [activeWeather, setActiveWeather] = useState(null); 
-  // เก็บข้อมูลกราฟฝุ่น PM2.5
   const [activeForecast, setActiveForecast] = useState(null); 
   
   const [loading, setLoading] = useState(true);
@@ -147,7 +145,6 @@ export default function App() {
   const cardRefs = useRef({});
   const markerRefs = useRef({});
 
-  // 1. ดึงข้อมูล Air4Thai
   const fetchAirQuality = async (isBackgroundLoad = false) => {
     if (!isBackgroundLoad) setLoading(true);
     try {
@@ -174,7 +171,6 @@ export default function App() {
     }
   };
 
-  // 2. ดึงอุณหภูมิขั้นสูง (Min/Max/Yesterday) สำหรับทุกสถานี
   const fetchAdvancedTemperatures = async (stations) => {
     const newTemps = {};
     const chunkSize = 40; 
@@ -213,7 +209,6 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // กรองและจัดเรียง
   useEffect(() => {
     let result = [...allStations];
     if (selectedProvince) result = result.filter(s => extractProvince(s.areaTH) === selectedProvince);
@@ -233,7 +228,6 @@ export default function App() {
     setFilteredStations(result);
   }, [selectedProvince, selectedStationId, allStations, viewMode, stationTemps]);
 
-  // เมื่อคลิกสถานี ให้ดึงข้อมูลลึกๆ (ดัชนีความร้อน + พยากรณ์ฝุ่น)
   useEffect(() => {
     if (activeStation) {
       if (cardRefs.current[activeStation.stationID]) {
@@ -247,7 +241,7 @@ export default function App() {
 
       const fetchDetails = async () => {
         try {
-          // ดึงสภาพอากาศปัจจุบัน (รวม Feels Like) + กราฟพยากรณ์ความร้อนรายชั่วโมง
+          // ดึงสภาพอากาศปัจจุบัน + กราฟพยากรณ์ความร้อน
           const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m&hourly=apparent_temperature&timezone=auto&forecast_days=2`;
           const resW = await fetch(urlWeather);
           const wData = await resW.json();
@@ -264,7 +258,7 @@ export default function App() {
               heatForecastList.push({
                 time: `${tDate.getHours().toString().padStart(2, '0')}:00`,
                 val: Math.round(val),
-                colorInfo: getHeatIndexAlert(val) // ดึงสีแท่งกราฟมาเตรียมไว้เลย
+                colorInfo: getHeatIndexAlert(val) 
               });
             }
           }
@@ -468,7 +462,6 @@ export default function App() {
                     boxShadow: isActive ? '0 5px 15px rgba(0,123,255,0.1)' : '0 2px 5px rgba(0,0,0,0.02)'
                   }}
                 >
-                  {/* หัวการ์ดและข้อมูลพื้นฐาน */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                     <div style={{ flex: 1, paddingRight: '10px' }}>
                       <h4 style={{ fontSize: '1rem', color: '#333', marginBottom: '2px', fontWeight: 'bold' }}>{station.nameTH}</h4>
@@ -517,7 +510,7 @@ export default function App() {
                   </div>
 
                   {/* ========================================================== */}
-                  {/* แผงข้อมูลเสริมเมื่อการ์ดนี้ถูกคลิก (แยกตาม Mode ชัดเจน) */}
+                  {/* แผงข้อมูลเสริมเมื่อการ์ดนี้ถูกคลิก */}
                   {/* ========================================================== */}
                   {isActive && (
                     <div style={{ borderTop: '1px solid #eee', marginTop: '15px', paddingTop: '15px' }}>
@@ -537,7 +530,8 @@ export default function App() {
                                 return activeForecast.map((data, index) => {
                                   const heightPercent = Math.max((data.val / maxVal) * 100, 5); 
                                   return (
-                                    <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }} title={`เวลา ${data.time} = ${data.val} µg/m³`}>
+                                    /* ✅ ตรงนี้แก้ไข CSS ให้แท่งกราฟยืดขึ้นเต็มความสูง 100% แล้วครับ */
+                                    <div key={index} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', cursor: 'pointer' }} title={`เวลา ${data.time} = ${data.val} µg/m³`}>
                                       <div style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.color, borderRadius: '2px 2px 0 0', opacity: 0.85, transition: '0.3s' }}></div>
                                       <span style={{ fontSize: '9px', color: '#999', marginTop: '4px', display: index % 2 === 0 ? 'block' : 'none' }}>{data.time.split(':')[0]}</span>
                                     </div>
@@ -558,7 +552,6 @@ export default function App() {
                             <p style={{ fontSize: '0.8rem', color: 'red', textAlign: 'center' }}>ดึงข้อมูลล้มเหลว</p>
                           ) : (
                             <>
-                              {/* 1. กล่อง Current Weather + Feels Like Alert */}
                               <div style={{ backgroundColor: '#fff7e6', borderRadius: '8px', padding: '12px', border: '1px solid #ffedd5', marginBottom: '15px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563', marginBottom: '10px' }}>
                                   <span>🌡️ ปัจจุบัน {activeWeather.temp} °C</span>
@@ -584,7 +577,6 @@ export default function App() {
                                 })()}
                               </div>
 
-                              {/* 2. กราฟพยากรณ์ดัชนีความร้อน */}
                               <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '10px' }}>📈 คาดการณ์ความร้อน (Feels Like) ล่วงหน้า 24 ชม.</h5>
                               {activeWeather.heatForecast && activeWeather.heatForecast.length > 0 && (
                                 <div style={{ height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '3px', borderBottom: '1px solid #ddd', paddingBottom: '2px' }}>
@@ -593,7 +585,8 @@ export default function App() {
                                     return activeWeather.heatForecast.map((data, index) => {
                                       const heightPercent = Math.max((data.val / maxVal) * 100, 5); 
                                       return (
-                                        <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }} title={`รู้สึกเหมือน: ${data.val}°C`}>
+                                        /* ✅ แก้ไข CSS กราฟให้เต็มกล่องเช่นเดียวกันครับ */
+                                        <div key={index} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', cursor: 'pointer' }} title={`รู้สึกเหมือน: ${data.val}°C`}>
                                           <div style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.colorInfo.bar, borderRadius: '2px 2px 0 0', opacity: 0.85, transition: '0.3s' }}></div>
                                           <span style={{ fontSize: '9px', color: '#999', marginTop: '4px', display: index % 2 === 0 ? 'block' : 'none' }}>{data.time.split(':')[0]}</span>
                                         </div>
