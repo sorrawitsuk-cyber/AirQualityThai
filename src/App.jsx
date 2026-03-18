@@ -83,8 +83,27 @@ const getWindColor = (val) => {
 
 const extractProvince = (areaTH) => {
   if (!areaTH) return 'ไม่ระบุ';
-  const parts = areaTH.split(',');
-  return parts[parts.length - 1].trim();
+
+  // 1. ดักจับสถานีในกรุงเทพฯ (มักจะมีคำว่า กทม, กรุงเทพ หรือ เขต)
+  if (areaTH.includes('กรุงเทพ') || areaTH.includes('กทม') || areaTH.includes('เขต')) {
+    return 'กรุงเทพมหานคร';
+  }
+
+  let province = areaTH;
+
+  // 2. ถ้าข้อมูลมีลูกน้ำ (,) ให้เอาคำหลังสุด (รูปแบบมาตรฐานของ Air4Thai)
+  if (areaTH.includes(',')) {
+    const parts = areaTH.split(',');
+    province = parts[parts.length - 1];
+  } 
+  // 3. ถ้าไม่มีลูกน้ำ ลองใช้การเว้นวรรค ( ) แล้วเอาคำหลังสุด
+  else {
+    const parts = areaTH.trim().split(/\s+/);
+    province = parts[parts.length - 1];
+  }
+
+  // 4. ทำความสะอาดข้อความ ตัดคำว่า "จ." ออก เพื่อไม่ให้ชื่อจังหวัดซ้ำซ้อน
+  return province.replace(/^จ\./, '').trim();
 };
 
 // ==============================================================
