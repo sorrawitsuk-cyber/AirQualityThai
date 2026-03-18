@@ -63,22 +63,23 @@ const getUvColor = (val) => {
   return { bg: '#9b59b6', text: '#fff', bar: '#9b59b6', label: 'อันตราย (Extreme)' };
 };
 
+// อัปเดตคำศัพท์เรื่องฝนให้เป็นวิชาการขึ้น
 const getRainColor = (val) => {
   if (isNaN(val) || val === null) return { bg: '#cccccc', text: '#333', bar: '#cccccc', label: 'ไม่มีข้อมูล' };
-  if (val === 0) return { bg: '#95a5a6', text: '#fff', bar: '#95a5a6', label: 'ไม่ตก' };
-  if (val <= 30) return { bg: '#74b9ff', text: '#222', bar: '#74b9ff', label: 'โอกาสน้อย' };
-  if (val <= 60) return { bg: '#0984e3', text: '#fff', bar: '#0984e3', label: 'ตกปานกลาง' };
+  if (val === 0) return { bg: '#95a5a6', text: '#fff', bar: '#95a5a6', label: 'ไม่มีฝน' };
+  if (val <= 30) return { bg: '#74b9ff', text: '#222', bar: '#74b9ff', label: 'โอกาสต่ำ' };
+  if (val <= 60) return { bg: '#0984e3', text: '#fff', bar: '#0984e3', label: 'โอกาสปานกลาง' };
   if (val <= 80) return { bg: '#273c75', text: '#fff', bar: '#273c75', label: 'โอกาสสูง' };
-  return { bg: '#192a56', text: '#fff', bar: '#192a56', label: 'ตกหนักชัวร์' };
+  return { bg: '#192a56', text: '#fff', bar: '#192a56', label: 'โอกาสสูงมาก' };
 };
 
-// เพิ่มฟังก์ชันกำหนดสีความเร็วลม (km/h)
+// อัปเดตคำศัพท์เรื่องลมให้เป็นวิชาการขึ้น
 const getWindColor = (val) => {
   if (isNaN(val) || val === null) return { bg: '#cccccc', text: '#333', bar: '#cccccc', label: 'ไม่มีข้อมูล' };
   if (val <= 10) return { bg: '#00b0f0', text: '#fff', bar: '#00b0f0', label: 'ลมอ่อน' };
   if (val <= 25) return { bg: '#2ecc71', text: '#fff', bar: '#2ecc71', label: 'ลมปานกลาง' };
   if (val <= 40) return { bg: '#f1c40f', text: '#222', bar: '#f1c40f', label: 'ลมแรง' };
-  if (val <= 60) return { bg: '#e67e22', text: '#fff', bar: '#e67e22', label: 'ลมกรรโชก' };
+  if (val <= 60) return { bg: '#e67e22', text: '#fff', bar: '#e67e22', label: 'ลมแรงมาก' };
   return { bg: '#e74c3c', text: '#fff', bar: '#e74c3c', label: 'พายุ' };
 };
 
@@ -120,7 +121,6 @@ const createCustomMarker = (viewMode, value, level, extraData) => {
     textColor = (value <= 30 && value > 0) ? '#222' : '#fff';
     displayValue = (value === null || isNaN(value)) ? '-' : `${Math.round(value)}%`;
   } else if (viewMode === 'wind') {
-    // 🌬️ โหมดลม: แสดงลูกศรหมุนตามทิศทางลม พร้อมตัวเลขความเร็ว
     const windInfo = getWindColor(value);
     bg = value !== null ? windInfo.bar : '#cccccc';
     textColor = (value > 10 && value <= 40) ? '#222' : '#fff';
@@ -162,7 +162,6 @@ function FitBounds({ stations, activeStation }) {
     if (activeStation) return; 
     if (stations && stations.length > 0) {
       const bounds = L.latLngBounds(stations.map(s => [parseFloat(s.lat), parseFloat(s.long)]));
-      // 👇 ปรับ maxZoom เป็น 12 (หรือ 13) และลด padding ลงเหลือ 30 ให้กระชับขึ้น
       map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 }); 
     }
   }, [stations, map, activeStation]);
@@ -207,8 +206,8 @@ export default function App() {
 
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
-    if (mode === 'temp') setSortOrder('asc'); // อุณหภูมิน้อยไปมาก
-    else setSortOrder('desc'); // นอกนั้นมากไปน้อย (อันตราย/ลมแรง ขึ้นก่อน)
+    if (mode === 'temp') setSortOrder('asc'); 
+    else setSortOrder('desc'); 
   };
 
   const fetchAirQuality = async (isBackgroundLoad = false) => {
@@ -261,13 +260,13 @@ export default function App() {
               feelsLike: r.current.apparent_temperature,
               humidity: r.current.relative_humidity_2m,
               windSpeed: r.current.wind_speed_10m,
-              windDir: r.current.wind_direction_10m, // ดึงทิศทางลม
+              windDir: r.current.wind_direction_10m, 
               tempMin: r.daily.temperature_2m_min[1],
               tempMax: r.daily.temperature_2m_max[1],
               tempYesterdayMax: r.daily.temperature_2m_max[0],
               uvMax: r.daily.uv_index_max[1],
               rainProb: r.daily.precipitation_probability_max[1],
-              windMax: r.daily.wind_speed_10m_max[1] // ดึงลมสูงสุด
+              windMax: r.daily.wind_speed_10m_max[1] 
             };
           }
         });
@@ -562,7 +561,7 @@ export default function App() {
                                   <>
                                     <span style={{color: '#34495e'}}>ทิศทาง: <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span></span>
                                     <span style={{color: '#ccc'}}>|</span>
-                                    <span style={{color: '#34495e'}}>กรรโชกสูงสุด: {tObj.windMax} km/h</span>
+                                    <span style={{color: '#34495e'}}>ความเร็วลมสูงสุด: {tObj.windMax} km/h</span>
                                   </>
                                 ) : (
                                   <>
@@ -609,7 +608,7 @@ export default function App() {
                           {activeWeather === null ? <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>กำลังโหลดข้อมูลพยากรณ์...</p> : (
                             <>
                               <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>
-                                📈 คาดการณ์{isUvMode ? ' UV สูงสุด' : isRainMode ? 'โอกาสเกิดฝน' : isHeatMode ? ' Heat Index สูงสุด' : isWindMode ? 'ลมกรรโชกแรงสุด' : 'อุณหภูมิสูงสุด'} 7 วัน
+                                📈 คาดการณ์{isUvMode ? ' UV สูงสุด' : isRainMode ? 'โอกาสเกิดฝน' : isHeatMode ? ' Heat Index สูงสุด' : isWindMode ? 'ความเร็วลมสูงสุด' : 'อุณหภูมิสูงสุด'} 7 วัน
                               </h5>
                               <div style={{ height: '110px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '6px', paddingTop: '10px' }}>
                                 {(() => {
