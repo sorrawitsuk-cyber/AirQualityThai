@@ -164,23 +164,15 @@ const createCustomMarker = (viewMode, value, level, extraData) => {
   });
 };
 
-// 🛠️ แก้ไข FitBounds ให้ซูมพอดีหน้าแรก และซูมเจาะจงเวลาเลือกจังหวัด
-function FitBounds({ stations, activeStation, selectedProvince }) {
+function FitBounds({ stations, activeStation }) {
   const map = useMap();
   useEffect(() => {
     if (activeStation) return; 
     if (stations && stations.length > 0) {
-      // ถ้าไม่ได้เลือกจังหวัด (หน้าแรก) ให้ซูมจุดศูนย์กลางประเทศไทยระดับ 6
-      if (!selectedProvince) {
-        map.flyTo([13.5, 101.0], 6, { duration: 1.5 });
-      } 
-      // ถ้าเลือกจังหวัด ให้คำนวณกรอบแล้วซูมเข้าไปให้พอดี
-      else {
-        const bounds = L.latLngBounds(stations.map(s => [parseFloat(s.lat), parseFloat(s.long)]));
-        map.fitBounds(bounds, { padding: [20, 20], maxZoom: 12 }); 
-      }
+      const bounds = L.latLngBounds(stations.map(s => [parseFloat(s.lat), parseFloat(s.long)]));
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 }); 
     }
-  }, [stations, map, activeStation, selectedProvince]);
+  }, [stations, map, activeStation]);
   return null;
 }
 
@@ -423,18 +415,8 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#f1f5f9', fontFamily: "'Kanit', sans-serif" }}>
       
-      {/* 🚀 1. Header (ดีไซน์ใหม่) ฝัง Filter ไว้ด้านในเลย */}
-      <header style={{ 
-        background: 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)', 
-        color: '#fff', 
-        padding: '12px 25px', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        boxShadow: '0 4px 10px rgba(0,0,0,0.1)', 
-        zIndex: 1000 
-      }}>
-        {/* โลโก้ และ ชื่อ */}
+      {/* 🚀 Header */}
+      <header style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)', color: '#fff', padding: '12px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', zIndex: 1000 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <div style={{ fontSize: '1.8rem', background: '#fff', borderRadius: '50%', padding: '5px', width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }}>
             🌤️
@@ -445,41 +427,37 @@ export default function App() {
           </div>
         </div>
 
-        {/* ตัวกรองจังหวัดและสถานี (ย้ายมาอยู่ใน Header) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '8px 20px', borderRadius: '12px', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)' }}>
+        {/* 🚀 ตัวกรองแบบชัดเจน Solid White */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.9rem', textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>🗺️ จังหวัด:</label>
-            <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', color: '#1e293b', minWidth: '160px', outline: 'none', cursor: 'pointer' }}>
+            <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.95rem', textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>🗺️ จังหวัด:</label>
+            <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', color: '#1e293b', fontSize: '0.95rem', minWidth: '200px', outline: 'none', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
               <option value="">-- ทุกจังหวัด --</option>
               {provinces.map(prov => (<option key={prov} value={prov}>{prov}</option>))}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.9rem', textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>📍 สถานี:</label>
-            <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) setActiveStation(stat); }} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', color: '#1e293b', minWidth: '160px', outline: 'none', cursor: 'pointer' }}>
-              <option value="">-- เลือกสถานี --</option>
+            <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.95rem', textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>📍 สถานี:</label>
+            <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) setActiveStation(stat); }} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', color: '#1e293b', fontSize: '0.95rem', minWidth: '220px', outline: 'none', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+              <option value="">-- ทุกสถานีในพื้นที่ --</option>
               {filteredStations.map(station => (<option key={station.stationID} value={station.stationID}>{station.nameTH}</option>))}
             </select>
           </div>
-          <button onClick={handleReset} style={{ padding: '6px 16px', backgroundColor: '#ffffff', color: '#0ea5e9', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+          <button onClick={handleReset} style={{ padding: '8px 16px', backgroundColor: '#ffffff', color: '#0ea5e9', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', transition: '0.2s' }} onMouseOver={(e) => e.target.style.backgroundColor = '#f1f5f9'} onMouseOut={(e) => e.target.style.backgroundColor = '#ffffff'}>
             🏠 หน้าแรก
           </button>
         </div>
 
-        {/* เวลาอัปเดต */}
         <div style={{ fontSize: '0.85rem', color: '#e0f2fe', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(0,0,0,0.15)', padding: '6px 12px', borderRadius: '20px' }}>
           <span style={{ fontSize: '1rem' }}>⏱️</span>
           อัปเดตล่าสุด: <strong style={{ color: '#fff' }}>{lastUpdateText || 'กำลังโหลด...'}</strong>
         </div>
       </header>
 
-      {/* Main Content Area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '15px', gap: '15px' }}>
         
-        {/* Left Column (Map) */}
+        {/* แผนที่ */}
         <div style={{ flex: 7, borderRadius: '12px', overflow: 'hidden', position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
-          
-          {/* Mode Buttons (Floating inside map) */}
           <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: 'rgba(255,255,255,0.9)', padding: '5px', borderRadius: '30px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', gap: '5px', backdropFilter: 'blur(4px)' }}>
             <button onClick={() => handleViewModeChange('aqi')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isAqiMode ? '#0ea5e9' : 'transparent', color: isAqiMode ? '#fff' : '#64748b' }}>☁️ AQI</button>
             <button onClick={() => handleViewModeChange('temp')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isTempMode ? '#22c55e' : 'transparent', color: isTempMode ? '#fff' : '#64748b' }}>🌡️ อุณหภูมิ</button>
@@ -491,7 +469,7 @@ export default function App() {
 
           <MapContainer center={[13.5, 101.0]} zoom={6} style={{ height: '100%', width: '100%', backgroundColor: '#bae6fd', zIndex: 1 }}>
             <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} />
+            <FitBounds stations={filteredStations} activeStation={activeStation} />
             <FlyToActiveStation activeStation={activeStation} />
 
             {filteredStations.map((station) => {
@@ -538,12 +516,11 @@ export default function App() {
           </MapContainer>
         </div>
 
-        {/* 🚀 3. Right Column (Sidebar) */}
+        {/* Sidebar ขวา */}
         <div style={{ flex: 3, minWidth: '380px', maxWidth: '450px', backgroundColor: '#ffffff', borderRadius: '12px', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          
           <div style={{ padding: '15px 20px', background: isAqiMode ? '#f0f9ff' : isTempMode ? '#f0fdf4' : isUvMode ? '#faf5ff' : isRainMode ? '#eff6ff' : isWindMode ? '#f8fafc' : '#fff7ed', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: '1rem', color: '#1e293b', margin: 0, fontWeight: 'bold' }}>
-              {isAqiMode ? 'มลพิษ (Air4Thai)' : isTempMode ? 'อุณหภูมิ (Open-Meteo)' : isUvMode ? 'รังสี UV (Open-Meteo)' : isRainMode ? 'โอกาสเกิดฝน (Open-Meteo)' : isWindMode ? 'ความเร็วลม (Open-Meteo)' : 'Heat Index (Open-Meteo)'}
+            <h2 style={{ fontSize: '1.1rem', color: '#1e293b', margin: 0, fontWeight: 'bold' }}>
+              {isAqiMode ? 'ข้อมูลมลพิษ (กรมควบคุมมลพิษ)' : isTempMode ? 'ข้อมูลอุณหภูมิ (Open-Meteo)' : isUvMode ? 'ดัชนีรังสี UV (Open-Meteo)' : isRainMode ? 'โอกาสเกิดฝน (Open-Meteo)' : isWindMode ? 'ความเร็วลม (Open-Meteo)' : 'Heat Index (Open-Meteo)'} <span style={{fontSize: '0.85rem', fontWeight: 'normal', color: '#64748b'}}>({filteredStations.length} สถานี)</span>
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', cursor: 'pointer', outline: 'none', backgroundColor: '#fff', fontWeight: 'bold', color: '#475569' }}>
@@ -572,7 +549,7 @@ export default function App() {
               } else if (isUvMode) {
                 displayMainVal = tObj?.uvMax !== undefined ? tObj.uvMax : '-'; unitLabel = 'UV'; boxBgColor = tObj ? getUvColor(tObj.uvMax).bar : '#ccc';
               } else if (isRainMode) {
-                displayMainVal = tObj?.rainProb !== undefined ? `${tObj.rainProb}%` : '-'; unitLabel = 'โอกาสตก'; boxBgColor = tObj ? getRainColor(tObj.rainProb).bar : '#ccc';
+                displayMainVal = tObj?.rainProb !== undefined ? `${tObj.rainProb}%` : '-'; unitLabel = 'โอกาสเกิดฝน'; boxBgColor = tObj ? getRainColor(tObj.rainProb).bar : '#ccc';
               } else if (isWindMode) {
                 displayMainVal = tObj?.windSpeed !== undefined ? tObj.windSpeed : '-'; unitLabel = 'km/h'; boxBgColor = tObj ? getWindColor(tObj.windSpeed).bar : '#ccc';
               }
@@ -608,7 +585,7 @@ export default function App() {
                                   <>
                                     <span style={{color: '#475569'}}>ทิศทาง: <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span></span>
                                     <span style={{color: '#cbd5e1'}}>|</span>
-                                    <span style={{color: '#475569'}}>สูงสุด: {tObj.windMax} km/h</span>
+                                    <span style={{color: '#475569'}}>ความเร็วลมสูงสุด: {tObj.windMax} km/h</span>
                                   </>
                                 ) : (
                                   <>
