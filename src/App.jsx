@@ -83,7 +83,6 @@ const getWindColor = (val) => {
 
 const extractProvince = (areaTH) => {
   if (!areaTH) return 'ไม่ระบุ';
-  // ดักจับกรุงเทพ
   if (areaTH.includes('กรุงเทพ') || areaTH.includes('กทม') || areaTH.includes('เขต')) {
     return 'กรุงเทพมหานคร';
   }
@@ -171,7 +170,6 @@ function FitBounds({ stations, activeStation }) {
     if (activeStation) return; 
     if (stations && stations.length > 0) {
       const bounds = L.latLngBounds(stations.map(s => [parseFloat(s.lat), parseFloat(s.long)]));
-      // ✅ ซูมเข้าจังหวัดได้พอดี
       map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 }); 
     }
   }, [stations, map, activeStation]);
@@ -223,13 +221,9 @@ export default function App() {
   const fetchAirQuality = async (isBackgroundLoad = false) => {
     if (!isBackgroundLoad) setLoading(true);
     try {
-      // ✅ แก้ปัญหา Cache ไม่อัปเดต
       const response = await fetch(`/api-air/services/getNewAQI_JSON.php?_t=${new Date().getTime()}`, {
         cache: 'no-store',
-        headers: {
-          'Pragma': 'no-cache',
-          'Cache-Control': 'no-cache'
-        }
+        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
       });
       if (!response.ok) throw new Error('Network error');
       const data = await response.json();
@@ -419,105 +413,124 @@ export default function App() {
   const isWindMode = viewMode === 'wind';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#f4f6f9', fontFamily: "'Kanit', sans-serif" }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#f1f5f9', fontFamily: "'Kanit', sans-serif" }}>
       
-      {/* แถบด้านบน (Filter & Reset) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '15px 30px', backgroundColor: '#ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <label style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>🗺️ จังหวัด:</label>
-          <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', minWidth: '180px' }}>
-            <option value="">-- ทุกจังหวัด --</option>
-            {provinces.map(prov => (<option key={prov} value={prov}>{prov}</option>))}
-          </select>
+      {/* 🚀 1. Header แบบ Dashboard ระดับมืออาชีพ */}
+      <header style={{ backgroundColor: '#1e293b', color: '#fff', padding: '12px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', zIndex: 1000 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <span style={{ fontSize: '2rem' }}>🇹🇭</span>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>Thailand Environment Dashboard</h1>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#cbd5e1' }}>ระบบเฝ้าระวังคุณภาพอากาศและสภาพอากาศแบบเรียลไทม์</p>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <label style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>📍 สถานี:</label>
-          {/* ✅ ปลดล็อก disabled */}
-          <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) setActiveStation(stat); }} style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', minWidth: '180px' }}>
-            <option value="">-- เลือกสถานี --</option>
-            {filteredStations.map(station => (<option key={station.stationID} value={station.stationID}>{station.nameTH}</option>))}
-          </select>
+        <div style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#334155', padding: '6px 12px', borderRadius: '20px' }}>
+          <span style={{ fontSize: '1rem' }}>⏱️</span>
+          อัปเดตล่าสุด: <strong style={{ color: '#fff' }}>{lastUpdateText || 'กำลังโหลด...'}</strong>
         </div>
+      </header>
 
-        <button onClick={handleReset} style={{ padding: '8px 16px', backgroundColor: '#f1f2f6', color: '#2f3542', border: '1px solid #ced6e0', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-          🏠 หน้าแรก
-        </button>
-        <div style={{ marginLeft: 'auto', fontSize: '0.95rem', color: '#555', fontWeight: 'bold' }}>
-          ข้อมูลอัปเดต: <span style={{ color: '#0984e3' }}>{lastUpdateText}</span>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* Main Content Area */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '15px', gap: '15px' }}>
         
-        {/* แผนที่ */}
-        <div style={{ flex: 7, height: '100%', position: 'relative', zIndex: 1 }}>
-          <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 1000, background: '#fff', padding: '4px', borderRadius: '30px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '80%' }}>
-            <button onClick={() => handleViewModeChange('aqi')} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isAqiMode ? '#0984e3' : 'transparent', color: isAqiMode ? '#fff' : '#666' }}>☁️ AQI</button>
-            <button onClick={() => handleViewModeChange('temp')} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isTempMode ? '#2ecc71' : 'transparent', color: isTempMode ? '#fff' : '#666' }}>🌡️ อุณหภูมิ</button>
-            <button onClick={() => handleViewModeChange('heat')} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isHeatMode ? '#e67e22' : 'transparent', color: isHeatMode ? '#fff' : '#666' }}>🥵 Heat Index</button>
-            <button onClick={() => handleViewModeChange('uv')} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isUvMode ? '#9b59b6' : 'transparent', color: isUvMode ? '#fff' : '#666' }}>☀️ UV</button>
-            <button onClick={() => handleViewModeChange('rain')} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isRainMode ? '#0984e3' : 'transparent', color: isRainMode ? '#fff' : '#666' }}>🌧️ ฝน</button>
-            <button onClick={() => handleViewModeChange('wind')} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isWindMode ? '#34495e' : 'transparent', color: isWindMode ? '#fff' : '#666' }}>🌬️ ลม</button>
+        {/* Left Column (Filters + Map) */}
+        <div style={{ flex: 7, display: 'flex', flexDirection: 'column', gap: '15px', minWidth: 0 }}>
+          
+          {/* 🚀 2. Control Bar (ตัวกรองพอดีกับแผนที่) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', padding: '12px 20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ fontWeight: 'bold', color: '#475569', fontSize: '0.9rem' }}>🗺️ จังหวัด:</label>
+                <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontFamily: 'inherit', minWidth: '180px', outline: 'none' }}>
+                  <option value="">-- ทุกจังหวัด --</option>
+                  {provinces.map(prov => (<option key={prov} value={prov}>{prov}</option>))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ fontWeight: 'bold', color: '#475569', fontSize: '0.9rem' }}>📍 สถานี:</label>
+                <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) setActiveStation(stat); }} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontFamily: 'inherit', minWidth: '200px', outline: 'none' }}>
+                  <option value="">-- เลือกสถานี --</option>
+                  {filteredStations.map(station => (<option key={station.stationID} value={station.stationID}>{station.nameTH}</option>))}
+                </select>
+              </div>
+            </div>
+            <button onClick={handleReset} style={{ padding: '6px 16px', backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: '0.2s' }} onMouseOver={(e) => e.target.style.backgroundColor = '#e2e8f0'} onMouseOut={(e) => e.target.style.backgroundColor = '#f1f5f9'}>
+              🏠 หน้าแรก
+            </button>
           </div>
 
-          <MapContainer center={[13.0, 100.0]} zoom={6} style={{ height: '100%', width: '100%', backgroundColor: '#aad3df' }}>
-            <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <FitBounds stations={filteredStations} activeStation={activeStation} />
-            <FlyToActiveStation activeStation={activeStation} />
+          {/* Map Container */}
+          <div style={{ flex: 1, borderRadius: '12px', overflow: 'hidden', position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+            
+            {/* Mode Buttons (Floating inside map) */}
+            <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: 'rgba(255,255,255,0.9)', padding: '5px', borderRadius: '30px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', gap: '5px', backdropFilter: 'blur(4px)' }}>
+              <button onClick={() => handleViewModeChange('aqi')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isAqiMode ? '#0ea5e9' : 'transparent', color: isAqiMode ? '#fff' : '#64748b' }}>☁️ AQI</button>
+              <button onClick={() => handleViewModeChange('temp')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isTempMode ? '#22c55e' : 'transparent', color: isTempMode ? '#fff' : '#64748b' }}>🌡️ อุณหภูมิ</button>
+              <button onClick={() => handleViewModeChange('heat')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isHeatMode ? '#f97316' : 'transparent', color: isHeatMode ? '#fff' : '#64748b' }}>🥵 Heat Index</button>
+              <button onClick={() => handleViewModeChange('uv')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isUvMode ? '#a855f7' : 'transparent', color: isUvMode ? '#fff' : '#64748b' }}>☀️ UV</button>
+              <button onClick={() => handleViewModeChange('rain')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isRainMode ? '#3b82f6' : 'transparent', color: isRainMode ? '#fff' : '#64748b' }}>🌧️ ฝน</button>
+              <button onClick={() => handleViewModeChange('wind')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isWindMode ? '#475569' : 'transparent', color: isWindMode ? '#fff' : '#64748b' }}>🌬️ ลม</button>
+            </div>
 
-            {filteredStations.map((station) => {
-              const aqiValue = station.AQILast?.AQI?.aqi || 0;
-              const tObj = stationTemps[station.stationID];
-              const aqiInfo = getAqiDetails(aqiValue);
-              
-              let markerVal = null;
-              if (isAqiMode) markerVal = aqiValue;
-              else if (isTempMode) markerVal = tObj?.temp;
-              else if (isHeatMode) markerVal = tObj?.feelsLike;
-              else if (isUvMode) markerVal = tObj?.uvMax;
-              else if (isRainMode) markerVal = tObj?.rainProb;
-              else if (isWindMode) markerVal = tObj?.windSpeed;
+            <MapContainer center={[13.0, 100.0]} zoom={6} style={{ height: '100%', width: '100%', backgroundColor: '#bae6fd', zIndex: 1 }}>
+              <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <FitBounds stations={filteredStations} activeStation={activeStation} />
+              <FlyToActiveStation activeStation={activeStation} />
 
-              return (
-                <Marker key={station.stationID} position={[parseFloat(station.lat), parseFloat(station.long)]} icon={createCustomMarker(viewMode, markerVal, aqiInfo.level, tObj)} ref={(ref) => markerRefs.current[station.stationID] = ref} eventHandlers={{ click: () => setActiveStation(station) }}>
-                  <Popup minWidth={260}>
-                    <div style={{ textAlign: 'center', fontFamily: 'Kanit' }}>
-                      <strong style={{ fontSize: '1.1rem' }}>{station.nameTH}</strong><br/>
-                      <div style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                        <span style={{ fontSize: '1.2rem', color: aqiInfo.color === '#ffff00' ? '#d4b500' : aqiInfo.color, fontWeight: 'bold' }}>AQI: {aqiValue} ({aqiInfo.text})</span>
-                      </div>
-                      
-                      {tObj && (
-                        <div style={{ marginTop: '10px', padding: '12px', backgroundColor: '#fff7e6', borderRadius: '8px', color: '#d35400', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left' }}>
-                              <span>🌡️ {tObj.temp?.toFixed(1) || '-'} °C</span>
-                              <span>🥵 รู้สึก: {tObj.feelsLike?.toFixed(1) || '-'} °C</span>
-                              <span style={{color: '#0984e3'}}>💧 ชื้น: {tObj.humidity || '-'}%</span>
-                              <span style={{color: '#0984e3'}}>🌧️ ฝน: {tObj.rainProb || '0'}%</span>
-                              <span style={{color: '#9b59b6'}}>☀️ UV: {tObj.uvMax || '-'}</span>
-                              <span style={{color: '#34495e', display: 'flex', alignItems: 'center', gap: '2px'}}>
-                                🌬️ ลม: {tObj.windSpeed || '-'} <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span>
-                              </span>
-                          </div>
+              {filteredStations.map((station) => {
+                const aqiValue = station.AQILast?.AQI?.aqi || 0;
+                const tObj = stationTemps[station.stationID];
+                const aqiInfo = getAqiDetails(aqiValue);
+                
+                let markerVal = null;
+                if (isAqiMode) markerVal = aqiValue;
+                else if (isTempMode) markerVal = tObj?.temp;
+                else if (isHeatMode) markerVal = tObj?.feelsLike;
+                else if (isUvMode) markerVal = tObj?.uvMax;
+                else if (isRainMode) markerVal = tObj?.rainProb;
+                else if (isWindMode) markerVal = tObj?.windSpeed;
+
+                return (
+                  <Marker key={station.stationID} position={[parseFloat(station.lat), parseFloat(station.long)]} icon={createCustomMarker(viewMode, markerVal, aqiInfo.level, tObj)} ref={(ref) => markerRefs.current[station.stationID] = ref} eventHandlers={{ click: () => setActiveStation(station) }}>
+                    <Popup minWidth={260}>
+                      <div style={{ textAlign: 'center', fontFamily: 'Kanit' }}>
+                        <strong style={{ fontSize: '1.1rem' }}>{station.nameTH}</strong><br/>
+                        <div style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                          <span style={{ fontSize: '1.2rem', color: aqiInfo.color === '#ffff00' ? '#d4b500' : aqiInfo.color, fontWeight: 'bold' }}>AQI: {aqiValue} ({aqiInfo.text})</span>
                         </div>
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
-          </MapContainer>
+                        
+                        {tObj && (
+                          <div style={{ marginTop: '10px', padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px', color: '#334155', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left' }}>
+                                <span>🌡️ {tObj.temp?.toFixed(1) || '-'} °C</span>
+                                <span>🥵 รู้สึก: {tObj.feelsLike?.toFixed(1) || '-'} °C</span>
+                                <span style={{color: '#0ea5e9'}}>💧 ชื้น: {tObj.humidity || '-'}%</span>
+                                <span style={{color: '#0ea5e9'}}>🌧️ ฝน: {tObj.rainProb || '0'}%</span>
+                                <span style={{color: '#a855f7'}}>☀️ UV: {tObj.uvMax || '-'}</span>
+                                <span style={{color: '#475569', display: 'flex', alignItems: 'center', gap: '2px'}}>
+                                  🌬️ ลม: {tObj.windSpeed || '-'} <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span>
+                                </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
+            </MapContainer>
+          </div>
         </div>
 
-        {/* Sidebar ขวา */}
-        <div style={{ flex: 3, minWidth: '380px', maxWidth: '450px', backgroundColor: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 15px rgba(0,0,0,0.05)', zIndex: 2 }}>
-          <div style={{ padding: '15px 20px', background: isAqiMode ? '#fff' : isTempMode ? '#f0fdf4' : isUvMode ? '#fdf2f8' : isRainMode ? '#eff6ff' : isWindMode ? '#f8f9fa' : '#fffaf0', borderBottom: '1px solid #eee', transition: 'background 0.3s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: '1.1rem', color: '#2c3e50', margin: 0, fontWeight: 'bold' }}>
-              {isAqiMode ? 'ข้อมูลมลพิษ' : isTempMode ? 'ข้อมูลอุณหภูมิ' : isUvMode ? 'ดัชนีรังสี UV' : isRainMode ? 'โอกาสเกิดฝน' : isWindMode ? 'ความเร็วลม' : 'Heat Index (ดัชนีความร้อน)'} ({filteredStations.length})
+        {/* 🚀 3. Right Column (Sidebar) */}
+        <div style={{ flex: 3, minWidth: '380px', maxWidth: '450px', backgroundColor: '#ffffff', borderRadius: '12px', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          
+          <div style={{ padding: '15px 20px', background: isAqiMode ? '#f0f9ff' : isTempMode ? '#f0fdf4' : isUvMode ? '#faf5ff' : isRainMode ? '#eff6ff' : isWindMode ? '#f8fafc' : '#fff7ed', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: '1rem', color: '#1e293b', margin: 0, fontWeight: 'bold' }}>
+              {isAqiMode ? 'มลพิษ (Air4Thai)' : isTempMode ? 'อุณหภูมิ (Open-Meteo)' : isUvMode ? 'รังสี UV (Open-Meteo)' : isRainMode ? 'โอกาสเกิดฝน (Open-Meteo)' : isWindMode ? 'ความเร็วลม (Open-Meteo)' : 'Heat Index (Open-Meteo)'}
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '0.8rem', color: '#666' }}>เรียง:</span>
-              <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '0.85rem', cursor: 'pointer', outline: 'none', backgroundColor: '#fff', fontWeight: 'bold', color: '#444' }}>
+              <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', cursor: 'pointer', outline: 'none', backgroundColor: '#fff', fontWeight: 'bold', color: '#475569' }}>
                 <option value="desc">⬇️ มากไปน้อย</option>
                 <option value="asc">⬆️ น้อยไปมาก</option>
               </select>
@@ -550,71 +563,71 @@ export default function App() {
 
               return (
                 <div key={station.stationID} ref={el => cardRefs.current[station.stationID] = el} onClick={() => setActiveStation(station)}
-                  style={{ display: 'flex', flexDirection: 'column', background: isActive ? '#f8fbff' : '#fff', border: isActive ? '1px solid #007bff' : '1px solid #eee', borderLeft: `6px solid ${boxBgColor}`, borderRadius: '10px', padding: '15px', marginBottom: '15px', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: isActive ? '0 5px 15px rgba(0,123,255,0.1)' : '0 2px 5px rgba(0,0,0,0.02)' }}>
+                  style={{ display: 'flex', flexDirection: 'column', background: isActive ? '#f8fafc' : '#fff', border: isActive ? '1px solid #94a3b8' : '1px solid #e2e8f0', borderLeft: `6px solid ${boxBgColor}`, borderRadius: '10px', padding: '15px', marginBottom: '15px', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: isActive ? '0 4px 10px rgba(0,0,0,0.05)' : '0 1px 3px rgba(0,0,0,0.02)' }}>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                     <div style={{ flex: 1, paddingRight: '10px' }}>
-                      <h4 style={{ fontSize: '1rem', color: '#333', marginBottom: '2px', fontWeight: 'bold' }}>{station.nameTH}</h4>
-                      <p style={{ fontSize: '0.8rem', color: '#007bff', marginBottom: '8px', fontWeight: 'bold', margin: 0 }}>{extractProvince(station.areaTH)}</p>
+                      <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '2px', fontWeight: 'bold' }}>{station.nameTH}</h4>
+                      <p style={{ fontSize: '0.8rem', color: '#3b82f6', marginBottom: '8px', fontWeight: 'bold', margin: 0 }}>{extractProvince(station.areaTH)}</p>
                       
                       <div style={{ minHeight: '35px', display: 'flex', alignItems: 'center', marginTop: '10px' }}>
                         {isAqiMode ? (
-                          <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: '#555' }}>
+                          <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: '#475569' }}>
                             <span>PM2.5: <strong style={{ color: getPM25Color(station.AQILast?.PM25?.value) }}>{station.AQILast?.PM25?.value || '-'}</strong></span>
                             <span>PM10: <strong style={{ color: getPM10Color(station.AQILast?.PM10?.value) }}>{station.AQILast?.PM10?.value || '-'}</strong></span>
                           </div>
                         ) : (
                           <div style={{ width: '100%' }}>
                             {tObj ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b', fontWeight: 'bold' }}>
                                 {isUvMode ? (
                                   <span style={{ color: getUvColor(tObj.uvMax).color }}>ระดับ: {getUvColor(tObj.uvMax).label}</span>
                                 ) : isRainMode ? (
                                   <>
-                                    <span style={{color: '#0984e3'}}>💧 ความชื้น: {tObj.humidity}%</span>
-                                    <span style={{color: '#ccc'}}>|</span>
-                                    <span style={{color: '#0984e3'}}>คาดการณ์: {getRainColor(tObj.rainProb).label}</span>
+                                    <span style={{color: '#0ea5e9'}}>💧 ความชื้น: {tObj.humidity}%</span>
+                                    <span style={{color: '#cbd5e1'}}>|</span>
+                                    <span style={{color: '#0ea5e9'}}>แนวโน้ม: {getRainColor(tObj.rainProb).label}</span>
                                   </>
                                 ) : isWindMode ? (
                                   <>
-                                    <span style={{color: '#34495e'}}>ทิศทาง: <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span></span>
-                                    <span style={{color: '#ccc'}}>|</span>
-                                    <span style={{color: '#34495e'}}>ความเร็วลมสูงสุด: {tObj.windMax} km/h</span>
+                                    <span style={{color: '#475569'}}>ทิศทาง: <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span></span>
+                                    <span style={{color: '#cbd5e1'}}>|</span>
+                                    <span style={{color: '#475569'}}>สูงสุด: {tObj.windMax} km/h</span>
                                   </>
                                 ) : (
                                   <>
-                                    <span><span style={{color: '#3498db'}}>●</span>ต่ำสุด {tObj.tempMin?.toFixed(1)}°</span>
-                                    <span style={{color: '#ccc'}}>|</span>
-                                    <span><span style={{color: '#e74c3c'}}>●</span>สูงสุด {tObj.tempMax?.toFixed(1)}°</span>
+                                    <span><span style={{color: '#3b82f6'}}>●</span>ต่ำสุด {tObj.tempMin?.toFixed(1)}°</span>
+                                    <span style={{color: '#cbd5e1'}}>|</span>
+                                    <span><span style={{color: '#ef4444'}}>●</span>สูงสุด {tObj.tempMax?.toFixed(1)}°</span>
                                   </>
                                 )}
                               </div>
-                            ) : (<span style={{ fontSize: '0.8rem', color: '#999' }}>ไม่มีข้อมูล</span>)}
+                            ) : (<span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>ไม่มีข้อมูล</span>)}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div style={{ backgroundColor: boxBgColor, color: (isAqiMode && aqiInfo.level === 3) || (isUvMode && tObj?.uvMax <= 5) ? '#222' : '#fff', minWidth: '65px', height: '65px', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', flexShrink: 0 }}>
-                      <span style={{ fontSize: '1.4rem', fontWeight: 'bold', lineHeight: 1 }}>{displayMainVal}</span>
-                      <span style={{ fontSize: '0.7rem', opacity: 0.9, marginTop: '2px', fontWeight: 'bold' }}>{unitLabel}</span>
+                    <div style={{ backgroundColor: boxBgColor, color: (isAqiMode && aqiInfo.level === 3) || (isUvMode && tObj?.uvMax <= 5) ? '#1e293b' : '#fff', minWidth: '60px', height: '60px', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', flexShrink: 0 }}>
+                      <span style={{ fontSize: '1.3rem', fontWeight: 'bold', lineHeight: 1 }}>{displayMainVal}</span>
+                      <span style={{ fontSize: '0.65rem', opacity: 0.9, marginTop: '2px', fontWeight: 'bold' }}>{unitLabel}</span>
                     </div>
                   </div>
 
                   {isActive && (
-                    <div style={{ borderTop: '1px solid #eee', marginTop: '15px', paddingTop: '15px' }}>
+                    <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '15px', paddingTop: '15px' }}>
                       {isAqiMode ? (
                         <div>
-                          <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
-                          {activeForecast === null ? <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>กำลังโหลด...</p> : (
+                          <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
+                          {activeForecast === null ? <p style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>กำลังโหลด...</p> : (
                             <div style={{ height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '2px', paddingTop: '10px' }}>
                               {activeForecast.map((data, index) => {
                                 const heightPercent = Math.max((data.val / (Math.max(...activeForecast.map(d => d.val)) + 15)) * 100, 5); 
                                 return (
                                   <div key={index} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }} title={`${data.time} = ${data.val} µg/m³`}>
-                                    <span style={{ fontSize: '8.5px', color: '#555', marginBottom: '3px', fontWeight: 'bold' }}>{data.val}</span>
-                                    <div style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.color, borderRadius: '2px 2px 0 0', opacity: 0.85 }}></div>
-                                    <div style={{ fontSize: '8px', color: '#999', marginTop: '4px', height: '12px' }}>{index % 3 === 0 ? data.time : ''}</div>
+                                    <span style={{ fontSize: '8.5px', color: '#64748b', marginBottom: '3px', fontWeight: 'bold' }}>{data.val}</span>
+                                    <div style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.color, borderRadius: '2px 2px 0 0', opacity: 0.9 }}></div>
+                                    <div style={{ fontSize: '8px', color: '#94a3b8', marginTop: '4px', height: '12px' }}>{index % 3 === 0 ? data.time : ''}</div>
                                   </div>
                                 );
                               })}
@@ -623,9 +636,9 @@ export default function App() {
                         </div>
                       ) : (
                         <div>
-                          {activeWeather === null ? <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>กำลังโหลดข้อมูลพยากรณ์...</p> : (
+                          {activeWeather === null ? <p style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>กำลังโหลดข้อมูลพยากรณ์...</p> : (
                             <>
-                              <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>
+                              <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px' }}>
                                 📈 คาดการณ์{isUvMode ? ' UV สูงสุด' : isRainMode ? 'โอกาสเกิดฝน' : isHeatMode ? ' Heat Index สูงสุด' : isWindMode ? 'ความเร็วลมสูงสุด' : 'อุณหภูมิสูงสุด'} 7 วัน
                               </h5>
                               <div style={{ height: '110px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '6px', paddingTop: '10px' }}>
@@ -638,11 +651,11 @@ export default function App() {
                                     const heightPercent = Math.max((data.val / maxVal) * 100, 5); 
                                     return (
                                       <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: data.colorInfo.color || '#333', marginBottom: '4px' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: data.colorInfo.color || '#475569', marginBottom: '4px' }}>
                                           {data.val}{isRainMode ? '%' : isTempMode || isHeatMode ? '°' : ''}
                                         </span>
                                         <div title={`${data.time}: ${data.val}`} style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: data.colorInfo.bar, borderRadius: '4px 4px 0 0' }}></div>
-                                        <div style={{ fontSize: '11px', color: index <= 1 ? '#0984e3' : '#666', marginTop: '6px', fontWeight: index <= 1 ? 'bold' : 'normal' }}>
+                                        <div style={{ fontSize: '11px', color: index <= 1 ? '#0ea5e9' : '#64748b', marginTop: '6px', fontWeight: index <= 1 ? 'bold' : 'normal' }}>
                                           {data.time}
                                         </div>
                                       </div>
