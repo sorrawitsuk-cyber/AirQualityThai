@@ -17,25 +17,14 @@ const getAqiDetails = (aqiValue) => {
   return { color: '#ff0000', text: 'มีผลกระทบ', level: 5 };
 };
 
-// สีตามเกณฑ์ PM2.5 ของไทย
 const getPM25Color = (val) => {
   const num = Number(val);
   if (isNaN(num)) return '#cccccc';
-  if (num <= 15.0) return '#00b0f0'; // ฟ้า (ดีมาก)
-  if (num <= 25.0) return '#92d050'; // เขียว (ดี)
-  if (num <= 37.5) return '#ffff00'; // เหลือง (ปานกลาง)
-  if (num <= 75.0) return '#ffc000'; // ส้ม (เริ่มมีผลกระทบ)
-  return '#ff0000'; // แดง (มีผลกระทบ)
-};
-
-const getPM10Color = (val) => {
-  const num = Number(val);
-  if (isNaN(num)) return '#333333';
-  if (num <= 50) return '#00b0f0';
-  if (num <= 80) return '#92d050';
-  if (num <= 120) return '#ffff00';
-  if (num <= 180) return '#ffc000';
-  return '#ff0000';
+  if (num <= 15.0) return '#00b0f0'; 
+  if (num <= 25.0) return '#92d050'; 
+  if (num <= 37.5) return '#ffff00'; 
+  if (num <= 75.0) return '#ffc000'; 
+  return '#ff0000'; 
 };
 
 const getTempColor = (val) => {
@@ -101,9 +90,7 @@ const getWeatherIcon = (code) => {
 
 const extractProvince = (areaTH) => {
   if (!areaTH) return 'ไม่ระบุ';
-  if (areaTH.includes('กรุงเทพ') || areaTH.includes('กทม') || areaTH.includes('เขต')) {
-    return 'กรุงเทพมหานคร';
-  }
+  if (areaTH.includes('กรุงเทพ') || areaTH.includes('กทม') || areaTH.includes('เขต')) return 'กรุงเทพมหานคร';
   let province = areaTH;
   if (areaTH.includes(',')) {
     const parts = areaTH.split(',');
@@ -115,6 +102,69 @@ const extractProvince = (areaTH) => {
   return province.replace(/^จ\./, '').trim();
 };
 
+// 🚀 1.1 ข้อมูลสำหรับแสดงผลในกล่อง Legend
+const legendData = {
+  pm25: {
+    title: 'ระดับ PM2.5 (µg/m³)',
+    items: [
+      { color: '#00b0f0', label: '0-15 (ดีมาก)' },
+      { color: '#92d050', label: '16-25 (ดี)' },
+      { color: '#ffff00', label: '26-37.5 (ปานกลาง)' },
+      { color: '#ffc000', label: '38-75 (เริ่มมีผลกระทบ)' },
+      { color: '#ff0000', label: '>75 (มีผลกระทบ)' },
+    ]
+  },
+  temp: {
+    title: 'อุณหภูมิ (°C)',
+    items: [
+      { color: '#3498db', label: '< 27 (เย็นสบาย)' },
+      { color: '#2ecc71', label: '27-32 (ปกติ)' },
+      { color: '#f1c40f', label: '33-35 (ร้อน)' },
+      { color: '#e67e22', label: '36-38 (ร้อนมาก)' },
+      { color: '#e74c3c', label: '> 38 (ร้อนจัด)' },
+    ]
+  },
+  heat: {
+    title: 'Heat Index (°C)',
+    items: [
+      { color: '#22c55e', label: '< 27 (ปกติ)' },
+      { color: '#eab308', label: '27-31 (เฝ้าระวัง)' },
+      { color: '#f97316', label: '32-40 (เตือนภัย)' },
+      { color: '#ef4444', label: '> 41 (อันตราย)' },
+    ]
+  },
+  uv: {
+    title: 'รังสี UV',
+    items: [
+      { color: '#2ecc71', label: '0-2 (ต่ำ)' },
+      { color: '#f1c40f', label: '3-5 (ปานกลาง)' },
+      { color: '#e67e22', label: '6-7 (สูง)' },
+      { color: '#e74c3c', label: '8-10 (สูงมาก)' },
+      { color: '#9b59b6', label: '> 10 (อันตราย)' },
+    ]
+  },
+  rain: {
+    title: 'โอกาสเกิดฝน (%)',
+    items: [
+      { color: '#95a5a6', label: '0 (ไม่มีฝน)' },
+      { color: '#74b9ff', label: '1-30 (โอกาสต่ำ)' },
+      { color: '#0984e3', label: '31-60 (ปานกลาง)' },
+      { color: '#273c75', label: '61-80 (โอกาสสูง)' },
+      { color: '#192a56', label: '> 80 (ตกหนัก)' },
+    ]
+  },
+  wind: {
+    title: 'ความเร็วลม (km/h)',
+    items: [
+      { color: '#00b0f0', label: '0-10 (ลมอ่อน)' },
+      { color: '#2ecc71', label: '11-25 (ลมปานกลาง)' },
+      { color: '#f1c40f', label: '26-40 (ลมแรง)' },
+      { color: '#e67e22', label: '41-60 (ลมแรงมาก)' },
+      { color: '#e74c3c', label: '> 60 (พายุ)' },
+    ]
+  }
+};
+
 // ==============================================================
 // 2. Map Components
 // ==============================================================
@@ -122,9 +172,8 @@ const createCustomMarker = (viewMode, value, extraData) => {
   let bg, textColor, displayValue;
   const fontSize = String(value).length > 2 ? '9px' : '11px';
 
-  if (viewMode === 'pm25') { // 🚀 เปลี่ยนโหมดเป็น pm25
+  if (viewMode === 'pm25') { 
     bg = getPM25Color(value);
-    // ถ้าเป็นสีเหลือง (#ffff00) ให้ตัวหนังสือสีดำ นอกนั้นสีขาว
     textColor = (value > 25.0 && value <= 37.5) ? '#222' : '#fff';
     displayValue = (value === 0 || isNaN(value)) ? '-' : value;
   } else if (viewMode === 'temp') {
@@ -220,7 +269,7 @@ export default function App() {
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedStationId, setSelectedStationId] = useState('');
   
-  const [viewMode, setViewMode] = useState('pm25'); // 🚀 ค่าเริ่มต้นเปลี่ยนเป็น pm25
+  const [viewMode, setViewMode] = useState('pm25'); 
   const [sortOrder, setSortOrder] = useState('desc'); 
   
   const [stationTemps, setStationTemps] = useState({});
@@ -282,10 +331,7 @@ export default function App() {
       try {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max,wind_speed_10m_max&past_days=1&forecast_days=1&timezone=Asia%2FBangkok`;
         const res = await fetch(url);
-        if (!res.ok) {
-          console.warn(`⚠️ Open-Meteo API Error: Status ${res.status}`);
-          continue; 
-        }
+        if (!res.ok) continue; 
         
         const weatherData = await res.json();
         const results = Array.isArray(weatherData) ? weatherData : [weatherData];
@@ -329,7 +375,7 @@ export default function App() {
     
     result.sort((a, b) => {
       let valA, valB;
-      if (viewMode === 'pm25') { // 🚀 จัดเรียงตาม PM2.5
+      if (viewMode === 'pm25') { 
         valA = Number(a.AQILast?.PM25?.value); valB = Number(b.AQILast?.PM25?.value);
       } else if (viewMode === 'temp') {
         valA = stationTemps[a.stationID]?.temp; valB = stationTemps[b.stationID]?.temp;
@@ -432,7 +478,7 @@ export default function App() {
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem', color: '#555' }}>กำลังโหลดข้อมูลสถานีทั่วประเทศ...</div>;
 
-  const isPm25Mode = viewMode === 'pm25'; // 🚀
+  const isPm25Mode = viewMode === 'pm25'; 
   const isTempMode = viewMode === 'temp';
   const isHeatMode = viewMode === 'heat';
   const isUvMode = viewMode === 'uv';
@@ -454,7 +500,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* ตัวกรอง */}
         <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '15px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '8px 20px', borderRadius: '12px', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)', overflowX: 'auto', whiteSpace: 'nowrap', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.95rem', textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>🗺️ จังหวัด:</label>
@@ -486,7 +531,6 @@ export default function App() {
         {/* แผนที่ */}
         <div style={{ flex: 7, borderRadius: '12px', overflow: 'hidden', position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', minHeight: window.innerWidth < 768 ? '50vh' : 'auto' }}>
           
-          {/* ปุ่มเปลี่ยนโหมด */}
           <div className="hide-scrollbar" style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: '30px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', gap: '8px', backdropFilter: 'blur(4px)', maxWidth: '85%', overflowX: 'auto', whiteSpace: 'nowrap', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <button onClick={() => handleViewModeChange('pm25')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isPm25Mode ? '#0ea5e9' : 'transparent', color: isPm25Mode ? '#fff' : '#64748b' }}>☁️ PM2.5</button>
             <button onClick={() => handleViewModeChange('temp')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isTempMode ? '#22c55e' : 'transparent', color: isTempMode ? '#fff' : '#64748b' }}>🌡️ อุณหภูมิ</button>
@@ -496,13 +540,28 @@ export default function App() {
             <button onClick={() => handleViewModeChange('wind')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isWindMode ? '#475569' : 'transparent', color: isWindMode ? '#fff' : '#64748b' }}>🌬️ ลม</button>
           </div>
 
+          {/* 🚀 กล่อง Legend (คำอธิบายสัญลักษณ์) แสดงที่มุมซ้ายล่าง */}
+          <div style={{ position: 'absolute', bottom: '25px', left: '15px', zIndex: 500, background: 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', backdropFilter: 'blur(4px)', border: '1px solid #e2e8f0' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#1e293b', fontWeight: 'bold' }}>
+              {legendData[viewMode].title}
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {legendData[viewMode].items.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '14px', height: '14px', backgroundColor: item.color, borderRadius: '50%', border: '1px solid rgba(0,0,0,0.1)' }}></span>
+                  <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: '500' }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <MapContainer center={[13.5, 101.0]} zoom={6} style={{ height: '100%', width: '100%', backgroundColor: '#bae6fd', zIndex: 1 }}>
             <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} />
             <FlyToActiveStation activeStation={activeStation} />
 
             {filteredStations.map((station) => {
-              const pm25Value = Number(station.AQILast?.PM25?.value); // 🚀 ดึงค่า PM2.5 มาใช้
+              const pm25Value = Number(station.AQILast?.PM25?.value); 
               const tObj = stationTemps[station.stationID];
               
               let markerVal = null;
@@ -519,7 +578,6 @@ export default function App() {
                     <div style={{ textAlign: 'center', fontFamily: 'Kanit' }}>
                       <strong style={{ fontSize: '1.1rem' }}>{station.nameTH}</strong><br/>
                       
-                      {/* 🚀 Popup โชว์ PM2.5 เด่นๆ แล้วห้อย AQI */}
                       <div style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
                         <span style={{ fontSize: '1.2rem', color: getPM25Color(pm25Value) === '#ffff00' ? '#d4b500' : getPM25Color(pm25Value), fontWeight: 'bold' }}>
                           PM2.5: {isNaN(pm25Value) ? '-' : pm25Value} µg/m³
@@ -574,8 +632,9 @@ export default function App() {
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '15px', scrollBehavior: 'smooth' }}>
             {filteredStations.map((station) => {
-              const pm25Value = Number(station.AQILast?.PM25?.value); // 🚀 ดึง PM2.5
+              const pm25Value = Number(station.AQILast?.PM25?.value); 
               const aqiValue = station.AQILast?.AQI?.aqi || '--';
+              const aqiInfo = getAqiDetails(station.AQILast?.AQI?.aqi);
               const isActive = activeStation?.stationID === station.stationID;
               
               const tObj = stationTemps[station.stationID];
@@ -608,9 +667,9 @@ export default function App() {
                       <div style={{ minHeight: '35px', display: 'flex', alignItems: 'center', marginTop: '10px' }}>
                         {isPm25Mode ? (
                           <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: '#475569' }}>
-                            {/* 🚀 ย้าย AQI มาไว้ตรงนี้แทน */}
                             <span>AQI: <strong style={{ color: getAqiDetails(aqiValue).color === '#ffff00' ? '#d4b500' : getAqiDetails(aqiValue).color }}>{aqiValue}</strong></span>
-                            <span>PM10: <strong style={{ color: getPM10Color(station.AQILast?.PM10?.value) }}>{station.AQILast?.PM10?.value || '-'}</strong></span>
+                            {/* 🚀 เปลี่ยนจากตัวเลข PM10 เป็นข้อความบอกสถานะสุขภาพ */}
+                            <span>สถานการณ์: <strong style={{ color: aqiInfo.color === '#ffff00' ? '#d4b500' : aqiInfo.color }}>{aqiInfo.text}</strong></span>
                           </div>
                         ) : (
                           <div style={{ width: '100%' }}>
