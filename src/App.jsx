@@ -677,6 +677,7 @@ export default function App() {
                 opacity={0.65}
                 attribution='&copy; <a href="https://rainviewer.com">RainViewer</a>'
                 zIndex={10}
+                maxNativeZoom={12}
               />
             )}
 
