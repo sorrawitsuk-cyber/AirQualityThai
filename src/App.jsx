@@ -17,24 +17,25 @@ const getAqiDetails = (aqiValue) => {
   return { color: '#ff0000', text: 'มีผลกระทบ', level: 5 };
 };
 
+// สีตามเกณฑ์ PM2.5 ของไทย
 const getPM25Color = (val) => {
   const num = Number(val);
-  if (isNaN(num)) return '#333333';
-  if (num <= 15.0) return '#008bbf'; 
-  if (num <= 25.0) return '#6aa84f'; 
-  if (num <= 37.5) return '#d4b500'; 
-  if (num <= 75.0) return '#e67e22'; 
-  return '#e74c3c'; 
+  if (isNaN(num)) return '#cccccc';
+  if (num <= 15.0) return '#00b0f0'; // ฟ้า (ดีมาก)
+  if (num <= 25.0) return '#92d050'; // เขียว (ดี)
+  if (num <= 37.5) return '#ffff00'; // เหลือง (ปานกลาง)
+  if (num <= 75.0) return '#ffc000'; // ส้ม (เริ่มมีผลกระทบ)
+  return '#ff0000'; // แดง (มีผลกระทบ)
 };
 
 const getPM10Color = (val) => {
   const num = Number(val);
   if (isNaN(num)) return '#333333';
-  if (num <= 50) return '#008bbf';
-  if (num <= 80) return '#6aa84f';
-  if (num <= 120) return '#d4b500';
-  if (num <= 180) return '#e67e22';
-  return '#e74c3c';
+  if (num <= 50) return '#00b0f0';
+  if (num <= 80) return '#92d050';
+  if (num <= 120) return '#ffff00';
+  if (num <= 180) return '#ffc000';
+  return '#ff0000';
 };
 
 const getTempColor = (val) => {
@@ -117,13 +118,14 @@ const extractProvince = (areaTH) => {
 // ==============================================================
 // 2. Map Components
 // ==============================================================
-const createCustomMarker = (viewMode, value, level, extraData) => {
+const createCustomMarker = (viewMode, value, extraData) => {
   let bg, textColor, displayValue;
   const fontSize = String(value).length > 2 ? '9px' : '11px';
 
-  if (viewMode === 'aqi') {
-    bg = getAqiDetails(value).color;
-    textColor = (level >= 2 && level <= 4) ? '#222' : '#fff';
+  if (viewMode === 'pm25') { // 🚀 เปลี่ยนโหมดเป็น pm25
+    bg = getPM25Color(value);
+    // ถ้าเป็นสีเหลือง (#ffff00) ให้ตัวหนังสือสีดำ นอกนั้นสีขาว
+    textColor = (value > 25.0 && value <= 37.5) ? '#222' : '#fff';
     displayValue = (value === 0 || isNaN(value)) ? '-' : value;
   } else if (viewMode === 'temp') {
     const tempInfo = getTempColor(value);
@@ -218,7 +220,7 @@ export default function App() {
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedStationId, setSelectedStationId] = useState('');
   
-  const [viewMode, setViewMode] = useState('aqi');
+  const [viewMode, setViewMode] = useState('pm25'); // 🚀 ค่าเริ่มต้นเปลี่ยนเป็น pm25
   const [sortOrder, setSortOrder] = useState('desc'); 
   
   const [stationTemps, setStationTemps] = useState({});
@@ -270,7 +272,7 @@ export default function App() {
 
   const fetchAdvancedTemperatures = async (stations) => {
     const newTemps = {};
-    const chunkSize = 25; // โหลดทีละ 25 สถานี ป้องกันการโดนบล็อก
+    const chunkSize = 25; 
     
     for (let i = 0; i < stations.length; i += chunkSize) {
       const chunk = stations.slice(i, i + chunkSize);
@@ -309,14 +311,13 @@ export default function App() {
       } catch (err) {
         console.error("Batch Temp fetch error", err);
       }
-      await new Promise(resolve => setTimeout(resolve, 800)); // หน่วงเวลา 800ms
+      await new Promise(resolve => setTimeout(resolve, 800)); 
     }
     setStationTemps(prev => ({...prev, ...newTemps}));
   };
 
   useEffect(() => {
     fetchAirQuality();
-    // อัปเดตอัตโนมัติทุกๆ 30 นาที (1800000 ms) เพื่อความเสถียร
     const intervalId = setInterval(() => { fetchAirQuality(true); }, 1800000); 
     return () => clearInterval(intervalId);
   }, []);
@@ -328,8 +329,8 @@ export default function App() {
     
     result.sort((a, b) => {
       let valA, valB;
-      if (viewMode === 'aqi') {
-        valA = Number(a.AQILast?.AQI?.aqi); valB = Number(b.AQILast?.AQI?.aqi);
+      if (viewMode === 'pm25') { // 🚀 จัดเรียงตาม PM2.5
+        valA = Number(a.AQILast?.PM25?.value); valB = Number(b.AQILast?.PM25?.value);
       } else if (viewMode === 'temp') {
         valA = stationTemps[a.stationID]?.temp; valB = stationTemps[b.stationID]?.temp;
       } else if (viewMode === 'heat') {
@@ -431,7 +432,7 @@ export default function App() {
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem', color: '#555' }}>กำลังโหลดข้อมูลสถานีทั่วประเทศ...</div>;
 
-  const isAqiMode = viewMode === 'aqi';
+  const isPm25Mode = viewMode === 'pm25'; // 🚀
   const isTempMode = viewMode === 'temp';
   const isHeatMode = viewMode === 'heat';
   const isUvMode = viewMode === 'uv';
@@ -453,7 +454,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* ตัวกรอง (สามารถปัดเลื่อนซ้ายขวาได้ในมือถือ) */}
+        {/* ตัวกรอง */}
         <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '15px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '8px 20px', borderRadius: '12px', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)', overflowX: 'auto', whiteSpace: 'nowrap', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.95rem', textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>🗺️ จังหวัด:</label>
@@ -485,9 +486,9 @@ export default function App() {
         {/* แผนที่ */}
         <div style={{ flex: 7, borderRadius: '12px', overflow: 'hidden', position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', minHeight: window.innerWidth < 768 ? '50vh' : 'auto' }}>
           
-          {/* ปุ่มเปลี่ยนโหมด (สามารถปัดเลื่อนซ้ายขวาได้ในมือถือ) */}
+          {/* ปุ่มเปลี่ยนโหมด */}
           <div className="hide-scrollbar" style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: '30px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', gap: '8px', backdropFilter: 'blur(4px)', maxWidth: '85%', overflowX: 'auto', whiteSpace: 'nowrap', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            <button onClick={() => handleViewModeChange('aqi')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isAqiMode ? '#0ea5e9' : 'transparent', color: isAqiMode ? '#fff' : '#64748b' }}>☁️ AQI</button>
+            <button onClick={() => handleViewModeChange('pm25')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isPm25Mode ? '#0ea5e9' : 'transparent', color: isPm25Mode ? '#fff' : '#64748b' }}>☁️ PM2.5</button>
             <button onClick={() => handleViewModeChange('temp')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isTempMode ? '#22c55e' : 'transparent', color: isTempMode ? '#fff' : '#64748b' }}>🌡️ อุณหภูมิ</button>
             <button onClick={() => handleViewModeChange('heat')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isHeatMode ? '#f97316' : 'transparent', color: isHeatMode ? '#fff' : '#64748b' }}>🥵 Heat Index</button>
             <button onClick={() => handleViewModeChange('uv')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isUvMode ? '#a855f7' : 'transparent', color: isUvMode ? '#fff' : '#64748b' }}>☀️ UV</button>
@@ -501,12 +502,11 @@ export default function App() {
             <FlyToActiveStation activeStation={activeStation} />
 
             {filteredStations.map((station) => {
-              const aqiValue = station.AQILast?.AQI?.aqi || 0;
+              const pm25Value = Number(station.AQILast?.PM25?.value); // 🚀 ดึงค่า PM2.5 มาใช้
               const tObj = stationTemps[station.stationID];
-              const aqiInfo = getAqiDetails(aqiValue);
               
               let markerVal = null;
-              if (isAqiMode) markerVal = aqiValue;
+              if (isPm25Mode) markerVal = pm25Value;
               else if (isTempMode) markerVal = tObj?.temp;
               else if (isHeatMode) markerVal = tObj?.feelsLike;
               else if (isUvMode) markerVal = tObj?.uvMax;
@@ -514,12 +514,19 @@ export default function App() {
               else if (isWindMode) markerVal = tObj?.windSpeed;
 
               return (
-                <Marker key={station.stationID} position={[parseFloat(station.lat), parseFloat(station.long)]} icon={createCustomMarker(viewMode, markerVal, aqiInfo.level, tObj)} ref={(ref) => markerRefs.current[station.stationID] = ref} eventHandlers={{ click: () => setActiveStation(station) }}>
+                <Marker key={station.stationID} position={[parseFloat(station.lat), parseFloat(station.long)]} icon={createCustomMarker(viewMode, markerVal, 0, tObj)} ref={(ref) => markerRefs.current[station.stationID] = ref} eventHandlers={{ click: () => setActiveStation(station) }}>
                   <Popup minWidth={260}>
                     <div style={{ textAlign: 'center', fontFamily: 'Kanit' }}>
                       <strong style={{ fontSize: '1.1rem' }}>{station.nameTH}</strong><br/>
+                      
+                      {/* 🚀 Popup โชว์ PM2.5 เด่นๆ แล้วห้อย AQI */}
                       <div style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                        <span style={{ fontSize: '1.2rem', color: aqiInfo.color === '#ffff00' ? '#d4b500' : aqiInfo.color, fontWeight: 'bold' }}>AQI: {aqiValue} ({aqiInfo.text})</span>
+                        <span style={{ fontSize: '1.2rem', color: getPM25Color(pm25Value) === '#ffff00' ? '#d4b500' : getPM25Color(pm25Value), fontWeight: 'bold' }}>
+                          PM2.5: {isNaN(pm25Value) ? '-' : pm25Value} µg/m³
+                        </span>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px' }}>
+                          (AQI: <span style={{color: getAqiDetails(station.AQILast?.AQI?.aqi).color === '#ffff00' ? '#d4b500' : getAqiDetails(station.AQILast?.AQI?.aqi).color, fontWeight: 'bold'}}>{station.AQILast?.AQI?.aqi || '-'}</span>)
+                        </div>
                       </div>
                       
                       {tObj && (
@@ -550,9 +557,9 @@ export default function App() {
         {/* Sidebar ขวา */}
         <div style={{ flex: 3, minWidth: window.innerWidth < 768 ? '100%' : '380px', maxWidth: window.innerWidth < 768 ? '100%' : '450px', backgroundColor: '#ffffff', borderRadius: '12px', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           
-          <div style={{ padding: '15px 20px', background: isAqiMode ? '#f0f9ff' : isTempMode ? '#f0fdf4' : isUvMode ? '#faf5ff' : isRainMode ? '#eff6ff' : isWindMode ? '#f8fafc' : '#fff7ed', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '15px 20px', background: isPm25Mode ? '#f0f9ff' : isTempMode ? '#f0fdf4' : isUvMode ? '#faf5ff' : isRainMode ? '#eff6ff' : isWindMode ? '#f8fafc' : '#fff7ed', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: '1rem', color: '#1e293b', margin: 0, fontWeight: 'bold' }}>
-              {isAqiMode ? 'ข้อมูลมลพิษ (Air4Thai)' : isTempMode ? 'อุณหภูมิ (Open-Meteo)' : isUvMode ? 'ดัชนีรังสี UV (Open-Meteo)' : isRainMode ? 'โอกาสเกิดฝน (Open-Meteo)' : isWindMode ? 'ความเร็วลม (Open-Meteo)' : 'Heat Index (Open-Meteo)'} 
+              {isPm25Mode ? 'ฝุ่น PM2.5 (Air4Thai)' : isTempMode ? 'อุณหภูมิ (Open-Meteo)' : isUvMode ? 'ดัชนีรังสี UV (Open-Meteo)' : isRainMode ? 'โอกาสเกิดฝน (Open-Meteo)' : isWindMode ? 'ความเร็วลม (Open-Meteo)' : 'Heat Index (Open-Meteo)'} 
                <span style={{fontSize: '0.85rem', fontWeight: 'normal', color: '#64748b'}}>
                  ({filteredStations.length} สถานี)
                </span>
@@ -567,16 +574,16 @@ export default function App() {
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '15px', scrollBehavior: 'smooth' }}>
             {filteredStations.map((station) => {
+              const pm25Value = Number(station.AQILast?.PM25?.value); // 🚀 ดึง PM2.5
               const aqiValue = station.AQILast?.AQI?.aqi || '--';
-              const aqiInfo = getAqiDetails(station.AQILast?.AQI?.aqi);
               const isActive = activeStation?.stationID === station.stationID;
               
               const tObj = stationTemps[station.stationID];
               
               let displayMainVal = '-', unitLabel = '', boxBgColor = '#ccc';
               
-              if (isAqiMode) {
-                displayMainVal = aqiValue; unitLabel = 'AQI'; boxBgColor = aqiInfo.color;
+              if (isPm25Mode) {
+                displayMainVal = isNaN(pm25Value) ? '-' : pm25Value; unitLabel = 'µg/m³'; boxBgColor = getPM25Color(pm25Value);
               } else if (isTempMode) {
                 displayMainVal = tObj?.temp !== undefined ? tObj.temp.toFixed(1) : '-'; unitLabel = '°C'; boxBgColor = getTempColor(tObj?.temp).bar;
               } else if (isHeatMode) {
@@ -599,9 +606,10 @@ export default function App() {
                       <p style={{ fontSize: '0.8rem', color: '#3b82f6', marginBottom: '8px', fontWeight: 'bold', margin: 0 }}>{extractProvince(station.areaTH)}</p>
                       
                       <div style={{ minHeight: '35px', display: 'flex', alignItems: 'center', marginTop: '10px' }}>
-                        {isAqiMode ? (
+                        {isPm25Mode ? (
                           <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: '#475569' }}>
-                            <span>PM2.5: <strong style={{ color: getPM25Color(station.AQILast?.PM25?.value) }}>{station.AQILast?.PM25?.value || '-'}</strong></span>
+                            {/* 🚀 ย้าย AQI มาไว้ตรงนี้แทน */}
+                            <span>AQI: <strong style={{ color: getAqiDetails(aqiValue).color === '#ffff00' ? '#d4b500' : getAqiDetails(aqiValue).color }}>{aqiValue}</strong></span>
                             <span>PM10: <strong style={{ color: getPM10Color(station.AQILast?.PM10?.value) }}>{station.AQILast?.PM10?.value || '-'}</strong></span>
                           </div>
                         ) : (
@@ -636,7 +644,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ backgroundColor: boxBgColor, color: (isAqiMode && aqiInfo.level === 3) || (isUvMode && tObj?.uvMax <= 5) ? '#1e293b' : '#fff', minWidth: '60px', height: '60px', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', flexShrink: 0 }}>
+                    <div style={{ backgroundColor: boxBgColor, color: (isPm25Mode && pm25Value > 25.0 && pm25Value <= 37.5) || (isUvMode && tObj?.uvMax <= 5) ? '#1e293b' : '#fff', minWidth: '60px', height: '60px', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', flexShrink: 0 }}>
                       <span style={{ fontSize: '1.3rem', fontWeight: 'bold', lineHeight: 1 }}>{displayMainVal}</span>
                       <span style={{ fontSize: '0.65rem', opacity: 0.9, marginTop: '2px', fontWeight: 'bold' }}>{unitLabel}</span>
                     </div>
@@ -644,7 +652,7 @@ export default function App() {
 
                   {isActive && (
                     <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '15px', paddingTop: '15px' }}>
-                      {isAqiMode ? (
+                      {isPm25Mode ? (
                         <div>
                           <h5 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
                           {activeForecast === null ? <p style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>กำลังโหลด...</p> : (
