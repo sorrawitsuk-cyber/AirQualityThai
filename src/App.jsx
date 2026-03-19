@@ -10,11 +10,11 @@ import './App.css';
 const getAqiDetails = (aqiValue) => {
   const aqi = Number(aqiValue);
   if (isNaN(aqi) || aqi === 0) return { color: '#cccccc', text: 'ไม่มีข้อมูล', level: 0 };
-  if (aqi <= 25) return { color: '#00b0f0', text: 'ดีมาก', level: 1 };
-  if (aqi <= 50) return { color: '#92d050', text: 'ดี', level: 2 };
-  if (aqi <= 100) return { color: '#ffff00', text: 'ปานกลาง', level: 3 };
-  if (aqi <= 200) return { color: '#ffc000', text: 'เริ่มมีผลกระทบ', level: 4 };
-  return { color: '#ff0000', text: 'มีผลกระทบ', level: 5 };
+  if (aqi <= 25) return { color: '#00b0f0', text: 'คุณภาพอากาศดีมาก', level: 1 };
+  if (aqi <= 50) return { color: '#92d050', text: 'คุณภาพอากาศดี', level: 2 };
+  if (aqi <= 100) return { color: '#ffff00', text: 'คุณภาพอากาศปานกลาง', level: 3 };
+  if (aqi <= 200) return { color: '#ffc000', text: 'เริ่มมีผลกระทบต่อสุขภาพ', level: 4 };
+  return { color: '#ff0000', text: 'มีผลกระทบต่อสุขภาพ', level: 5 };
 };
 
 const getPM25Color = (val) => {
@@ -25,6 +25,16 @@ const getPM25Color = (val) => {
   if (num <= 37.5) return '#ffff00'; 
   if (num <= 75.0) return '#ffc000'; 
   return '#ff0000'; 
+};
+
+const getPM10Color = (val) => {
+  const num = Number(val);
+  if (isNaN(num)) return '#333333';
+  if (num <= 50) return '#00b0f0';
+  if (num <= 80) return '#92d050';
+  if (num <= 120) return '#ffff00';
+  if (num <= 180) return '#ffc000';
+  return '#ff0000';
 };
 
 const getTempColor = (val) => {
@@ -107,11 +117,11 @@ const legendData = {
   pm25: {
     title: 'ระดับ PM2.5 (µg/m³)',
     items: [
-      { color: '#00b0f0', label: '0-15 (ดีมาก)' },
-      { color: '#92d050', label: '16-25 (ดี)' },
-      { color: '#ffff00', label: '26-37.5 (ปานกลาง)' },
-      { color: '#ffc000', label: '38-75 (เริ่มมีผลกระทบ)' },
-      { color: '#ff0000', label: '>75 (มีผลกระทบ)' },
+      { color: '#00b0f0', label: '0-15.0 (ดีมาก)' },
+      { color: '#92d050', label: '15.1-25.0 (ดี)' },
+      { color: '#ffff00', label: '25.1-37.5 (ปานกลาง)' },
+      { color: '#ffc000', label: '37.6-75.0 (เริ่มมีผลกระทบฯ)' },
+      { color: '#ff0000', label: '> 75.0 (มีผลกระทบฯ)' },
     ]
   },
   temp: {
@@ -129,8 +139,8 @@ const legendData = {
     items: [
       { color: '#22c55e', label: '< 27 (ปกติ)' },
       { color: '#eab308', label: '27-31 (เฝ้าระวัง)' },
-      { color: '#f97316', label: '32-40 (เตือนภัย)' },
-      { color: '#ef4444', label: '> 41 (อันตราย)' },
+      { color: '#f97316', label: '32-40 (เตือนภัยเพลียแดด)' },
+      { color: '#ef4444', label: '> 41 (อันตรายเสี่ยงฮีทสโตรก)' },
     ]
   },
   uv: {
@@ -148,9 +158,9 @@ const legendData = {
     items: [
       { color: '#95a5a6', label: '0 (ไม่มีฝน)' },
       { color: '#74b9ff', label: '1-30 (โอกาสต่ำ)' },
-      { color: '#0984e3', label: '31-60 (ปานกลาง)' },
+      { color: '#0984e3', label: '31-60 (โอกาสปานกลาง)' },
       { color: '#273c75', label: '61-80 (โอกาสสูง)' },
-      { color: '#192a56', label: '> 80 (ตกหนัก)' },
+      { color: '#192a56', label: '> 80 (โอกาสสูงมาก)' },
     ]
   },
   wind: {
@@ -329,9 +339,13 @@ export default function App() {
       const lons = chunk.map(s => s.long).join(',');
       
       try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max,wind_speed_10m_max&past_days=1&forecast_days=1&timezone=Asia%2FBangkok`;
+        // ✅ เพิ่ม apparent_temperature_max, apparent_temperature_min ในการดึงข้อมูล current
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,uv_index_max,precipitation_probability_max,wind_speed_10m_max&past_days=1&forecast_days=1&timezone=Asia%2FBangkok`;
         const res = await fetch(url);
-        if (!res.ok) continue; 
+        if (!res.ok) {
+          console.warn(`⚠️ Open-Meteo API Error: Status ${res.status}`);
+          continue; 
+        }
         
         const weatherData = await res.json();
         const results = Array.isArray(weatherData) ? weatherData : [weatherData];
@@ -347,6 +361,8 @@ export default function App() {
               weatherCode: r.current.weather_code,
               tempMin: r.daily.temperature_2m_min[1],
               tempMax: r.daily.temperature_2m_max[1],
+              heatMin: r.daily.apparent_temperature_min[1], // เก็บค่า Heat Index ต่ำสุด
+              heatMax: r.daily.apparent_temperature_max[1], // เก็บค่า Heat Index สูงสุด
               tempYesterdayMax: r.daily.temperature_2m_max[0],
               uvMax: r.daily.uv_index_max[1],
               rainProb: r.daily.precipitation_probability_max[1],
@@ -540,7 +556,6 @@ export default function App() {
             <button onClick={() => handleViewModeChange('wind')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: isWindMode ? '#475569' : 'transparent', color: isWindMode ? '#fff' : '#64748b' }}>🌬️ ลม</button>
           </div>
 
-          {/* 🚀 กล่อง Legend (คำอธิบายสัญลักษณ์) แสดงที่มุมซ้ายล่าง */}
           <div style={{ position: 'absolute', bottom: '25px', left: '15px', zIndex: 500, background: 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', backdropFilter: 'blur(4px)', border: '1px solid #e2e8f0' }}>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#1e293b', fontWeight: 'bold' }}>
               {legendData[viewMode].title}
@@ -598,7 +613,7 @@ export default function App() {
                               <span style={{color: '#0ea5e9'}}>💧 ชื้น: {tObj.humidity || '-'}%</span>
                               <span style={{color: '#0ea5e9'}}>🌧️ ฝน: {tObj.rainProb || '0'}%</span>
                               <span style={{color: '#a855f7'}}>☀️ UV: {tObj.uvMax || '-'}</span>
-                              <span style={{color: '#475569', display: 'flex', alignItems: 'center', gap: '2px'}}>
+                              <span style={{color: '#34495e', display: 'flex', alignItems: 'center', gap: '2px'}}>
                                 🌬️ ลม: {tObj.windSpeed || '-'} <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span>
                               </span>
                           </div>
@@ -668,8 +683,7 @@ export default function App() {
                         {isPm25Mode ? (
                           <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: '#475569' }}>
                             <span>AQI: <strong style={{ color: getAqiDetails(aqiValue).color === '#ffff00' ? '#d4b500' : getAqiDetails(aqiValue).color }}>{aqiValue}</strong></span>
-                            {/* 🚀 เปลี่ยนจากตัวเลข PM10 เป็นข้อความบอกสถานะสุขภาพ */}
-                            <span>สถานการณ์: <strong style={{ color: aqiInfo.color === '#ffff00' ? '#d4b500' : aqiInfo.color }}>{aqiInfo.text}</strong></span>
+                            <span>ผลกระทบ: <strong style={{ color: aqiInfo.color === '#ffff00' ? '#d4b500' : aqiInfo.color }}>{aqiInfo.text}</strong></span>
                           </div>
                         ) : (
                           <div style={{ width: '100%' }}>
@@ -683,6 +697,12 @@ export default function App() {
                                     <span style={{color: '#cbd5e1'}}>|</span>
                                     <span style={{color: '#0ea5e9'}}>คาดการณ์: {getRainColor(tObj.rainProb).label}</span>
                                   </>
+                                ) : isHeatMode ? (
+                                    <>
+                                      <span><span style={{color: '#3b82f6'}}>●</span>ต่ำสุด {tObj.heatMin?.toFixed(1)}°</span>
+                                      <span style={{color: '#cbd5e1'}}>|</span>
+                                      <span><span style={{color: '#ef4444'}}>●</span>สูงสุด {tObj.heatMax?.toFixed(1)}°</span>
+                                    </>
                                 ) : isWindMode ? (
                                   <>
                                     <span style={{color: '#475569'}}>ทิศทาง: <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span></span>
