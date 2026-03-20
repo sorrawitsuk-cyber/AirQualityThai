@@ -71,14 +71,6 @@ const getUvColor = (val) => {
   return { bg: '#9b59b6', text: '#fff', bar: '#9b59b6', label: 'อันตราย (Extreme)' };
 };
 
-const getUvHealthAdvice = (val) => {
-  if (isNaN(val) || val === null) return null;
-  if (val > 10) return { text: "หลีกเลี่ยงการออกแดดเด็ดขาด ผิวหนังและดวงตาอาจไหม้ได้ในเวลาไม่กี่นาที", icon: "⛔" };
-  if (val >= 8) return { text: "ควรอยู่ในที่ร่ม หากต้องออกแดดต้องทาครีมกันแดด SPF50+ ใส่เสื้อแขนยาว หมวก และแว่นตากันแดด", icon: "☂️" };
-  if (val >= 6) return { text: "ควรทาครีมกันแดด สวมหมวก หรือกางร่มเมื่อออกแดด", icon: "🧢" };
-  return null;
-};
-
 const getRainColor = (val) => {
   if (isNaN(val) || val === null) return { bg: '#cccccc', text: '#333', bar: '#cccccc', label: 'ไม่มีข้อมูล' };
   if (val === 0) return { bg: '#95a5a6', text: '#fff', bar: '#95a5a6', label: 'ไม่มีฝน' };
@@ -141,7 +133,7 @@ const chartConfigs = {
   pm25: { key: 'pm25', name: 'PM2.5', unit: 'µg/m³', color: '#f59e0b', hasLY: false, type: 'area' },
   temp: { key: 'temp', keyLY: 'tempLY', name: 'อุณหภูมิสูงสุด', unit: '°C', color: '#ef4444', hasLY: true, type: 'line' },
   heat: { key: 'heat', keyLY: 'heatLY', name: 'Heat Index สูงสุด', unit: '°C', color: '#ea580c', hasLY: true, type: 'line' },
-  uv:   { key: 'uv', keyLY: null, name: 'ดัชนีรังสี UV', unit: 'UV', color: '#a855f7', hasLY: false, type: 'area' },
+  uv:   { key: 'uv', keyLY: null, name: 'ดัชนีรังสี UV', unit: 'UV', color: '#a855f7', hasLY: false, type: 'area' }, 
   rain: { key: 'rain', keyLY: 'rainLY', name: 'ปริมาณฝนสะสม', unit: 'mm', color: '#3b82f6', hasLY: true, type: 'bar' },
   wind: { key: 'wind', keyLY: 'windLY', name: 'ความเร็วลมสูงสุด', unit: 'km/h', color: '#64748b', hasLY: true, type: 'line' },
 };
@@ -265,7 +257,6 @@ export default function App() {
   const [showRadar, setShowRadar] = useState(false);
   const [radarTime, setRadarTime] = useState(null);
 
-  // 📊 สเตทสำหรับ Dashboard ล่าง 
   const [dashHistory, setDashHistory] = useState([]);
   const [dashForecast, setDashForecast] = useState([]);
   const [dashLoading, setDashLoading] = useState(false);
@@ -490,33 +481,38 @@ export default function App() {
   const textColor = darkMode ? '#f8fafc' : '#1e293b'; const subTextColor = darkMode ? '#94a3b8' : '#64748b';
   const borderColor = darkMode ? '#334155' : '#e2e8f0';
 
-  const activeChart = chartConfigs[viewMode] || chartConfigs['pm25']; // ป้องกัน error กันเหนียว
+  const activeChart = chartConfigs[viewMode] || chartConfigs['pm25']; 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: themeBg, fontFamily: "'Kanit', sans-serif", transition: 'background-color 0.3s', overflowY: 'auto' }}>
       
-      {/* ======================= HEADER ======================= */}
+      {/* ======================= HEADER 6.1 (จัดระเบียบใหม่ชิดซ้ายสวยงาม) ======================= */}
       <header style={{ background: darkMode ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)', color: '#fff', padding: '12px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', zIndex: 1000, flexWrap: 'wrap', gap: '15px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: window.innerWidth > 1024 ? 1 : 'auto' }}>
-          <div style={{ fontSize: '1.8rem', background: '#fff', borderRadius: '50%', padding: '5px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }}>{darkMode ? '🌙' : '🌤️'}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>Thailand Environment Dashboard</h1>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#cbd5e1' }}>ระบบเฝ้าระวังคุณภาพอากาศและสภาพอากาศ</p>
+        
+        {/* 🚀 กรุ๊ปซ้าย: โลโก้ + ตัวกรอง (ย้ายมาไว้ชิดซ้ายให้เป็นระเบียบ) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', flex: 1 }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ fontSize: '1.8rem', background: '#fff', borderRadius: '50%', padding: '5px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }}>{darkMode ? '🌙' : '🌤️'}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', textShadow: '1px 1px 2px rgba(0,0,0,0.2)', whiteSpace: 'nowrap' }}>Thailand Environment Dashboard</h1>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#cbd5e1', whiteSpace: 'nowrap' }}>ระบบเฝ้าระวังคุณภาพอากาศและสภาพอากาศ</p>
+            </div>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', flex: window.innerWidth > 1024 ? 1.5 : 'auto' }}>
-          <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '6px 15px', borderRadius: '30px', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)', overflowX: 'auto', whiteSpace: 'nowrap', width: '100%', maxWidth: '700px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+          <div style={{ width: '1px', height: '35px', backgroundColor: 'rgba(255,255,255,0.3)', display: window.innerWidth < 1024 ? 'none' : 'block' }}></div>
+
+          <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '6px 15px', borderRadius: '30px', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.9rem' }}>🗺️</label>
-              <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#ffffff', color: '#1e293b', fontSize: '0.95rem', width: '100%', minWidth: '150px', outline: 'none', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+              <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#ffffff', color: '#1e293b', fontSize: '0.95rem', minWidth: '150px', outline: 'none', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                 <option value="">ทุกจังหวัด</option>{provinces.map(prov => (<option key={prov} value={prov}>{prov}</option>))}
               </select>
             </div>
             <div style={{ width: '2px', height: '20px', backgroundColor: 'rgba(255,255,255,0.3)', margin: '0 5px' }}></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.9rem' }}>📍</label>
-              <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#ffffff', color: '#1e293b', fontSize: '0.95rem', width: '100%', minWidth: '220px', outline: 'none', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+              <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#ffffff', color: '#1e293b', fontSize: '0.95rem', minWidth: '220px', outline: 'none', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                 <option value="">-- เลือกสถานี --</option>
                 {filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(station => (<option key={station.stationID} value={station.stationID}>{station.nameTH}</option>))}
               </select>
@@ -525,7 +521,8 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', justifyContent: 'flex-end', flex: window.innerWidth > 1024 ? 1 : 'auto', flexWrap: 'wrap' }}>
+        {/* 🚀 กรุ๊ปขวา: เวลาอัปเดต + Dark Mode */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ fontSize: '0.8rem', color: '#e0f2fe', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '20px' }}>
             <span>⏱️</span> <span style={{display: window.innerWidth < 768 ? 'none' : 'inline'}}>อัปเดต: </span><strong style={{ color: '#fff' }}>{lastUpdateText || '...'}</strong>
           </div>
