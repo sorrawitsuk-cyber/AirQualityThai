@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -71,14 +71,6 @@ const getUvColor = (val) => {
   if (val <= 7) return { bg: '#e67e22', text: '#fff', bar: '#e67e22', label: 'สูง (High)' };
   if (val <= 10) return { bg: '#e74c3c', text: '#fff', bar: '#e74c3c', label: 'สูงมาก (V.High)' };
   return { bg: '#9b59b6', text: '#fff', bar: '#9b59b6', label: 'อันตราย (Extreme)' };
-};
-
-const getUvHealthAdvice = (val) => {
-  if (isNaN(val) || val === null) return null;
-  if (val > 10) return { text: "หลีกเลี่ยงการออกแดดเด็ดขาด ผิวหนังและดวงตาอาจไหม้ได้ในเวลาไม่กี่นาที", icon: "⛔" };
-  if (val >= 8) return { text: "ควรอยู่ในที่ร่ม หากต้องออกแดดต้องทาครีมกันแดด SPF50+ ใส่เสื้อแขนยาว หมวก และแว่นตากันแดด", icon: "☂️" };
-  if (val >= 6) return { text: "ควรทาครีมกันแดด สวมหมวก หรือกางร่มเมื่อออกแดด", icon: "🧢" };
-  return null;
 };
 
 const getRainColor = (val) => {
@@ -155,37 +147,12 @@ const createCustomMarker = (viewMode, value, extraData) => {
   let bg, textColor, displayValue;
   const fontSize = String(value).length > 2 ? '9px' : '11px';
 
-  if (viewMode === 'pm25') { 
-    bg = getPM25Color(value);
-    textColor = (value > 25.0 && value <= 37.5) ? '#222' : '#fff';
-    displayValue = (value === 0 || isNaN(value)) ? '-' : value;
-  } else if (viewMode === 'temp') {
-    const tempInfo = getTempColor(value);
-    bg = tempInfo.bg;
-    textColor = tempInfo.text;
-    displayValue = (value === 0 || isNaN(value) || value === null) ? '-' : Math.round(value);
-  } else if (viewMode === 'heat') {
-    const heatInfo = getHeatIndexAlert(value);
-    bg = value ? heatInfo.bar : '#cccccc';
-    textColor = '#fff'; 
-    displayValue = (value === 0 || isNaN(value) || value === null) ? '-' : Math.round(value);
-  } else if (viewMode === 'uv') {
-    const uvInfo = getUvColor(value);
-    bg = value !== null ? uvInfo.bar : '#cccccc';
-    textColor = (value > 2 && value <= 5) ? '#222' : '#fff'; 
-    displayValue = (value === 0 || isNaN(value) || value === null) ? '-' : Math.round(value);
-  } else if (viewMode === 'rain') {
-    const rainInfo = getRainColor(value);
-    bg = value !== null ? rainInfo.bar : '#cccccc';
-    textColor = (value <= 30 && value > 0) ? '#222' : '#fff';
-    displayValue = (value === null || isNaN(value)) ? '-' : `${Math.round(value)}%`;
-  } else if (viewMode === 'wind') {
-    const windInfo = getWindColor(value);
-    bg = value !== null ? windInfo.bar : '#cccccc';
-    textColor = (value > 10 && value <= 40) ? '#222' : '#fff';
-    const dir = extraData?.windDir || 0;
-    displayValue = value === null ? '-' : `<div style="display:flex; flex-direction:column; align-items:center; line-height:1;"><span style="transform: rotate(${dir}deg); font-size: 14px; margin-bottom: -1px; font-weight: bold;">↓</span><span style="font-size: 9px;">${Math.round(value)}</span></div>`;
-  }
+  if (viewMode === 'pm25') { bg = getPM25Color(value); textColor = (value > 25.0 && value <= 37.5) ? '#222' : '#fff'; displayValue = (value === 0 || isNaN(value)) ? '-' : value; }
+  else if (viewMode === 'temp') { const tInfo = getTempColor(value); bg = tInfo.bg; textColor = tInfo.text; displayValue = (value === 0 || isNaN(value) || value === null) ? '-' : Math.round(value); }
+  else if (viewMode === 'heat') { const hInfo = getHeatIndexAlert(value); bg = value ? hInfo.bar : '#cccccc'; textColor = '#fff'; displayValue = (value === 0 || isNaN(value) || value === null) ? '-' : Math.round(value); }
+  else if (viewMode === 'uv') { const uInfo = getUvColor(value); bg = value !== null ? uInfo.bar : '#cccccc'; textColor = (value > 2 && value <= 5) ? '#222' : '#fff'; displayValue = (value === 0 || isNaN(value) || value === null) ? '-' : Math.round(value); }
+  else if (viewMode === 'rain') { const rInfo = getRainColor(value); bg = value !== null ? rInfo.bar : '#cccccc'; textColor = (value <= 30 && value > 0) ? '#222' : '#fff'; displayValue = (value === null || isNaN(value)) ? '-' : `${Math.round(value)}%`; }
+  else if (viewMode === 'wind') { const wInfo = getWindColor(value); bg = value !== null ? wInfo.bar : '#cccccc'; textColor = (value > 10 && value <= 40) ? '#222' : '#fff'; const dir = extraData?.windDir || 0; displayValue = value === null ? '-' : `<div style="display:flex; flex-direction:column; align-items:center; line-height:1;"><span style="transform: rotate(${dir}deg); font-size: 14px; margin-bottom: -1px; font-weight: bold;">↓</span><span style="font-size: 9px;">${Math.round(value)}</span></div>`; }
 
   return L.divIcon({
     className: 'custom-div-icon',
@@ -199,9 +166,8 @@ function FitBounds({ stations, activeStation, selectedProvince }) {
   useEffect(() => {
     if (activeStation) return; 
     if (stations && stations.length > 0) {
-      if (!selectedProvince) {
-        map.flyTo([13.5, 101.0], 6, { duration: 1.5 });
-      } else {
+      if (!selectedProvince) map.flyTo([13.5, 101.0], 6, { duration: 1.5 });
+      else {
         const bounds = L.latLngBounds(stations.map(s => [parseFloat(s.lat), parseFloat(s.long)]));
         map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 }); 
       }
@@ -213,9 +179,7 @@ function FitBounds({ stations, activeStation, selectedProvince }) {
 function FlyToActiveStation({ activeStation }) {
   const map = useMap();
   useEffect(() => {
-    if (activeStation) {
-      map.flyTo([parseFloat(activeStation.lat), parseFloat(activeStation.long)], 13, { duration: 1.5 });
-    }
+    if (activeStation) map.flyTo([parseFloat(activeStation.lat), parseFloat(activeStation.long)], 13, { duration: 1.5 });
   }, [activeStation, map]);
   return null;
 }
@@ -223,9 +187,7 @@ function FlyToActiveStation({ activeStation }) {
 function RadarMapHandler({ showRadar }) {
   const map = useMap();
   useEffect(() => {
-    if (showRadar) {
-      if (map.getZoom() > 8) map.flyTo([13.5, 101.0], 6, { duration: 1.2 });
-    }
+    if (showRadar && map.getZoom() > 8) map.flyTo([13.5, 101.0], 6, { duration: 1.2 });
   }, [showRadar, map]);
   return null;
 }
@@ -248,7 +210,6 @@ export default function App() {
   
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedStationId, setSelectedStationId] = useState('');
-  
   const [viewMode, setViewMode] = useState('pm25'); 
   const [sortOrder, setSortOrder] = useState('desc'); 
   
@@ -266,7 +227,6 @@ export default function App() {
 
   const [showRadar, setShowRadar] = useState(false);
   const [radarTime, setRadarTime] = useState(null);
-
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
 
@@ -286,8 +246,7 @@ export default function App() {
 
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
-    if (mode === 'temp') setSortOrder('asc'); 
-    else setSortOrder('desc'); 
+    if (mode === 'temp') setSortOrder('asc'); else setSortOrder('desc'); 
     setShowRadar(false);
   };
 
@@ -296,8 +255,7 @@ export default function App() {
       try {
         const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
         const data = await res.json();
-        const past = data.radar.past;
-        setRadarTime(past[past.length - 1].time);
+        setRadarTime(data.radar.past[data.radar.past.length - 1].time);
       } catch (err) { console.error("Error fetching radar:", err); }
     }
     setShowRadar(!showRadar);
@@ -312,12 +270,8 @@ export default function App() {
       
       if (data && data.stations) {
         setAllStations(data.stations);
-        const provs = [...new Set(data.stations.map(s => extractProvince(s.areaTH)))];
-        setProvinces(provs.sort((a, b) => a.localeCompare(b, 'th')));
-
-        if (data.stations.length > 0) {
-          setLastUpdateText(`${data.stations[0].AQILast?.date || ''} เวลา ${data.stations[0].AQILast?.time || ''} น.`);
-        }
+        setProvinces([...new Set(data.stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')));
+        if (data.stations.length > 0) setLastUpdateText(`${data.stations[0].AQILast?.date || ''} เวลา ${data.stations[0].AQILast?.time || ''} น.`);
         fetchAdvancedTemperatures(data.stations);
       }
     } catch (err) { console.error("Fetch error:", err); } 
@@ -542,7 +496,6 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: themeBg, fontFamily: "'Kanit', sans-serif", transition: 'background-color 0.3s', overflowY: 'auto' }}>
       
-      {/* ======================= HEADER ======================= */}
       <header style={{ background: darkMode ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)', color: '#fff', padding: '12px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', zIndex: 1000, flexWrap: 'wrap', gap: '15px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -571,7 +524,6 @@ export default function App() {
             <button onClick={handleReset} style={{ padding: '8px 16px', backgroundColor: '#ffffff', color: '#0ea5e9', border: 'none', borderRadius: '20px', fontSize: '0.95rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', marginLeft: '5px' }}>🏠 หน้าแรก</button>
           </div>
         </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ fontSize: '0.8rem', color: '#e0f2fe', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '20px' }}>
             <span>⏱️</span> <span style={{display: window.innerWidth < 768 ? 'none' : 'inline'}}>อัปเดต: </span><strong style={{ color: '#fff' }}>{lastUpdateText || '...'}</strong>
@@ -580,7 +532,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* ======================= MAIN MAP CONTENT ======================= */}
       <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', minHeight: window.innerWidth < 768 ? 'auto' : 'calc(100vh - 105px)', padding: '15px', paddingBottom: '0' }}>
         
         {/* MAP */}
@@ -599,7 +550,7 @@ export default function App() {
           <button onClick={handleFindNearest} disabled={locating} title="ค้นหาสถานีใกล้ฉัน" style={{ position: 'absolute', bottom: '25px', right: '15px', zIndex: 500, width: '44px', height: '44px', borderRadius: '50%', backgroundColor: cardBg, color: textColor, border: `1px solid ${borderColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', cursor: locating ? 'wait' : 'pointer', padding: 0 }}>{locating ? '⏳' : '🎯'}</button>
 
           {!showRadar && (
-            <div style={{ position: 'absolute', bottom: '25px', left: '15px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', backdropFilter: 'blur(4px)', border: `1px solid ${borderColor}` }}>
+            <div style={{ position: 'absolute', bottom: '25px', left: '60px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', backdropFilter: 'blur(4px)', border: `1px solid ${borderColor}` }}>
               <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: textColor, fontWeight: 'bold' }}>{legendData[viewMode].title}</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 {legendData[viewMode].items.map((item, idx) => (
@@ -610,7 +561,17 @@ export default function App() {
           )}
 
           <MapContainer center={[13.5, 101.0]} zoom={6} style={{ height: '100%', width: '100%', backgroundColor: darkMode ? '#1a202c' : '#bae6fd', zIndex: 1 }}>
-            <TileLayer attribution='&copy; OpenStreetMap' url={darkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"} />
+            
+            {/* 🚀 ระบบเปลี่ยนแผนที่ฐาน (Base Layer Control) แบบ Google Maps */}
+            <LayersControl position="bottomleft">
+              <LayersControl.BaseLayer checked name="🗺️ แผนที่ปกติ (Default)">
+                <TileLayer attribution='&copy; OpenStreetMap' url={darkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"} />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="🛰️ ภาพดาวเทียม (Satellite)">
+                <TileLayer attribution='&copy; Esri' url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+              </LayersControl.BaseLayer>
+            </LayersControl>
+
             {showRadar && radarTime && <TileLayer url={`https://tilecache.rainviewer.com/v2/radar/${radarTime}/256/{z}/{x}/{y}/2/1_1.png`} opacity={0.65} attribution='&copy; RainViewer' zIndex={10} maxNativeZoom={12} />}
             <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} />
             <FlyToActiveStation activeStation={activeStation} />
@@ -628,7 +589,6 @@ export default function App() {
                         <span style={{ fontSize: '1.2rem', color: getPM25Color(pm25Value) === '#ffff00' ? '#d4b500' : getPM25Color(pm25Value), fontWeight: 'bold' }}>PM2.5: {isNaN(pm25Value) ? '-' : pm25Value} µg/m³</span>
                         <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px' }}>(AQI: <span style={{color: getAqiDetails(station.AQILast?.AQI?.aqi).color === '#ffff00' ? '#d4b500' : getAqiDetails(station.AQILast?.AQI?.aqi).color, fontWeight: 'bold'}}>{station.AQILast?.AQI?.aqi || '-'}</span>)</div>
                       </div>
-                      {/* 🚀 ข้อมูลสภาพอากาศใน Popup กลับมาแล้ว! */}
                       {tObj && (
                         <div style={{ marginTop: '10px', padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px', color: '#334155', fontWeight: 'bold', fontSize: '0.85rem' }}>
                           <div style={{ textAlign: 'center', marginBottom: '8px', fontSize: '1.1rem', color: '#1e293b' }}>{getWeatherIcon(tObj.weatherCode).icon} <span style={{fontSize: '0.95rem'}}>{getWeatherIcon(tObj.weatherCode).text}</span></div>
@@ -704,7 +664,7 @@ export default function App() {
                     <div style={{ marginTop: '12px', padding: '10px', backgroundColor: darkMode ? '#334155' : '#f8fafc', borderRadius: '8px', border: `1px dashed ${boxBgColor}`, display: 'flex', gap: '8px', alignItems: 'flex-start' }}><span style={{ fontSize: '1.2rem' }}>{healthAdvice.icon}</span><span style={{ fontSize: '0.8rem', color: textColor, lineHeight: 1.4 }}>{healthAdvice.text}</span></div>
                   )}
 
-                  {/* 🚀 กราฟแท่งจิ๋วพยากรณ์ล่วงหน้า (ในการ์ด) กลับมาแล้ว! */}
+                  {/* กราฟแท่งจิ๋วพยากรณ์ล่วงหน้า */}
                   {isActive && (
                     <div style={{ borderTop: `1px solid ${borderColor}`, marginTop: '15px', paddingTop: '15px' }}>
                       {isPm25Mode ? (
@@ -759,7 +719,6 @@ export default function App() {
                       )}
                     </div>
                   )}
-
                 </div>
               );
             })}
