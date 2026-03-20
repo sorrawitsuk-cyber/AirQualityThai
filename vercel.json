@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api-air/:path*",
-      "destination": "http://air4thai.pcd.go.th/:path*"
+      "source": "/api-air/:match*",
+      "destination": "http://air4thai.com/bmd/api/:match*"
     }
   ]
 }
