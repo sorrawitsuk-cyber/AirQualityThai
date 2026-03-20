@@ -141,7 +141,6 @@ export default function App() {
     setShowRadar(!showRadar);
   };
 
-  // 🚀 ดึงข้อมูลจาก Firebase + Cache
   const fetchAirQuality = async (isBackgroundLoad = false) => {
     const cachedData = localStorage.getItem('dashboard_cache');
     if (cachedData && !isBackgroundLoad) {
@@ -223,7 +222,6 @@ export default function App() {
               let tLabel = i===0?'วันนี้':i===1?'พรุ่งนี้':days[new Date(wData.daily.time[i]).getDay()];
               tempF.push({ time: tLabel, val: Math.round(wData.daily.temperature_2m_max[i]||0), colorInfo: getTempColor(wData.daily.temperature_2m_max[i]) });
               heatF.push({ time: tLabel, val: Math.round(wData.daily.apparent_temperature_max[i]||0), colorInfo: getHeatIndexAlert(wData.daily.apparent_temperature_max[i]) });
-              // 🚀 ดักจับค่า null กรณี UV ไม่มีข้อมูลพยากรณ์ยาว 7 วัน
               if(wData.daily.uv_index_max[i] !== null && wData.daily.uv_index_max[i] !== undefined){
                 uvF.push({ time: tLabel, val: Math.round(wData.daily.uv_index_max[i]||0), colorInfo: getUvColor(wData.daily.uv_index_max[i]) });
               }
@@ -271,7 +269,6 @@ export default function App() {
         for (let i=0; i<dW.daily.time.length; i++) {
           let dObj = new Date(dW.daily.time[i]);
           
-          // 🚀 กรองเฉพาะข้อมูล PM2.5 ที่มีอยู่จริง (ไม่เอา Null มาเฉลี่ย)
           let avgPm = null;
           if (dA.hourly && dA.hourly.pm2_5) { 
             const startIdx = i*24;
@@ -374,7 +371,6 @@ export default function App() {
   const borderColor = darkMode ? '#334155' : '#e2e8f0';
   const activeChart = chartConfigs[viewMode] || chartConfigs['pm25']; 
 
-  // 🚀 กรองข้อมูล Dashboard เอาเฉพาะวันที่มีข้อมูลจริงๆ (แก้ปัญหากราฟตกเป็น 0)
   const validForecast = dashForecast.filter(d => d[activeChart.key] !== null && d[activeChart.key] !== undefined);
 
   return (
@@ -431,7 +427,6 @@ export default function App() {
             {/* MAP AREA */}
             <div style={{ flex: 7, borderRadius: '12px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '60vh' : 'calc(100vh - 120px)' }}>
               
-              {/* Toolbar บนแผนที่ */}
               <div className="hide-scrollbar" style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: '30px', display: 'flex', gap: '8px', overflowX: 'auto', whiteSpace: 'nowrap', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
                 <button onClick={() => handleViewModeChange('pm25')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isPm25Mode ? '#0ea5e9' : 'transparent', color: isPm25Mode ? '#fff' : subTextColor }}>☁️ PM2.5</button>
                 <button onClick={() => handleViewModeChange('temp')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isTempMode ? '#22c55e' : 'transparent', color: isTempMode ? '#fff' : subTextColor }}>🌡️ อุณหภูมิ</button>
@@ -443,7 +438,6 @@ export default function App() {
                 <button onClick={toggleRadar} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: showRadar ? '#ef4444' : 'transparent', color: showRadar ? '#fff' : subTextColor }}>{showRadar ? '📡 ปิดเรดาร์' : '📡 เรดาร์ฝน'}</button>
               </div>
 
-              {/* 🚀 ย้ายเวลาอัปเดตมาเป็น Overlay มุมล่างขวาของแผนที่ */}
               <div style={{ position: 'absolute', bottom: '25px', right: '70px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: '20px', fontSize: '0.75rem', color: subTextColor, backdropFilter: 'blur(4px)', border: `1px solid ${borderColor}`, pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <span style={{ fontSize: '1rem' }}>⏱️</span> อัปเดต: {lastUpdateText || 'กำลังโหลด...'}
               </div>
@@ -545,16 +539,26 @@ export default function App() {
                         <div style={{ marginTop:'12px', padding:'10px', background:darkMode?'#1e293b':'#f8fafc', borderRadius:'8px', display:'flex', gap:'8px', border: `1px dashed ${boxBg}` }}><span>{hAdv.icon}</span><span style={{fontSize:'0.8rem',color:textColor}}>{hAdv.text}</span></div>
                       )}
 
-                      {/* MINI CHARTS */}
+                      {/* 🚀 แก้ไขโค้ดแท่งกราฟจิ๋ว ป้องกันปัญหาทะลุกรอบ 100% */}
                       {isActive && (
-                        <div style={{ borderTop:`1px solid ${borderColor}`, marginTop:'15px', paddingTop:'10px' }}>
+                        <div style={{ borderTop:`1px solid ${borderColor}`, marginTop:'15px', paddingTop:'15px' }}>
                           {isPm25Mode ? (
                             <div>
-                              <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
-                              <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'2px' }}>
+                              <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
+                              <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'3px' }}>
                                 {activeForecast ? activeForecast.map((d,i)=>{
-                                  const h=Math.max((d.val/(Math.max(...activeForecast.map(x=>x.val))+15))*100, 5);
-                                  return <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}><span style={{fontSize:'8px', color:subTextColor, fontWeight:'bold'}}>{d.val}</span><div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'2px 2px 0 0'}}></div><span style={{fontSize:'8px', color:subTextColor}}>{i%3===0?d.time:''}</span></div>
+                                  const maxVal = Math.max(...activeForecast.map(x=>x.val)) || 1;
+                                  const h = Math.max((d.val / maxVal) * 100, 5); // ป้องกันค่าเป็น 0
+                                  return (
+                                    <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
+                                      <span style={{fontSize:'9px', color:subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
+                                      {/* กล่อง Flex ตรงกลางเพื่อรองรับการยืดหดของแท่งสี */}
+                                      <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
+                                        <div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'3px 3px 0 0'}}></div>
+                                      </div>
+                                      <span style={{fontSize:'8px', color:subTextColor, marginTop:'4px', height:'12px'}}>{i%3===0?d.time:''}</span>
+                                    </div>
+                                  );
                                 }) : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
                               </div>
                             </div>
@@ -562,15 +566,24 @@ export default function App() {
                             <div>
                               {activeWeather ? (() => {
                                 let fData = isHeatMode?activeWeather.heatForecast:isUvMode?activeWeather.uvForecast:isRainMode?activeWeather.rainForecast:isWindMode?activeWeather.windForecast:activeWeather.tempForecast;
-                                fData = fData.filter(d => d.val !== null && !isNaN(d.val)); // 🚀 กรองอันที่ไม่มีข้อมูลทิ้ง
+                                fData = fData.filter(d => d.val !== null && !isNaN(d.val)); // กรองอันที่ไม่มีข้อมูลทิ้ง
                                 return (
                                   <>
-                                    <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor }}>📈 คาดการณ์ {fData.length} วัน</h5>
+                                    <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์ {fData.length} วัน</h5>
                                     <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
                                       {fData.map((d,i)=>{
-                                        const m=Math.max(...fData.map(x=>x.val))+(isRainMode?10:5);
-                                        const h=Math.max((d.val/m)*100, 5);
-                                        return <div key={i} style={{flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center', height:'100%'}}><span style={{fontSize:'10px', color:d.colorInfo.color||subTextColor, fontWeight:'bold'}}>{d.val}</span><div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'2px 2px 0 0'}}></div><span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor}}>{d.time}</span></div>
+                                        const maxVal = Math.max(...fData.map(x=>x.val)) + (isRainMode?10:5) || 1;
+                                        const h = Math.max((d.val / maxVal) * 100, 5);
+                                        return (
+                                          <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
+                                            <span style={{fontSize:'10px', color:d.colorInfo.color||subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
+                                            {/* กล่อง Flex ตรงกลาง */}
+                                            <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
+                                              <div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'3px 3px 0 0'}}></div>
+                                            </div>
+                                            <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
+                                          </div>
+                                        );
                                       })}
                                     </div>
                                   </>
@@ -610,7 +623,6 @@ export default function App() {
                     </div>
                   </div>
                   <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
-                    {/* 🚀 หัวกราฟพยากรณ์ล่วงหน้าจะเปลี่ยนจำนวนวันอัตโนมัติ */}
                     <h3 style={{ fontSize: '1rem', color: textColor, textAlign: 'center', fontWeight:'bold' }}>🔮 พยากรณ์ล่วงหน้า {validForecast.length} วัน (Forecast)</h3>
                     <div style={{ height: '220px', marginTop:'15px' }}>
                       <ResponsiveContainer>
