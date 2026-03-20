@@ -117,7 +117,6 @@ export default function App() {
 
   const [currentPage, setCurrentPage] = useState('map'); 
   
-  // 🚀 ปรับโครงสร้าง State การแจ้งเตือนเพื่อแยกดี/ร้าย
   const [alertsData, setAlertsData] = useState({ warnings: [], normals: [] });
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsLocationName, setAlertsLocationName] = useState('');
@@ -216,14 +215,23 @@ export default function App() {
       setActiveWeather(null); setActiveForecast(null);
       const fetchCardDetails = async () => {
         try {
-          const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&daily=temperature_2m_max,apparent_temperature_max,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7`;
+          // 🚀 ดึงค่า temperature_2m_min เพิ่มจาก API
+          const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7`;
           const resW = await fetch(urlWeather); const wData = await resW.json();
           let tempF=[], heatF=[], uvF=[], rainF=[], windF=[];
           if (wData.daily && wData.daily.time) {
             for (let i = 0; i < wData.daily.time.length; i++) {
               const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
               let tLabel = i===0?'วันนี้':i===1?'พรุ่งนี้':days[new Date(wData.daily.time[i]).getDay()];
-              tempF.push({ time: tLabel, val: Math.round(wData.daily.temperature_2m_max[i]||0), colorInfo: getTempColor(wData.daily.temperature_2m_max[i]) });
+              
+              // 🚀 เก็บข้อมูล minVal เพิ่มเข้ามาใน tempForecast
+              tempF.push({ 
+                time: tLabel, 
+                val: Math.round(wData.daily.temperature_2m_max[i]||0), 
+                minVal: Math.round(wData.daily.temperature_2m_min[i]||0), 
+                colorInfo: getTempColor(wData.daily.temperature_2m_max[i]) 
+              });
+              
               heatF.push({ time: tLabel, val: Math.round(wData.daily.apparent_temperature_max[i]||0), colorInfo: getHeatIndexAlert(wData.daily.apparent_temperature_max[i]) });
               if(wData.daily.uv_index_max[i] !== null && wData.daily.uv_index_max[i] !== undefined){
                 uvF.push({ time: tLabel, val: Math.round(wData.daily.uv_index_max[i]||0), colorInfo: getUvColor(wData.daily.uv_index_max[i]) });
@@ -332,7 +340,6 @@ export default function App() {
     }, () => { alert('ดึงพิกัดไม่ได้'); setLocating(false); });
   };
 
-  // 🚀 ระบบวิเคราะห์แจ้งเตือนแบบใหม่ แยกฝั่ง ลบ/บวก ชัดเจน
   const fetchAlertsData = async (lat, lon, locName) => {
     setAlertsLoading(true); setAlertsLocationName(locName);
     try {
@@ -347,7 +354,6 @@ export default function App() {
       const nIdx = new Date().getHours();
       const fmt = (iso) => `${new Date(iso).getHours()}:00 น.`;
 
-      // 🌧️ 1. วิเคราะห์ฝน 3H & 24H
       let rain3hP = 0, rain3hV = 0, rain3hT = '';
       let rain24hList = [];
       if(dW.hourly && dW.hourly.time) {
@@ -373,7 +379,6 @@ export default function App() {
           norms.push({ icon:'☀️', color:'#10b981', title:'ไม่มีฝน (ตลอด 24 ชม.)', desc:`โอกาสเกิดฝนต่ำมาก ท้องฟ้าโปร่ง สามารถทำกิจกรรมกลางแจ้ง ซักผ้า หรือเดินทางได้เต็มที่` });
       }
 
-      // 🍃 2. วิเคราะห์ลม 24H
       let mWindS = 0, mWindD = 0, windT = '';
       if(dW.hourly && dW.hourly.time) {
           dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
@@ -385,7 +390,6 @@ export default function App() {
       if (mWindS >= 40) warns.push({ icon:'🌪️', color:'#f59e0b', title:'เตือนภัยลมกระโชกแรง', desc:`ลมพัดแรงจากทิศ${windDirTxt} ความเร็วสูงสุด ${mWindS} km/h (${fmt(windT)}) ระวังสิ่งของปลิวหรือกิ่งไม้หัก`});
       else norms.push({ icon:'🍃', color:'#10b981', title:'สภาพลมปกติ', desc:`ลมพัดเบาถึงปานกลาง จากทิศ${windDirTxt} ความเร็วสูงสุด ${mWindS} km/h (${fmt(windT)}) อากาศถ่ายเทได้ดี`});
 
-      // 🥵 3. วิเคราะห์ความร้อน 24H
       let mHeat = 0, hTime = '';
       if(dW.hourly && dW.hourly.time) {
          dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
@@ -396,7 +400,6 @@ export default function App() {
       else if (mHeat >= 33) warns.push({ icon:'😰', color:'#ea580c', title:'เตือนภัยอากาศร้อน', desc:`ดัชนีความร้อนแตะ ${mHeat.toFixed(1)}°C (${fmt(hTime)}) ควรลดระยะเวลากิจกรรมและดื่มน้ำบ่อยๆ`});
       else norms.push({ icon:'😎', color:'#22c55e', title:'อุณหภูมิเกณฑ์ปลอดภัย', desc:`ดัชนีความร้อนสูงสุด ${mHeat.toFixed(1)}°C (${fmt(hTime)}) อากาศกำลังดี ไม่เป็นอันตรายต่อสุขภาพ`});
 
-      // 😷 4. วิเคราะห์ PM2.5 24H
       let mPm = 0, pTime = '';
       if(dA.hourly && dA.hourly.pm2_5) {
          dA.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
@@ -407,7 +410,6 @@ export default function App() {
       else if (mPm >= 37.5) warns.push({ icon:'😷', color:'#f59e0b', title:'ฝุ่น PM2.5 เริ่มมีผลกระทบ', desc:`ฝุ่นจะแตะ ${mPm.toFixed(1)} µg/m³ (${fmt(pTime)}) กลุ่มเสี่ยงควรหลีกเลี่ยงพื้นที่โล่งแจ้ง`});
       else norms.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ปริมาณฝุ่นสูงสุดเพียง ${mPm.toFixed(1)} µg/m³ หายใจได้เต็มปอด ไร้กังวลเรื่องฝุ่น`});
 
-      // ☀️ 5. วิเคราะห์ UV 24H
       let mUv = 0, uTime = '';
       if(dW.hourly && dW.hourly.time) {
          dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
@@ -610,56 +612,87 @@ export default function App() {
                         <div style={{ marginTop:'12px', padding:'10px', background:darkMode?'#1e293b':'#f8fafc', borderRadius:'8px', display:'flex', gap:'8px', border: `1px dashed ${boxBg}` }}><span>{hAdv.icon}</span><span style={{fontSize:'0.8rem',color:textColor}}>{hAdv.text}</span></div>
                       )}
 
-                      {/* MINI CHARTS */}
+                      {/* 🚀 กราฟอุณหภูมิแบบ Range Bar (ซ้อนต่ำสุด-สูงสุด) */}
                       {isActive && (
                         <div style={{ borderTop:`1px solid ${borderColor}`, marginTop:'15px', paddingTop:'15px' }}>
-                          {isPm25Mode ? (
-                            <div>
-                              <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
-                              <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'3px' }}>
-                                {activeForecast ? activeForecast.map((d,i)=>{
-                                  const maxVal = Math.max(...activeForecast.map(x=>x.val)) || 1;
-                                  const h = Math.max((d.val / maxVal) * 100, 5); 
-                                  return (
-                                    <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
-                                      <span style={{fontSize:'9px', color:subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
-                                      <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
-                                        <div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'3px 3px 0 0'}}></div>
-                                      </div>
-                                      <span style={{fontSize:'8px', color:subTextColor, marginTop:'4px', height:'12px'}}>{i%3===0?d.time:''}</span>
-                                    </div>
-                                  );
-                                }) : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              {activeWeather ? (() => {
-                                let fData = isHeatMode?activeWeather.heatForecast:isUvMode?activeWeather.uvForecast:isRainMode?activeWeather.rainForecast:isWindMode?activeWeather.windForecast:activeWeather.tempForecast;
-                                fData = fData.filter(d => d.val !== null && !isNaN(d.val)); 
-                                return (
-                                  <>
-                                    <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์ {fData.length} วัน</h5>
-                                    <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
-                                      {fData.map((d,i)=>{
-                                        const maxVal = Math.max(...fData.map(x=>x.val)) + (isRainMode?10:5) || 1;
-                                        const h = Math.max((d.val / maxVal) * 100, 5);
-                                        return (
-                                          <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
-                                            <span style={{fontSize:'10px', color:d.colorInfo.color||subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
-                                            <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
-                                              <div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'3px 3px 0 0'}}></div>
-                                            </div>
-                                            <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
+                          {activeWeather ? (() => {
+                            if (isTempMode) {
+                              return (
+                                <div>
+                                  <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์อุณหภูมิ 7 วัน (ต่ำสุด - สูงสุด)</h5>
+                                  <div style={{ height:'110px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
+                                    {activeWeather.tempForecast.map((d,i)=>{
+                                      const globalMax = Math.max(...activeWeather.tempForecast.map(x=>x.val)) + 1;
+                                      const globalMin = Math.min(...activeWeather.tempForecast.map(x=>x.minVal)) - 1;
+                                      const range = globalMax - globalMin || 1;
+                                      const bottomP = Math.max(0, ((d.minVal - globalMin) / range) * 100);
+                                      const heightP = Math.max(8, ((d.val - d.minVal) / range) * 100);
+
+                                      return (
+                                        <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
+                                          <span style={{fontSize:'10px', color:textColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}°</span>
+                                          {/* แกนแนวตั้ง (ราง) */}
+                                          <div style={{width:'8px', flex:1, position:'relative', backgroundColor: darkMode?'#334155':'#e2e8f0', borderRadius:'4px', margin:'2px 0'}}>
+                                            {/* แท่งอุณหภูมิ (Range) */}
+                                            <div style={{position:'absolute', bottom:`${bottomP}%`, height:`${heightP}%`, width:'100%', backgroundColor:d.colorInfo.bar, borderRadius:'4px', backgroundImage: `linear-gradient(to top, #60a5fa, ${d.colorInfo.bar})`}}></div>
                                           </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </>
-                                );
-                              })() : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
-                            </div>
-                          )}
+                                          <span style={{fontSize:'10px', color:'#3b82f6', fontWeight:'bold', marginTop:'4px'}}>{d.minVal}°</span>
+                                          <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            } else if (isPm25Mode) {
+                               return (
+                                <div>
+                                  <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
+                                  <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'3px' }}>
+                                    {activeForecast ? activeForecast.map((d,i)=>{
+                                      const maxVal = Math.max(...activeForecast.map(x=>x.val)) || 1;
+                                      const h = Math.max((d.val / maxVal) * 100, 5); 
+                                      return (
+                                        <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
+                                          <span style={{fontSize:'9px', color:subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
+                                          <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
+                                            <div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'3px 3px 0 0'}}></div>
+                                          </div>
+                                          <span style={{fontSize:'8px', color:subTextColor, marginTop:'4px', height:'12px'}}>{i%3===0?d.time:''}</span>
+                                        </div>
+                                      );
+                                    }) : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // 🚀 กราฟโหมดอื่นๆ (ที่ไม่ใช่ Temp และ PM2.5)
+                            let fData = isHeatMode?activeWeather.heatForecast:isUvMode?activeWeather.uvForecast:isRainMode?activeWeather.rainForecast:isWindMode?activeWeather.windForecast:[];
+                            fData = fData.filter(d => d.val !== null && !isNaN(d.val)); 
+                            if(fData.length === 0) return null;
+                            
+                            return (
+                              <div>
+                                <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์ {fData.length} วัน</h5>
+                                <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
+                                  {fData.map((d,i)=>{
+                                    const maxVal = Math.max(...fData.map(x=>x.val)) + (isRainMode?10:5) || 1;
+                                    const h = Math.max((d.val / maxVal) * 100, 5);
+                                    return (
+                                      <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
+                                        <span style={{fontSize:'10px', color:d.colorInfo.color||subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
+                                        <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
+                                          <div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'3px 3px 0 0'}}></div>
+                                        </div>
+                                        <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })() : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
                         </div>
                       )}
                     </div>
@@ -723,7 +756,6 @@ export default function App() {
           {alertsLoading ? null : (alertsData.warnings.length > 0 || alertsData.normals.length > 0) && (
             <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '25px' }}>
               
-              {/* คอลัมน์ซ้าย: แจ้งเตือนภัย (Warnings) */}
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ fontSize: '1.3rem', color: '#ef4444', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #fecaca`, paddingBottom: '10px' }}>🚨 สิ่งที่ต้องเฝ้าระวัง</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -743,7 +775,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* คอลัมน์ขวา: สภาวะปลอดภัย (Normals) */}
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ fontSize: '1.3rem', color: '#10b981', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #bbf7d0`, paddingBottom: '10px' }}>✅ สภาวะปลอดภัย</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
