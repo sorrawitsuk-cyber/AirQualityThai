@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api-air/:match*",
-      "destination": "http://air4thai.com/bmd/api/:match*"
+      "destination": "http://air4thai.pcd.go.th/:match*"
     }
   ]
 }
