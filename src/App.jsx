@@ -267,11 +267,9 @@ export default function App() {
   const [showRadar, setShowRadar] = useState(false);
   const [radarTime, setRadarTime] = useState(null);
 
-  // 🚀 สเตทสำหรับ "กราฟจิ๋วในการ์ด"
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
 
-  // 📊 สเตทสำหรับ Dashboard ล่าง
   const [dashHistory, setDashHistory] = useState([]);
   const [dashForecast, setDashForecast] = useState([]);
   const [dashLoading, setDashLoading] = useState(false);
@@ -380,15 +378,13 @@ export default function App() {
     setFilteredStations(result);
   }, [selectedProvince, selectedStationId, allStations, viewMode, sortOrder, stationTemps]);
 
-  // 🚀 ฟังก์ชันดึงข้อมูล "กราฟในการ์ด" แบบเฉพาะเจาะจง (ทำงานแยกกับ Dashboard ล่าง)
   useEffect(() => {
     if (activeStation) {
       if (cardRefs.current[activeStation.stationID]) cardRefs.current[activeStation.stationID].scrollIntoView({ behavior: 'smooth', block: 'center' });
       const marker = markerRefs.current[activeStation.stationID];
       if (marker && !showRadar) marker.openPopup(); 
 
-      setActiveWeather(null); 
-      setActiveForecast(null);
+      setActiveWeather(null); setActiveForecast(null);
 
       const fetchCardDetails = async () => {
         try {
@@ -421,7 +417,6 @@ export default function App() {
             const currentRealPm25 = Number(activeStation.AQILast?.PM25?.value);
             let offset = (!isNaN(currentRealPm25) && aData.hourly.pm2_5[startIndex] !== undefined) ? currentRealPm25 - aData.hourly.pm2_5[startIndex] : 0;
             const pmForecastList = [];
-            // ดึงข้อมูลราย 3 ชม. ล่วงหน้า 72 ชม. (24 แท่ง)
             for (let i = startIndex; i < aData.hourly.time.length && pmForecastList.length < 24; i += 3) {
               let calibratedVal = Math.max(0, (aData.hourly.pm2_5[i] || 0) + offset);
               pmForecastList.push({ time: `${new Date(aData.hourly.time[i]).getHours().toString().padStart(2, '0')}`, val: Math.round(calibratedVal), color: getPM25Color(calibratedVal) });
@@ -633,6 +628,17 @@ export default function App() {
                         <span style={{ fontSize: '1.2rem', color: getPM25Color(pm25Value) === '#ffff00' ? '#d4b500' : getPM25Color(pm25Value), fontWeight: 'bold' }}>PM2.5: {isNaN(pm25Value) ? '-' : pm25Value} µg/m³</span>
                         <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px' }}>(AQI: <span style={{color: getAqiDetails(station.AQILast?.AQI?.aqi).color === '#ffff00' ? '#d4b500' : getAqiDetails(station.AQILast?.AQI?.aqi).color, fontWeight: 'bold'}}>{station.AQILast?.AQI?.aqi || '-'}</span>)</div>
                       </div>
+                      {/* 🚀 ข้อมูลสภาพอากาศใน Popup กลับมาแล้ว! */}
+                      {tObj && (
+                        <div style={{ marginTop: '10px', padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px', color: '#334155', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                          <div style={{ textAlign: 'center', marginBottom: '8px', fontSize: '1.1rem', color: '#1e293b' }}>{getWeatherIcon(tObj.weatherCode).icon} <span style={{fontSize: '0.95rem'}}>{getWeatherIcon(tObj.weatherCode).text}</span></div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left' }}>
+                              <span>🌡️ {tObj.temp?.toFixed(1) || '-'} °C</span><span>🥵 รู้สึก: {tObj.feelsLike?.toFixed(1) || '-'} °C</span>
+                              <span style={{color: '#0ea5e9'}}>💧 ชื้น: {tObj.humidity || '-'}%</span><span style={{color: '#0ea5e9'}}>🌧️ ฝน: {tObj.rainProb || '0'}%</span>
+                              <span style={{color: '#a855f7'}}>☀️ UV: {tObj.uvMax || '-'}</span><span style={{color: '#34495e', display: 'flex', alignItems: 'center', gap: '2px'}}>🌬️ ลม: {tObj.windSpeed || '-'} <span style={{ transform: `rotate(${tObj.windDir}deg)`, display: 'inline-block' }}>↓</span></span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </Popup>
                 </Marker>
@@ -654,12 +660,14 @@ export default function App() {
               const pm25Value = Number(station.AQILast?.PM25?.value); const aqiValue = station.AQILast?.AQI?.aqi || '--'; const aqiInfo = getAqiDetails(station.AQILast?.AQI?.aqi);
               const isActive = activeStation?.stationID === station.stationID; const tObj = stationTemps[station.stationID];
               let displayMainVal = '-', unitLabel = '', boxBgColor = '#ccc';
+              
               if (isPm25Mode) { displayMainVal = isNaN(pm25Value) ? '-' : pm25Value; unitLabel = 'µg/m³'; boxBgColor = getPM25Color(pm25Value); }
               else if (isTempMode) { displayMainVal = tObj?.temp !== undefined ? tObj.temp.toFixed(1) : '-'; unitLabel = '°C'; boxBgColor = getTempColor(tObj?.temp).bar; }
               else if (isHeatMode) { displayMainVal = tObj?.feelsLike !== undefined ? tObj.feelsLike.toFixed(1) : '-'; unitLabel = '°C'; boxBgColor = tObj ? getHeatIndexAlert(tObj.feelsLike).bar : '#ccc'; }
               else if (isUvMode) { displayMainVal = tObj?.uvMax !== undefined ? tObj.uvMax : '-'; unitLabel = 'UV'; boxBgColor = tObj ? getUvColor(tObj.uvMax).bar : '#ccc'; }
               else if (isRainMode) { displayMainVal = tObj?.rainProb !== undefined ? `${tObj.rainProb}%` : '-'; unitLabel = 'ตก'; boxBgColor = tObj ? getRainColor(tObj.rainProb).bar : '#ccc'; }
               else if (isWindMode) { displayMainVal = tObj?.windSpeed !== undefined ? tObj.windSpeed : '-'; unitLabel = 'km/h'; boxBgColor = tObj ? getWindColor(tObj.windSpeed).bar : '#ccc'; }
+              
               let healthAdvice = null;
               if (isPm25Mode) healthAdvice = getPM25HealthAdvice(pm25Value); else if (isHeatMode) healthAdvice = getHeatHealthAdvice(tObj?.feelsLike); else if (isUvMode) healthAdvice = getUvHealthAdvice(tObj?.uvMax);
 
@@ -696,7 +704,7 @@ export default function App() {
                     <div style={{ marginTop: '12px', padding: '10px', backgroundColor: darkMode ? '#334155' : '#f8fafc', borderRadius: '8px', border: `1px dashed ${boxBgColor}`, display: 'flex', gap: '8px', alignItems: 'flex-start' }}><span style={{ fontSize: '1.2rem' }}>{healthAdvice.icon}</span><span style={{ fontSize: '0.8rem', color: textColor, lineHeight: 1.4 }}>{healthAdvice.text}</span></div>
                   )}
 
-                  {/* 🚀 กราฟแท่งจิ๋วพยากรณ์ล่วงหน้า (กลับมาแล้ว!) */}
+                  {/* 🚀 กราฟแท่งจิ๋วพยากรณ์ล่วงหน้า (ในการ์ด) กลับมาแล้ว! */}
                   {isActive && (
                     <div style={{ borderTop: `1px solid ${borderColor}`, marginTop: '15px', paddingTop: '15px' }}>
                       {isPm25Mode ? (
