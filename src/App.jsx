@@ -307,10 +307,28 @@ export default function App() {
   };
 
   // 🚀 ฟังก์ชันดึงข้อมูลจาก Firebase (โหลดรวดเดียว 180 สถานีใน 0.1 วินาที!)
+  // 🚀 ฟังก์ชันดึงข้อมูลจาก Firebase + ระบบ Cache (เร็วทะลุนรก 0.1 วิ!)
   const fetchAirQuality = async (isBackgroundLoad = false) => {
-    if (!isBackgroundLoad) setLoading(true);
+    
+    // 1. ⚡ เช็ค Cache ก่อนเลย! ถ้ามีของเก่าในเครื่อง ให้เอามาโชว์ทันที (ไม่ให้จอเทา)
+    const cachedData = localStorage.getItem('dashboard_cache');
+    if (cachedData && !isBackgroundLoad) {
+      try {
+        const parsedCache = JSON.parse(cachedData);
+        setAllStations(parsedCache.stations);
+        setProvinces([...new Set(parsedCache.stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')));
+        setLastUpdateText(`${parsedCache.stations[0].AQILast?.date || ''} เวลา ${parsedCache.stations[0].AQILast?.time || ''} น.`);
+        setStationTemps(parsedCache.weather);
+        // หมายเหตุ: ไม่สั่ง setLoading(true) เพราะเรามีข้อมูลมาโชว์ให้ผู้ใช้ดูแล้ว
+      } catch (e) {
+        console.error("Cache parsing error", e);
+      }
+    } else if (!isBackgroundLoad) {
+      setLoading(true); // โชว์หน้า Loading เฉพาะตอนเข้าเว็บครั้งแรกสุดๆ ที่ไม่มี Cache
+    }
+
     try {
-      // ยิง API ไปที่โกดัง Firebase ของเราโดยตรง
+      // 2. 📡 แอบไปดึงข้อมูลล่าสุดจาก Firebase แบบเงียบๆ (Background Fetch)
       const PROJECT_ID = "thai-env-dashboard"; 
       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/weatherData/latest`;
       
@@ -318,8 +336,6 @@ export default function App() {
       if (!response.ok) throw new Error('Network error');
       
       const rawData = await response.json();
-      
-      // แกะกล่องข้อมูล JSON ที่บอท Apps Script แพ็คไว้ให้
       const payloadString = rawData.fields.jsonData.stringValue;
       const parsedData = JSON.parse(payloadString);
       
@@ -327,12 +343,13 @@ export default function App() {
       const weather = parsedData.weather;
       
       if (stations && stations.length > 0) {
-        // อัปเดตข้อมูลฝุ่นและสถานี
+        // 3. 💾 เซฟข้อมูลล่าสุดลงตู้เย็น (Cache) ไว้ใช้รอบหน้า
+        localStorage.setItem('dashboard_cache', JSON.stringify({ stations, weather }));
+        
+        // 4. ✨ อัปเดตหน้าจอให้เป็นข้อมูลใหม่สุด
         setAllStations(stations);
         setProvinces([...new Set(stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')));
         setLastUpdateText(`${stations[0].AQILast?.date || ''} เวลา ${stations[0].AQILast?.time || ''} น.`);
-        
-        // อัปเดตสภาพอากาศรวดเดียวจบ!
         setStationTemps(weather); 
       }
     } catch (err) { 
