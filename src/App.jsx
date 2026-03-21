@@ -19,19 +19,14 @@ const getUvHealthAdvice = (val) => { return (isNaN(val)||val===null)?null:val>10
 const getRainColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:'#333',bar:'#ccc',label:'ไม่มีข้อมูล'}:val===0?{bg:'#95a5a6',text:'#fff',bar:'#95a5a6',label:'ไม่มีฝน'}:val<=30?{bg:'#74b9ff',text:'#222',bar:'#74b9ff',label:'โอกาสต่ำ'}:val<=60?{bg:'#0984e3',text:'#fff',bar:'#0984e3',label:'ปานกลาง'}:val<=80?{bg:'#273c75',text:'#fff',bar:'#273c75',label:'โอกาสสูง'}:{bg:'#192a56',text:'#fff',bar:'#192a56',label:'โอกาสสูงมาก'}; };
 const getWindColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:'#333',bar:'#ccc',label:'ไม่มีข้อมูล'}:val<=10?{bg:'#00b0f0',text:'#fff',bar:'#00b0f0',label:'ลมอ่อน'}:val<=25?{bg:'#2ecc71',text:'#fff',bar:'#2ecc71',label:'ลมปานกลาง'}:val<=40?{bg:'#f1c40f',text:'#222',bar:'#f1c40f',label:'ลมแรง'}:val<=60?{bg:'#e67e22',text:'#fff',bar:'#e67e22',label:'ลมแรงมาก'}:{bg:'#e74c3c',text:'#fff',bar:'#e74c3c',label:'พายุ'}; };
 const getWeatherIcon = (c) => { if(c===undefined||c===null)return{icon:'❓',text:'ไม่ทราบ'}; if(c===0)return{icon:'☀️',text:'แจ่มใส'}; if(c===1)return{icon:'🌤️',text:'มีเมฆบางส่วน'}; if(c===2)return{icon:'⛅',text:'มีเมฆ'}; if(c===3)return{icon:'☁️',text:'มีเมฆมาก'}; if([45,48].includes(c))return{icon:'🌫️',text:'มีหมอก'}; if([51,53,55,56,57].includes(c))return{icon:'🌧️',text:'ฝนปรอย'}; if([61,63,65,66,67].includes(c))return{icon:'🌧️',text:'ฝนตก'}; if([71,73,75,77,85,86].includes(c))return{icon:'❄️',text:'หิมะ'}; if([80,81,82].includes(c))return{icon:'🌦️',text:'ฝนตกหย่อมๆ'}; if([95,96,99].includes(c))return{icon:'⛈️',text:'พายุฝน'}; return{icon:'🌤️',text:'ปกติ'}; };
-
-// 🚀 แก้ไขฟังก์ชันดึงชื่อจังหวัดให้ลบ "จ." ออกอย่างหมดจด
 const extractProvince = (area) => { 
   if(!area) return 'ไม่ระบุ'; 
-  if(area.includes('กรุงเทพ')||area.includes('กทม')||area.includes('เขต')) return 'กรุงเทพมหานคร'; 
   let p = area.includes(',') ? area.split(',').pop() : area.trim().split(/\s+/).pop(); 
-  // เคลียร์ช่องว่างและเอาคำว่า จ. หรือ จังหวัด ออกให้หมด
   p = p.trim().replace(/^(จ\.|จังหวัด)/, '').trim();
-  // ดักเคสพิมพ์ติดกันแปลกๆ เช่น "อ.เมืองจ.เชียงใหม่"
   if (p.includes('จ.')) p = p.split('จ.').pop().trim();
+  if (p.includes('กรุงเทพ') || p.includes('กทม')) return 'กรุงเทพมหานคร'; 
   return p; 
 };
-
 const getWindDirTxt = (d) => { if(d===null||d===undefined)return'ไม่ทราบทิศ'; if(d>=337.5||d<22.5)return'เหนือ'; if(d>=22.5&&d<67.5)return'ตะวันออกเฉียงเหนือ'; if(d>=67.5&&d<112.5)return'ตะวันออก'; if(d>=112.5&&d<157.5)return'ตะวันออกเฉียงใต้'; if(d>=157.5&&d<202.5)return'ใต้'; if(d>=202.5&&d<247.5)return'ตะวันตกเฉียงใต้'; if(d>=247.5&&d<292.5)return'ตะวันตก'; return'ตะวันตกเฉียงเหนือ'; };
 
 const legendData = {
@@ -73,8 +68,15 @@ function FitBounds({ stations, activeStation, selectedProvince }) {
   useEffect(() => {
     if (activeStation) return; 
     if (stations && stations.length > 0) {
-      if (!selectedProvince) map.flyTo([13.5, 101.0], 6, { duration: 1.5 });
-      else { const bounds = L.latLngBounds(stations.map(s => [parseFloat(s.lat), parseFloat(s.long)])); map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 }); }
+      if (!selectedProvince) {
+        map.flyTo([13.5, 101.0], 6, { duration: 1.5 });
+      } else { 
+        const validStations = stations.filter(s => s.lat && s.long && !isNaN(s.lat) && !isNaN(s.long) && parseFloat(s.lat) !== 0);
+        if (validStations.length > 0) {
+          const bounds = L.latLngBounds(validStations.map(s => [parseFloat(s.lat), parseFloat(s.long)])); 
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 }); 
+        }
+      }
     }
   }, [stations, map, activeStation, selectedProvince]);
   return null;
@@ -119,6 +121,14 @@ export default function App() {
   const [showRadar, setShowRadar] = useState(false);
   const [radarTime, setRadarTime] = useState(null);
   
+  // 🚀 เพิ่ม State สำหรับเช็กมือถือ เพื่อปรับ Layout ให้ไม่บีบเละ
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
 
@@ -128,11 +138,12 @@ export default function App() {
   const [dashTitle, setDashTitle] = useState('ภาพรวมทั้งประเทศ');
 
   const [currentPage, setCurrentPage] = useState('map'); 
-  const [showStats, setShowStats] = useState(window.innerWidth >= 768);
+  const [showStats, setShowStats] = useState(!isMobile);
 
   const [alertsData, setAlertsData] = useState({ warnings: [], normals: [] });
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsLocationName, setAlertsLocationName] = useState('');
+  const [alertProvince, setAlertProvince] = useState(''); // 🚀 ตัวแปรเก็บค่าจังหวัดหน้าแจ้งเตือน
   const [nationwideSummary, setNationwideSummary] = useState(null);
 
   const cardRefs = useRef({});
@@ -361,14 +372,21 @@ export default function App() {
 
   const handleReset = () => { setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); setCurrentPage('map'); };
   
-  const handleFindNearest = () => {
-    if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); setLocating(true);
-    navigator.geolocation.getCurrentPosition((pos) => {
-      let nearest = null; let minD = Infinity;
-      allStations.forEach(s => { const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); if (d<minD){minD=d; nearest=s;} });
-      if (nearest) { setSelectedProvince(extractProvince(nearest.areaTH)); setSelectedStationId(nearest.stationID); setActiveStation(nearest); setShowRadar(false); setCurrentPage('map'); }
-      setLocating(false);
-    }, () => { alert('ดึงพิกัดไม่ได้'); setLocating(false); });
+  const handleScanLocation = () => {
+    if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); 
+    setAlertProvince(''); // เคลียร์ dropdown จังหวัดเมื่อกดปุ่ม GPS
+    setAlertsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        fetchAlertsData(pos.coords.latitude, pos.coords.longitude, '📍 พิกัดปัจจุบันของฉัน');
+        if (currentPage === 'map') {
+           let nearest = null; let minD = Infinity;
+           allStations.forEach(s => { const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); if (d<minD){minD=d; nearest=s;} });
+           if (nearest) { setSelectedProvince(extractProvince(nearest.areaTH)); setSelectedStationId(nearest.stationID); setActiveStation(nearest); setShowRadar(false); }
+        }
+      }, 
+      () => { alert('ไม่อนุญาต GPS'); setAlertsLoading(false); }
+    );
   };
 
   const fetchAlertsData = async (lat, lon, locName) => {
@@ -454,11 +472,6 @@ export default function App() {
     } catch(e) { console.error("Alert err:", e); } finally { setAlertsLoading(false); }
   };
 
-  const handleScanLocation = () => {
-    if (!navigator.geolocation) return alert('ไม่รองรับ GPS');
-    navigator.geolocation.getCurrentPosition((pos) => fetchAlertsData(pos.coords.latitude, pos.coords.longitude, '📍 พิกัดปัจจุบันของคุณ'), () => alert('ไม่อนุญาต GPS'));
-  };
-
   useEffect(() => {
     if (currentPage==='alerts' && !alertsLocationName) {
       if(activeStation) fetchAlertsData(activeStation.lat, activeStation.long, `สถานี${activeStation.nameTH}`);
@@ -481,34 +494,33 @@ export default function App() {
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', backgroundColor:themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'auto', overflowX:'hidden' }}>
       
       {/* HEADER */}
-      <header style={{ background: darkMode ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)', color: '#fff', padding: '12px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+      <header style={{ background: darkMode ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)', color: '#fff', padding: isMobile ? '10px 15px' : '12px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <div style={{ fontSize: '1.8rem', background: '#fff', borderRadius: '50%', padding: '5px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{darkMode ? '🌙' : '🌤️'}</div>
+            <div style={{ fontSize: isMobile ? '1.5rem' : '1.8rem', background: '#fff', borderRadius: '50%', padding: '5px', width: isMobile ? '38px' : '48px', height: isMobile ? '38px' : '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{darkMode ? '🌙' : '🌤️'}</div>
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold' }}>Thailand Environment Dashboard</h1>
+              <h1 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 'bold' }}>Thailand Environment Dashboard</h1>
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#cbd5e1' }}>ระบบเฝ้าระวังคุณภาพอากาศและสภาพอากาศ</p>
             </div>
           </div>
           {currentPage === 'map' && (
             <>
-              <div style={{ width: '1px', height: '35px', backgroundColor: 'rgba(255,255,255,0.3)', display: window.innerWidth < 1024 ? 'none' : 'block' }}></div>
+              <div style={{ width: '1px', height: '35px', backgroundColor: 'rgba(255,255,255,0.3)', display: isMobile ? 'none' : 'block' }}></div>
               <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '6px 15px', borderRadius: '30px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>🗺️</label>
-                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '150px', outline: 'none', cursor: 'pointer' }}>
+                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '130px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">ทุกจังหวัด</option>{provinces.map(p => (<option key={p} value={p}>{p}</option>))}
                   </select>
                 </div>
                 <div style={{ width: '2px', height: '20px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📍</label>
-                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '220px', outline: 'none', cursor: 'pointer' }}>
+                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '150px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">-- เลือกสถานี --</option>
                     {filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(s => (<option key={s.stationID} value={s.stationID}>{s.nameTH}</option>))}
                   </select>
                 </div>
-                <button onClick={handleReset} style={{ padding: '8px 16px', backgroundColor: '#fff', color: '#0ea5e9', border: 'none', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>🏠 หน้าแรก</button>
               </div>
             </>
           )}
@@ -526,10 +538,10 @@ export default function App() {
       {/* BODY CONTENT */}
       {currentPage === 'map' ? (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px' }}>
+          <div style={{ display: 'flex', gap: '15px', flexDirection: isMobile ? 'column' : 'row', padding: '15px' }}>
             
-            {/* MAP AREA */}
-            <div style={{ flex: 7, borderRadius: '12px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '50vh' : 'calc(100vh - 120px)' }}>
+            {/* 🚀 MAP AREA (แก้ไข Layout บนมือถือ) */}
+            <div style={{ flex: isMobile ? 'none' : 7, width: '100%', height: isMobile ? '400px' : 'calc(100vh - 120px)', flexShrink: 0, borderRadius: '12px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}` }}>
               
               <div className="hide-scrollbar" style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: '30px', display: 'flex', gap: '8px', overflowX: 'auto', whiteSpace: 'nowrap', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
                 <button onClick={() => handleViewModeChange('pm25')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isPm25Mode ? '#0ea5e9' : 'transparent', color: isPm25Mode ? '#fff' : subTextColor }}>☁️ PM2.5</button>
@@ -549,7 +561,7 @@ export default function App() {
               <button onClick={handleFindNearest} disabled={locating} style={{ position: 'absolute', bottom: '25px', right: '15px', zIndex: 500, width: '44px', height: '44px', borderRadius: '50%', backgroundColor: cardBg, color: textColor, border: `1px solid ${borderColor}`, cursor: locating ? 'wait' : 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>{locating ? '⏳' : '🎯'}</button>
 
               {!showRadar && (
-                <div style={{ position: 'absolute', bottom: '25px', left: window.innerWidth < 768 ? '15px' : '60px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
+                <div style={{ position: 'absolute', bottom: '25px', left: isMobile ? '15px' : '60px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: textColor }}>{legendData[viewMode].title}</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     {legendData[viewMode].items.map((item, idx) => (
@@ -603,8 +615,8 @@ export default function App() {
               </MapContainer>
             </div>
 
-            {/* SIDEBAR RIGHT LIST */}
-            <div style={{ flex: 3, minWidth: window.innerWidth < 768 ? '100%' : '380px', maxWidth: window.innerWidth < 768 ? '100%' : '450px', backgroundColor: cardBg, borderRadius: '12px', display: 'flex', flexDirection: 'column', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? 'auto' : 'calc(100vh - 120px)', maxHeight: window.innerWidth < 768 ? '50vh' : 'none' }}>
+            {/* 🚀 SIDEBAR RIGHT LIST (แก้ไข Layout บนมือถือ) */}
+            <div style={{ flex: isMobile ? 'none' : 3, width: '100%', height: isMobile ? '500px' : 'calc(100vh - 120px)', flexShrink: 0, backgroundColor: cardBg, borderRadius: '12px', display: 'flex', flexDirection: 'column', border: `1px solid ${borderColor}` }}>
               <div style={{ padding: '15px', background: darkMode ? '#0f172a' : '#f0f9ff', borderBottom: `1px solid ${borderColor}`, display: 'flex', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
                 <h2 style={{ fontSize: '1rem', color: textColor, margin: 0, fontWeight: 'bold' }}>{activeChart.name} <span style={{fontSize:'0.85rem', color:subTextColor}}>({filteredStations.length} จุด)</span></h2>
                 <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: cardBg, color: textColor, outline:'none' }}>
@@ -746,7 +758,7 @@ export default function App() {
               {showStats && (
                 <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: `1px solid ${borderColor}` }}>
                   {dashLoading ? <div style={{ textAlign:'center', color:subTextColor, padding:'50px' }}>⏳ กำลังประมวลผลข้อมูลดาวเทียม...</div> : dashHistory.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 1fr', gap: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: !isMobile ? '1fr 1fr' : '1fr', gap: '20px' }}>
                       <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
                         <h3 style={{ fontSize: '1rem', color: textColor, textAlign: 'center', fontWeight:'bold' }}>⏳ ย้อนหลัง 14 วัน</h3>
                         <div style={{ height: '220px', marginTop:'15px' }}>
@@ -781,22 +793,52 @@ export default function App() {
           </div>
         </div>
       ) : (
-        // ======================= ALERTS TAB =======================
+        // ======================= 🚀 ALERTS TAB =======================
         <div style={{ flex: 1, padding: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
           
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
             <h2 style={{ fontSize: '2rem', color: textColor, marginBottom: '10px', fontWeight:'bold' }}>🔔 ศูนย์พยากรณ์และแจ้งเตือนภัย</h2>
             <p style={{ color: subTextColor, fontSize:'1.1rem', marginBottom: '25px' }}>วิเคราะห์ข้อมูลเชิงลึก 24 ชั่วโมงข้างหน้า เพื่อให้คุณวางแผนชีวิตได้ง่ายขึ้น</p>
-            <button onClick={handleScanLocation} disabled={alertsLoading} style={{ backgroundColor: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '30px', padding: '15px 30px', fontSize: '1.1rem', fontWeight: 'bold', cursor: alertsLoading?'wait':'pointer', boxShadow: '0 4px 15px rgba(14,165,233,0.4)', transition: '0.2s' }}>
-              {alertsLoading ? '⏳ กำลังประมวลผลผ่านดาวเทียม...' : '📍 ตรวจสอบพิกัดปัจจุบันของฉัน'}
-            </button>
-            {alertsLocationName && !alertsLoading && <div style={{ marginTop: '20px', padding: '8px 15px', backgroundColor: darkMode?'#0f172a':'#f0f9ff', borderRadius: '20px', color: '#0ea5e9', fontWeight: 'bold', display:'inline-block' }}>พิกัดที่กำลังวิเคราะห์: {alertsLocationName}</div>}
+            
+            {/* 🚀 เพิ่ม Dropdown ค้นหาจังหวัดคู่กับปุ่ม GPS */}
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'center', gap: '15px', alignItems: 'center' }}>
+              <button onClick={handleScanLocation} disabled={alertsLoading} style={{ backgroundColor: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '30px', padding: '12px 25px', fontSize: '1.05rem', fontWeight: 'bold', cursor: alertsLoading?'wait':'pointer', boxShadow: '0 4px 15px rgba(14,165,233,0.4)', transition: '0.2s', width: isMobile ? '100%' : 'auto' }}>
+                {alertsLoading ? '⏳ กำลังประมวลผล...' : '📍 พิกัดปัจจุบันของฉัน'}
+              </button>
+              
+              <div style={{ color: subTextColor, fontWeight: 'bold' }}>หรือ</div>
+              
+              <select 
+                value={alertProvince}
+                onChange={(e) => {
+                  const prov = e.target.value;
+                  setAlertProvince(prov);
+                  if (prov) {
+                    const provStations = allStations.filter(s => extractProvince(s.areaTH) === prov);
+                    if (provStations.length > 0) {
+                      // หาค่าพิกัดกลางของจังหวัดนั้นๆ เพื่อดึงพยากรณ์อากาศ
+                      const avgLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length;
+                      const avgLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length;
+                      fetchAlertsData(avgLat, avgLon, `จังหวัด${prov}`);
+                    } else {
+                      alert('ขออภัย ไม่พบสถานีตรวจวัดในจังหวัดนี้');
+                    }
+                  }
+                }}
+                style={{ padding: '12px 20px', borderRadius: '30px', border: `1px solid ${borderColor}`, backgroundColor: cardBg, color: textColor, outline: 'none', fontSize: '1.05rem', width: isMobile ? '100%' : 'auto', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}
+              >
+                <option value="">ค้นหาพยากรณ์รายจังหวัด...</option>
+                {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+
+            {alertsLocationName && !alertsLoading && <div style={{ marginTop: '25px', padding: '8px 20px', backgroundColor: darkMode?'#0f172a':'#f0f9ff', borderRadius: '20px', color: '#0ea5e9', fontWeight: 'bold', display:'inline-block' }}>พื้นที่กำลังวิเคราะห์: {alertsLocationName}</div>}
           </div>
 
           {alertsLoading ? null : (alertsData.warnings.length > 0 || alertsData.normals.length > 0) && (
-            <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontSize: '1.3rem', color: '#ef4444', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #fecaca`, paddingBottom: '10px' }}>🚨 สิ่งที่ต้องเฝ้าระวัง (พิกัดคุณ)</h3>
+                <h3 style={{ fontSize: '1.3rem', color: '#ef4444', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #fecaca`, paddingBottom: '10px' }}>🚨 สิ่งที่ต้องเฝ้าระวัง</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {alertsData.warnings.length > 0 ? (
                     alertsData.warnings.map((al, idx) => (
@@ -815,7 +857,7 @@ export default function App() {
               </div>
 
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontSize: '1.3rem', color: '#10b981', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #bbf7d0`, paddingBottom: '10px' }}>✅ สภาวะปลอดภัย (พิกัดคุณ)</h3>
+                <h3 style={{ fontSize: '1.3rem', color: '#10b981', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #bbf7d0`, paddingBottom: '10px' }}>✅ สภาวะปลอดภัย</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {alertsData.normals.length > 0 ? (
                     alertsData.normals.map((al, idx) => (
@@ -835,7 +877,7 @@ export default function App() {
           )}
 
           {nationwideSummary && (
-            <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: window.innerWidth < 768 ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+            <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: isMobile ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
               <div style={{ textAlign: 'center', marginBottom: '25px' }}>
                 <h3 style={{ fontSize: '1.5rem', color: textColor, margin: '0 0 5px 0', fontWeight:'bold' }}>🇹🇭 สรุปภาพรวมความเสี่ยงทั่วประเทศ (วันนี้)</h3>
                 <p style={{ margin: 0, color: subTextColor, fontSize: '0.95rem' }}>วิเคราะห์ข้อมูลจากจุดตรวจวัดกว่า {allStations.length} จุดทั่วไทย เพื่อหาสถานที่ที่ต้องเฝ้าระวังเป็นพิเศษ</p>
