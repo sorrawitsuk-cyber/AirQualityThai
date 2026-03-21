@@ -6,7 +6,7 @@ import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, Cartesia
 import './App.css';
 
 // ==============================================================
-// 1. ฟังก์ชันคำนวณสีและข้อความ (Minified)
+// 1. ฟังก์ชันคำนวณสีและข้อความ (Minified & Bulletproof)
 // ==============================================================
 const getAqiDetails = (val) => { const v=Number(val); return isNaN(v)||v===0?{color:'#ccc',text:'ไม่มีข้อมูล',level:0}:v<=25?{color:'#00b0f0',text:'คุณภาพอากาศดีมาก',level:1}:v<=50?{color:'#92d050',text:'คุณภาพอากาศดี',level:2}:v<=100?{color:'#ffff00',text:'ปานกลาง',level:3}:v<=200?{color:'#ffc000',text:'เริ่มมีผลกระทบฯ',level:4}:{color:'#ff0000',text:'มีผลกระทบต่อสุขภาพ',level:5};};
 const getPM25Color = (val) => { const v=Number(val); return isNaN(v)?'#ccc':v<=15?'#00b0f0':v<=25?'#92d050':v<=37.5?'#ffff00':v<=75?'#ffc000':'#ff0000'; };
@@ -19,14 +19,22 @@ const getUvHealthAdvice = (val) => { return (isNaN(val)||val===null)?null:val>10
 const getRainColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:'#333',bar:'#ccc',label:'ไม่มีข้อมูล'}:val===0?{bg:'#95a5a6',text:'#fff',bar:'#95a5a6',label:'ไม่มีฝน'}:val<=30?{bg:'#74b9ff',text:'#222',bar:'#74b9ff',label:'โอกาสต่ำ'}:val<=60?{bg:'#0984e3',text:'#fff',bar:'#0984e3',label:'ปานกลาง'}:val<=80?{bg:'#273c75',text:'#fff',bar:'#273c75',label:'โอกาสสูง'}:{bg:'#192a56',text:'#fff',bar:'#192a56',label:'โอกาสสูงมาก'}; };
 const getWindColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:'#333',bar:'#ccc',label:'ไม่มีข้อมูล'}:val<=10?{bg:'#00b0f0',text:'#fff',bar:'#00b0f0',label:'ลมอ่อน'}:val<=25?{bg:'#2ecc71',text:'#fff',bar:'#2ecc71',label:'ลมปานกลาง'}:val<=40?{bg:'#f1c40f',text:'#222',bar:'#f1c40f',label:'ลมแรง'}:val<=60?{bg:'#e67e22',text:'#fff',bar:'#e67e22',label:'ลมแรงมาก'}:{bg:'#e74c3c',text:'#fff',bar:'#e74c3c',label:'พายุ'}; };
 const getWeatherIcon = (c) => { if(c===undefined||c===null)return{icon:'❓',text:'ไม่ทราบ'}; if(c===0)return{icon:'☀️',text:'แจ่มใส'}; if(c===1)return{icon:'🌤️',text:'มีเมฆบางส่วน'}; if(c===2)return{icon:'⛅',text:'มีเมฆ'}; if(c===3)return{icon:'☁️',text:'มีเมฆมาก'}; if([45,48].includes(c))return{icon:'🌫️',text:'มีหมอก'}; if([51,53,55,56,57].includes(c))return{icon:'🌧️',text:'ฝนปรอย'}; if([61,63,65,66,67].includes(c))return{icon:'🌧️',text:'ฝนตก'}; if([71,73,75,77,85,86].includes(c))return{icon:'❄️',text:'หิมะ'}; if([80,81,82].includes(c))return{icon:'🌦️',text:'ฝนตกหย่อมๆ'}; if([95,96,99].includes(c))return{icon:'⛈️',text:'พายุฝน'}; return{icon:'🌤️',text:'ปกติ'}; };
+
+// 🚀 ฟังก์ชันดึงจังหวัดแบบกันหน้าเว็บพัง (Try-Catch Protected)
 const extractProvince = (area) => { 
-  if(!area) return 'ไม่ระบุ'; 
-  let p = area.includes(',') ? area.split(',').pop() : area.trim().split(/\s+/).pop(); 
-  p = p.trim().replace(/^(จ\.|จังหวัด)/, '').trim();
-  if (p.includes('จ.')) p = p.split('จ.').pop().trim();
-  if (p.includes('กรุงเทพ') || p.includes('กทม')) return 'กรุงเทพมหานคร'; 
-  return p; 
+  try {
+    if(!area || typeof area !== 'string') return 'ไม่ระบุ'; 
+    let p = area.includes(',') ? area.split(',').pop() : area.trim().split(/\s+/).pop(); 
+    if(!p) return 'ไม่ระบุ';
+    p = String(p).trim().replace(/^(จ\.|จังหวัด)/, '').trim();
+    if (p.includes('จ.')) p = p.split('จ.').pop().trim();
+    if (p.includes('กรุงเทพ') || p.includes('กทม')) return 'กรุงเทพมหานคร'; 
+    return p; 
+  } catch (error) {
+    return 'ไม่ระบุ';
+  }
 };
+
 const getWindDirTxt = (d) => { if(d===null||d===undefined)return'ไม่ทราบทิศ'; if(d>=337.5||d<22.5)return'เหนือ'; if(d>=22.5&&d<67.5)return'ตะวันออกเฉียงเหนือ'; if(d>=67.5&&d<112.5)return'ตะวันออก'; if(d>=112.5&&d<157.5)return'ตะวันออกเฉียงใต้'; if(d>=157.5&&d<202.5)return'ใต้'; if(d>=202.5&&d<247.5)return'ตะวันตกเฉียงใต้'; if(d>=247.5&&d<292.5)return'ตะวันตก'; return'ตะวันตกเฉียงเหนือ'; };
 
 const legendData = {
@@ -121,10 +129,16 @@ export default function App() {
   const [showRadar, setShowRadar] = useState(false);
   const [radarTime, setRadarTime] = useState(null);
   
-  // 🚀 เพิ่ม State สำหรับเช็กมือถือ เพื่อปรับ Layout ให้ไม่บีบเละ
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  // 🚀 ระบบเช็กหน้าจอแบบป้องกันการพัง (Safe Window Check)
+  const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
+
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => {
+      setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
+      setIsTablet(typeof window !== 'undefined' && window.innerWidth < 1024);
+    };
+    handleResize(); // เซ็ตค่าครั้งแรกหลังโหลดเว็บ
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -138,12 +152,15 @@ export default function App() {
   const [dashTitle, setDashTitle] = useState('ภาพรวมทั้งประเทศ');
 
   const [currentPage, setCurrentPage] = useState('map'); 
-  const [showStats, setShowStats] = useState(!isMobile);
+  const [showStats, setShowStats] = useState(true);
+
+  // สลับการซ่อน/โชว์สถิติอัตโนมัติเมื่อขนาดหน้าจอเปลี่ยน
+  useEffect(() => { setShowStats(!isMobile); }, [isMobile]);
 
   const [alertsData, setAlertsData] = useState({ warnings: [], normals: [] });
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsLocationName, setAlertsLocationName] = useState('');
-  const [alertProvince, setAlertProvince] = useState(''); // 🚀 ตัวแปรเก็บค่าจังหวัดหน้าแจ้งเตือน
+  const [alertProvince, setAlertProvince] = useState('');
   const [nationwideSummary, setNationwideSummary] = useState(null);
 
   const cardRefs = useRef({});
@@ -321,7 +338,6 @@ export default function App() {
       if (dW.daily && dW.daily.time) {
         for (let i=0; i<dW.daily.time.length; i++) {
           let dObj = new Date(dW.daily.time[i]);
-          
           let avgPm = null;
           if (dA.hourly && dA.hourly.pm2_5) { 
             const startIdx = i*24;
@@ -330,7 +346,6 @@ export default function App() {
               if(hrs.length > 0) avgPm = Math.round(hrs.reduce((a,b)=>a+b,0)/hrs.length); 
             }
           }
-
           let item = {
             date: dObj.toLocaleDateString('th-TH',{day:'numeric',month:'short'}),
             dayName: ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'][dObj.getDay()],
@@ -341,7 +356,6 @@ export default function App() {
             uv: dW.daily.uv_index_max ? (dW.daily.uv_index_max[i] ?? null) : null, 
             pm25: avgPm
           };
-          
           if (i<14) {
             item.tempLY = dArc.daily?.temperature_2m_max?(dArc.daily.temperature_2m_max[i]||0):0;
             item.heatLY = dArc.daily?.apparent_temperature_max?(dArc.daily.apparent_temperature_max[i]||0):0;
@@ -374,7 +388,7 @@ export default function App() {
   
   const handleScanLocation = () => {
     if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); 
-    setAlertProvince(''); // เคลียร์ dropdown จังหวัดเมื่อกดปุ่ม GPS
+    setAlertProvince('');
     setAlertsLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -394,77 +408,46 @@ export default function App() {
     try {
       const urlW = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,uv_index,wind_speed_10m,wind_direction_10m&forecast_days=2&timezone=Asia%2FBangkok`;
       const urlA = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=pm2_5&forecast_days=2&timezone=Asia%2FBangkok`;
-      
       const [rW, rA] = await Promise.all([fetch(urlW), fetch(urlA)]);
       const [dW, dA] = await Promise.all([rW.json(), rA.json()]);
 
-      let warns = [];
-      let norms = [];
+      let warns = []; let norms = [];
       const nIdx = new Date().getHours();
       const fmt = (iso) => `${new Date(iso).getHours()}:00 น.`;
 
-      let rain3hP = 0, rain3hV = 0, rain3hT = '';
-      let rain24hList = [];
+      let rain3hP = 0, rain3hV = 0, rain3hT = ''; let rain24hList = [];
       if(dW.hourly && dW.hourly.time) {
-        dW.hourly.time.slice(nIdx, nIdx+3).forEach((t, i) => {
-          const idx = nIdx+i;
-          if (dW.hourly.precipitation_probability[idx] > rain3hP) { rain3hP=dW.hourly.precipitation_probability[idx]; rain3hV=dW.hourly.precipitation[idx]; rain3hT=t; }
-        });
-        dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-           const idx = nIdx+i;
-           if(dW.hourly.precipitation_probability[idx] >= 20) {
-               rain24hList.push({ t, p: dW.hourly.precipitation_probability[idx], v: dW.hourly.precipitation[idx] });
-           }
-        });
+        dW.hourly.time.slice(nIdx, nIdx+3).forEach((t, i) => { const idx = nIdx+i; if (dW.hourly.precipitation_probability[idx] > rain3hP) { rain3hP=dW.hourly.precipitation_probability[idx]; rain3hV=dW.hourly.precipitation[idx]; rain3hT=t; } });
+        dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => { const idx = nIdx+i; if(dW.hourly.precipitation_probability[idx] >= 20) { rain24hList.push({ t, p: dW.hourly.precipitation_probability[idx], v: dW.hourly.precipitation[idx] }); } });
       }
 
-      if (rain3hP >= 30 || rain3hV > 0.1) {
-          warns.push({ icon:'🌧️', color:'#3b82f6', title:'เตรียมพกร่ม! (ฝนใน 3 ชม.)', desc:`พบกลุ่มฝน โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm ช่วงเวลา ${fmt(rain3hT)}` });
-      } else if (rain24hList.length > 0) {
+      if (rain3hP >= 30 || rain3hV > 0.1) warns.push({ icon:'🌧️', color:'#3b82f6', title:'เตรียมพกร่ม! (ฝนใน 3 ชม.)', desc:`พบกลุ่มฝน โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm ช่วงเวลา ${fmt(rain3hT)}` });
+      else if (rain24hList.length > 0) {
           let peak = rain24hList.reduce((max, obj) => obj.p > max.p ? obj : max, rain24hList[0]);
           if (peak.p >= 50) warns.push({ icon:'🌦️', color:'#0ea5e9', title:'แนวโน้มฝนตกใน 24 ชม.', desc:`วันนี้มีโอกาสฝนตก ${peak.p}% ช่วงเวลาประมาณ ${fmt(peak.t)} เตรียมตัวและเผื่อเวลาเดินทาง` });
           else norms.push({ icon:'🌥️', color:'#0ea5e9', title:'โอกาสเกิดฝนเล็กน้อย (24 ชม.)', desc:`อาจมีละอองฝนช่วง ${fmt(peak.t)} (${peak.p}%) แต่โดยรวมสามารถทำกิจกรรมได้ตามปกติ` });
-      } else {
-          norms.push({ icon:'☀️', color:'#10b981', title:'ไม่มีฝน (ตลอด 24 ชม.)', desc:`โอกาสเกิดฝนต่ำมาก ท้องฟ้าโปร่ง สามารถทำกิจกรรมกลางแจ้ง ซักผ้า หรือเดินทางได้เต็มที่` });
-      }
+      } else norms.push({ icon:'☀️', color:'#10b981', title:'ไม่มีฝน (ตลอด 24 ชม.)', desc:`โอกาสเกิดฝนต่ำมาก ท้องฟ้าโปร่ง สามารถทำกิจกรรมกลางแจ้ง ซักผ้า หรือเดินทางได้เต็มที่` });
 
       let mWindS = 0, mWindD = 0, windT = '';
-      if(dW.hourly && dW.hourly.time) {
-          dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-              const idx = nIdx+i;
-              if(dW.hourly.wind_speed_10m[idx] > mWindS) { mWindS = dW.hourly.wind_speed_10m[idx]; mWindD = dW.hourly.wind_direction_10m[idx]; windT = t; }
-          });
-      }
+      if(dW.hourly && dW.hourly.time) { dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => { const idx = nIdx+i; if(dW.hourly.wind_speed_10m[idx] > mWindS) { mWindS = dW.hourly.wind_speed_10m[idx]; mWindD = dW.hourly.wind_direction_10m[idx]; windT = t; } }); }
       let windDirTxt = getWindDirTxt(mWindD);
       if (mWindS >= 40) warns.push({ icon:'🌪️', color:'#f59e0b', title:'เตือนภัยลมกระโชกแรง', desc:`ลมพัดแรงจากทิศ${windDirTxt} ความเร็วสูงสุด ${mWindS} km/h (${fmt(windT)}) ระวังสิ่งของปลิวหรือกิ่งไม้หัก`});
       else norms.push({ icon:'🍃', color:'#10b981', title:'สภาพลมปกติ', desc:`ลมพัดเบาถึงปานกลาง จากทิศ${windDirTxt} ความเร็วสูงสุด ${mWindS} km/h (${fmt(windT)}) อากาศถ่ายเทได้ดี`});
 
       let mHeat = 0, hTime = '';
-      if(dW.hourly && dW.hourly.time) {
-         dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-             const idx = nIdx+i; if (dW.hourly.apparent_temperature[idx] > mHeat) { mHeat = dW.hourly.apparent_temperature[idx]; hTime = t; }
-         });
-      }
+      if(dW.hourly && dW.hourly.time) { dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => { const idx = nIdx+i; if (dW.hourly.apparent_temperature[idx] > mHeat) { mHeat = dW.hourly.apparent_temperature[idx]; hTime = t; } }); }
       if (mHeat >= 42) warns.push({ icon:'🥵', color:'#ef4444', title:'อากาศร้อนอันตราย!', desc:`ดัชนีความร้อนจะแตะ ${mHeat.toFixed(1)}°C (${fmt(hTime)}) ควรงดกิจกรรมกลางแจ้งเด็ดขาด`});
       else if (mHeat >= 33) warns.push({ icon:'😰', color:'#ea580c', title:'เตือนภัยอากาศร้อน', desc:`ดัชนีความร้อนแตะ ${mHeat.toFixed(1)}°C (${fmt(hTime)}) ควรลดระยะเวลากิจกรรมและดื่มน้ำบ่อยๆ`});
       else norms.push({ icon:'😎', color:'#22c55e', title:'อุณหภูมิเกณฑ์ปลอดภัย', desc:`ดัชนีความร้อนสูงสุด ${mHeat.toFixed(1)}°C (${fmt(hTime)}) อากาศกำลังดี ไม่เป็นอันตรายต่อสุขภาพ`});
 
       let mPm = 0, pTime = '';
-      if(dA.hourly && dA.hourly.pm2_5) {
-         dA.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-             const idx = nIdx+i; if(dA.hourly.pm2_5[idx] > mPm) { mPm = dA.hourly.pm2_5[idx]; pTime = t; }
-         });
-      }
+      if(dA.hourly && dA.hourly.pm2_5) { dA.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => { const idx = nIdx+i; if(dA.hourly.pm2_5[idx] > mPm) { mPm = dA.hourly.pm2_5[idx]; pTime = t; } }); }
       if (mPm >= 75) warns.push({ icon:'☠️', color:'#dc2626', title:'ฝุ่น PM2.5 ระดับอันตราย', desc:`ฝุ่นสูงสุด ${mPm.toFixed(1)} µg/m³ (${fmt(pTime)}) ควรงดออกจากบ้าน หรือใส่หน้ากาก N95 ตลอดเวลา`});
       else if (mPm >= 37.5) warns.push({ icon:'😷', color:'#f59e0b', title:'ฝุ่น PM2.5 เริ่มมีผลกระทบ', desc:`ฝุ่นจะแตะ ${mPm.toFixed(1)} µg/m³ (${fmt(pTime)}) กลุ่มเสี่ยงควรหลีกเลี่ยงพื้นที่โล่งแจ้ง`});
       else norms.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ปริมาณฝุ่นสูงสุดเพียง ${mPm.toFixed(1)} µg/m³ หายใจได้เต็มปอด ไร้กังวลเรื่องฝุ่น`});
 
       let mUv = 0, uTime = '';
-      if(dW.hourly && dW.hourly.time) {
-         dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-             const idx = nIdx+i; if(dW.hourly.uv_index[idx] > mUv) { mUv = dW.hourly.uv_index[idx]; uTime = t; }
-         });
-      }
+      if(dW.hourly && dW.hourly.time) { dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => { const idx = nIdx+i; if(dW.hourly.uv_index[idx] > mUv) { mUv = dW.hourly.uv_index[idx]; uTime = t; } }); }
       if (mUv >= 8) warns.push({ icon:'☀️', color:'#a855f7', title:'รังสี UV สูงมาก', desc:`ดัชนี UV ถึงระดับ ${mUv} (${fmt(uTime)}) เสี่ยงผิวไหม้รุนแรง ควรทากันแดด SPF50+ และกางร่ม`});
       else norms.push({ icon:'🌤️', color:'#3b82f6', title:'รังสี UV ระดับปลอดภัย', desc:`ดัชนี UV สูงสุดระดับ ${mUv} (${fmt(uTime)}) สามารถออกแดดได้ ไม่เป็นอันตรายรุนแรง`});
 
@@ -488,7 +471,7 @@ export default function App() {
   const borderColor = darkMode ? '#334155' : '#e2e8f0';
   const activeChart = chartConfigs[viewMode] || chartConfigs['pm25']; 
 
-  const validForecast = dashForecast.filter(d => d[activeChart.key] !== null && d[activeChart.key] !== undefined);
+  const validForecast = dashForecast.filter(d => d && d[activeChart.key] !== null && d[activeChart.key] !== undefined);
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', backgroundColor:themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'auto', overflowX:'hidden' }}>
@@ -505,7 +488,7 @@ export default function App() {
           </div>
           {currentPage === 'map' && (
             <>
-              <div style={{ width: '1px', height: '35px', backgroundColor: 'rgba(255,255,255,0.3)', display: isMobile ? 'none' : 'block' }}></div>
+              <div style={{ width: '1px', height: '35px', backgroundColor: 'rgba(255,255,255,0.3)', display: isTablet ? 'none' : 'block' }}></div>
               <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '6px 15px', borderRadius: '30px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>🗺️</label>
@@ -528,7 +511,7 @@ export default function App() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '25px', padding: '4px' }}>
-            <button onClick={() => setCurrentPage('map')} style={{ padding: '6px 16px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: currentPage === 'map' ? '#fff' : 'transparent', color: currentPage === 'map' ? '#0ea5e9' : '#fff' }}>🗺️ แผนที่ & สถิติ</button>
+            <button onClick={() => setCurrentPage('map')} style={{ padding: '6px 16px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: currentPage === 'map' ? '#fff' : 'transparent', color: currentPage === 'map' ? '#0ea5e9' : '#fff' }}>🗺️ แผนที่</button>
             <button onClick={() => setCurrentPage('alerts')} style={{ padding: '6px 16px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: currentPage === 'alerts' ? '#fff' : 'transparent', color: currentPage === 'alerts' ? '#0ea5e9' : '#fff' }}>🔔 แจ้งเตือนภัย</button>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer', fontSize: '1.2rem' }}>{darkMode ? '☀️' : '🌙'}</button>
@@ -538,10 +521,10 @@ export default function App() {
       {/* BODY CONTENT */}
       {currentPage === 'map' ? (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <div style={{ display: 'flex', gap: '15px', flexDirection: isMobile ? 'column' : 'row', padding: '15px' }}>
+          <div style={{ display: 'flex', gap: '15px', flexDirection: isTablet ? 'column' : 'row', padding: '15px' }}>
             
-            {/* 🚀 MAP AREA (แก้ไข Layout บนมือถือ) */}
-            <div style={{ flex: isMobile ? 'none' : 7, width: '100%', height: isMobile ? '400px' : 'calc(100vh - 120px)', flexShrink: 0, borderRadius: '12px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}` }}>
+            {/* MAP AREA */}
+            <div style={{ flex: isTablet ? 'none' : 7, width: '100%', height: isTablet ? '400px' : 'calc(100vh - 120px)', flexShrink: 0, borderRadius: '12px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}` }}>
               
               <div className="hide-scrollbar" style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: '30px', display: 'flex', gap: '8px', overflowX: 'auto', whiteSpace: 'nowrap', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
                 <button onClick={() => handleViewModeChange('pm25')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isPm25Mode ? '#0ea5e9' : 'transparent', color: isPm25Mode ? '#fff' : subTextColor }}>☁️ PM2.5</button>
@@ -615,8 +598,8 @@ export default function App() {
               </MapContainer>
             </div>
 
-            {/* 🚀 SIDEBAR RIGHT LIST (แก้ไข Layout บนมือถือ) */}
-            <div style={{ flex: isMobile ? 'none' : 3, width: '100%', height: isMobile ? '500px' : 'calc(100vh - 120px)', flexShrink: 0, backgroundColor: cardBg, borderRadius: '12px', display: 'flex', flexDirection: 'column', border: `1px solid ${borderColor}` }}>
+            {/* SIDEBAR RIGHT LIST */}
+            <div style={{ flex: isTablet ? 'none' : 3, width: '100%', height: isTablet ? '500px' : 'calc(100vh - 120px)', flexShrink: 0, backgroundColor: cardBg, borderRadius: '12px', display: 'flex', flexDirection: 'column', border: `1px solid ${borderColor}` }}>
               <div style={{ padding: '15px', background: darkMode ? '#0f172a' : '#f0f9ff', borderBottom: `1px solid ${borderColor}`, display: 'flex', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
                 <h2 style={{ fontSize: '1rem', color: textColor, margin: 0, fontWeight: 'bold' }}>{activeChart.name} <span style={{fontSize:'0.85rem', color:subTextColor}}>({filteredStations.length} จุด)</span></h2>
                 <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: cardBg, color: textColor, outline:'none' }}>
@@ -709,7 +692,7 @@ export default function App() {
                             }
 
                             let fData = isHeatMode?activeWeather.heatForecast:isUvMode?activeWeather.uvForecast:isRainMode?activeWeather.rainForecast:isWindMode?activeWeather.windForecast:[];
-                            fData = fData.filter(d => d.val !== null && !isNaN(d.val)); 
+                            fData = fData.filter(d => d && d.val !== null && !isNaN(d.val)); 
                             if(fData.length === 0) return null;
                             
                             return (
@@ -758,7 +741,7 @@ export default function App() {
               {showStats && (
                 <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: `1px solid ${borderColor}` }}>
                   {dashLoading ? <div style={{ textAlign:'center', color:subTextColor, padding:'50px' }}>⏳ กำลังประมวลผลข้อมูลดาวเทียม...</div> : dashHistory.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: !isMobile ? '1fr 1fr' : '1fr', gap: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: '20px' }}>
                       <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
                         <h3 style={{ fontSize: '1rem', color: textColor, textAlign: 'center', fontWeight:'bold' }}>⏳ ย้อนหลัง 14 วัน</h3>
                         <div style={{ height: '220px', marginTop:'15px' }}>
@@ -800,7 +783,6 @@ export default function App() {
             <h2 style={{ fontSize: '2rem', color: textColor, marginBottom: '10px', fontWeight:'bold' }}>🔔 ศูนย์พยากรณ์และแจ้งเตือนภัย</h2>
             <p style={{ color: subTextColor, fontSize:'1.1rem', marginBottom: '25px' }}>วิเคราะห์ข้อมูลเชิงลึก 24 ชั่วโมงข้างหน้า เพื่อให้คุณวางแผนชีวิตได้ง่ายขึ้น</p>
             
-            {/* 🚀 เพิ่ม Dropdown ค้นหาจังหวัดคู่กับปุ่ม GPS */}
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'center', gap: '15px', alignItems: 'center' }}>
               <button onClick={handleScanLocation} disabled={alertsLoading} style={{ backgroundColor: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '30px', padding: '12px 25px', fontSize: '1.05rem', fontWeight: 'bold', cursor: alertsLoading?'wait':'pointer', boxShadow: '0 4px 15px rgba(14,165,233,0.4)', transition: '0.2s', width: isMobile ? '100%' : 'auto' }}>
                 {alertsLoading ? '⏳ กำลังประมวลผล...' : '📍 พิกัดปัจจุบันของฉัน'}
@@ -816,7 +798,6 @@ export default function App() {
                   if (prov) {
                     const provStations = allStations.filter(s => extractProvince(s.areaTH) === prov);
                     if (provStations.length > 0) {
-                      // หาค่าพิกัดกลางของจังหวัดนั้นๆ เพื่อดึงพยากรณ์อากาศ
                       const avgLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length;
                       const avgLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length;
                       fetchAlertsData(avgLat, avgLon, `จังหวัด${prov}`);
@@ -836,7 +817,7 @@ export default function App() {
           </div>
 
           {alertsLoading ? null : (alertsData.warnings.length > 0 || alertsData.normals.length > 0) && (
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ fontSize: '1.3rem', color: '#ef4444', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #fecaca`, paddingBottom: '10px' }}>🚨 สิ่งที่ต้องเฝ้าระวัง</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
