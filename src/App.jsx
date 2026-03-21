@@ -5,9 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './App.css';
 
-// ==============================================================
-// 1. ฟังก์ชันคำนวณสีและข้อความ (Minified)
-// ==============================================================
+// 1. ฟังก์ชันคำนวณสีและข้อความ
 const getAqiDetails = (val) => { const v=Number(val); return isNaN(v)||v===0?{color:'#ccc',text:'ไม่มีข้อมูล',level:0}:v<=25?{color:'#00b0f0',text:'คุณภาพอากาศดีมาก',level:1}:v<=50?{color:'#92d050',text:'คุณภาพอากาศดี',level:2}:v<=100?{color:'#ffff00',text:'ปานกลาง',level:3}:v<=200?{color:'#ffc000',text:'เริ่มมีผลกระทบฯ',level:4}:{color:'#ff0000',text:'มีผลกระทบต่อสุขภาพ',level:5};};
 const getPM25Color = (val) => { const v=Number(val); return isNaN(v)?'#ccc':v<=15?'#00b0f0':v<=25?'#92d050':v<=37.5?'#ffff00':v<=75?'#ffc000':'#ff0000'; };
 const getPM25HealthAdvice = (val) => { const v=Number(val); return isNaN(v)||v===0?null:v<=25?{text:"อากาศดีเยี่ยม เหมาะกับการทำกิจกรรมกลางแจ้ง",icon:"🏃‍♂️"}:v<=37.5?{text:"ประชาชนทั่วไปทำกิจกรรมได้ปกติ",icon:"🚶‍♀️"}:v<=75?{text:"ลดระยะเวลาการทำกิจกรรมกลางแจ้ง (หน้ากาก N95)",icon:"😷"}:{text:"งดกิจกรรมกลางแจ้งเด็ดขาด",icon:"🚨"}; };
@@ -49,9 +47,7 @@ const chartConfigs = {
   wind: { key: 'wind', keyLY: 'windLY', name: 'ความเร็วลมสูงสุด', unit: 'km/h', color: '#64748b', hasLY: true, type: 'line' },
 };
 
-// ==============================================================
 // 2. Map Components
-// ==============================================================
 const createCustomMarker = (viewMode, value, extraData) => {
   let bg, textColor, displayValue;
   const fontSize = String(value).length > 2 ? '9px' : '11px';
@@ -70,9 +66,8 @@ function FitBounds({ stations, activeStation, selectedProvince }) {
   useEffect(() => {
     if (activeStation) return; 
     if (stations && stations.length > 0) {
-      if (!selectedProvince) {
-        map.flyTo([13.5, 101.0], 6, { duration: 1.5 });
-      } else { 
+      if (!selectedProvince) { map.flyTo([13.5, 101.0], 6, { duration: 1.5 }); } 
+      else { 
         const validStations = stations.filter(s => s.lat && s.long && !isNaN(s.lat) && !isNaN(s.long) && parseFloat(s.lat) !== 0);
         if (validStations.length > 0) {
           const bounds = L.latLngBounds(validStations.map(s => [parseFloat(s.lat), parseFloat(s.long)])); 
@@ -108,8 +103,10 @@ function deg2rad(deg) { return deg * (Math.PI/180) }
 // 3. Main App Component
 // ==============================================================
 export default function App() {
-  const [allStations, setAllStations] = useState([]);
+  const [pm25Stations, setPm25Stations] = useState([]); // 187 จุด
+  const [weatherStations, setWeatherStations] = useState([]); // 77 จุด
   const [filteredStations, setFilteredStations] = useState([]);
+  
   const [provinces, setProvinces] = useState([]);
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedStationId, setSelectedStationId] = useState('');
@@ -149,7 +146,13 @@ export default function App() {
     else document.body.classList.remove('dark-theme');
   }, [darkMode]);
 
-  const handleViewModeChange = (mode) => { setViewMode(mode); setSortOrder(mode === 'temp' ? 'asc' : 'desc'); setShowRadar(false); };
+  const handleViewModeChange = (mode) => { 
+    setViewMode(mode); 
+    setSortOrder(mode === 'temp' ? 'asc' : 'desc'); 
+    setShowRadar(false); 
+    setSelectedStationId(''); // รีเซ็ตสถานีเมื่อเปลี่ยนโหมด เพราะรายการสถานีจะเปลี่ยนไป
+    setActiveStation(null);
+  };
 
   const toggleRadar = async () => {
     if (!showRadar) {
@@ -167,18 +170,16 @@ export default function App() {
     if (cachedData && !isBackgroundLoad) {
       try {
         const parsedCache = JSON.parse(cachedData);
-        setAllStations(parsedCache.stations);
-        setProvinces([...new Set(parsedCache.stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')));
-        setLastUpdateText(`${parsedCache.stations[0].AQILast?.date || ''} เวลา ${parsedCache.stations[0].AQILast?.time || ''} น.`);
-        setStationTemps(parsedCache.weather);
+        setPm25Stations(parsedCache.stations || []);
+        setWeatherStations(parsedCache.weatherStations || []);
+        setProvinces([...new Set((parsedCache.stations || []).map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')));
+        setLastUpdateText(`${parsedCache.stations[0]?.AQILast?.date || ''} เวลา ${parsedCache.stations[0]?.AQILast?.time || ''} น.`);
+        setStationTemps(parsedCache.weather || {});
       } catch (e) { console.error("Cache error", e); }
-    } else if (!isBackgroundLoad) {
-      setLoading(true);
-    }
+    } else if (!isBackgroundLoad) { setLoading(true); }
 
     try {
       const PROJECT_ID = "thai-env-dashboard"; 
-      // 🚀 เพิ่ม Cache Busting (?t=) ป้องกันการติด Cache
       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/weatherData/latest?t=${new Date().getTime()}`;
       const response = await fetch(url, { cache: 'no-store' });
       if (!response.ok) throw new Error('Network error');
@@ -187,14 +188,16 @@ export default function App() {
       const payloadString = rawData.fields.jsonData.stringValue;
       const parsedData = JSON.parse(payloadString);
       
-      const stations = parsedData.stations;
-      const weather = parsedData.weather;
+      const stations = parsedData.stations || [];
+      const wStations = parsedData.weatherStations || [];
+      const weather = parsedData.weather || {};
       
-      if (stations && stations.length > 0) {
-        localStorage.setItem('dashboard_cache', JSON.stringify({ stations, weather }));
-        setAllStations(stations);
+      if (stations.length > 0) {
+        localStorage.setItem('dashboard_cache', JSON.stringify({ stations, weatherStations: wStations, weather }));
+        setPm25Stations(stations);
+        setWeatherStations(wStations);
         setProvinces([...new Set(stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')));
-        setLastUpdateText(`${stations[0].AQILast?.date || ''} เวลา ${stations[0].AQILast?.time || ''} น.`);
+        setLastUpdateText(`${stations[0]?.AQILast?.date || ''} เวลา ${stations[0]?.AQILast?.time || ''} น.`);
         setStationTemps(weather); 
       }
     } catch (err) { console.error("Fetch error:", err); } 
@@ -203,43 +206,47 @@ export default function App() {
 
   useEffect(() => {
     fetchAirQuality();
-    // 🚀 อัปเดตทุก 1 ชั่วโมง (3600000 ms)
-    const intervalId = setInterval(() => { fetchAirQuality(true); }, 3600000); 
+    const intervalId = setInterval(() => { fetchAirQuality(true); }, 1800000); 
     return () => clearInterval(intervalId);
   }, []);
 
+  // วิเคราะห์ความเสี่ยงทั่วประเทศ (ใช้ PM2.5 187 จุด และ Weather 77 จุด เพื่อความแม่นยำสูงสุด)
   useEffect(() => {
-    if (allStations.length === 0 || Object.keys(stationTemps).length === 0) return;
-    const provData = {};
-    allStations.forEach(s => {
-      const prov = extractProvince(s.areaTH);
+    if (pm25Stations.length === 0 || weatherStations.length === 0) return;
+    
+    let pm25Risks = []; let stormRisks = []; let heatRisks = [];
+    
+    pm25Stations.forEach(s => {
+      const pm = Number(s.AQILast?.PM25?.value);
+      if(pm >= 37.5) pm25Risks.push({ prov: extractProvince(s.areaTH), val: pm });
+    });
+    
+    weatherStations.forEach(s => {
       const t = stationTemps[s.stationID];
-      const pm = Number(s.AQILast?.PM25?.value) || 0;
-      if(!provData[prov]) provData[prov] = { pm: 0, rain: 0, heat: 0, wind: 0 };
-      if(pm > provData[prov].pm) provData[prov].pm = pm;
       if(t) {
-        if(t.rainProb > provData[prov].rain) provData[prov].rain = t.rainProb;
-        if(t.heatMax > provData[prov].heat) provData[prov].heat = t.heatMax;
-        if(t.windMax > provData[prov].wind) provData[prov].wind = t.windMax;
+        if(t.rainProb >= 40 || t.windMax >= 30) stormRisks.push({ prov: s.areaTH, rain: t.rainProb, wind: t.windMax });
+        if(t.heatMax >= 40) heatRisks.push({ prov: s.areaTH, val: t.heatMax });
       }
     });
 
-    let pm25Risks = []; let stormRisks = []; let heatRisks = [];
-    Object.keys(provData).forEach(prov => {
-      const d = provData[prov];
-      if(d.pm >= 37.5) pm25Risks.push({ prov, val: d.pm });
-      if(d.rain >= 40 || d.wind >= 30) stormRisks.push({ prov, rain: d.rain, wind: d.wind });
-      if(d.heat >= 40) heatRisks.push({ prov, val: d.heat });
-    });
-
     pm25Risks.sort((a,b)=>b.val - a.val); stormRisks.sort((a,b)=>Math.max(b.rain, b.wind) - Math.max(a.rain, a.wind)); heatRisks.sort((a,b)=>b.val - a.val);
-    setNationwideSummary({ pm25: pm25Risks.slice(0, 15), storm: stormRisks.slice(0, 15), heat: heatRisks.slice(0, 15) });
-  }, [allStations, stationTemps]);
+    
+    // จัดกลุ่มจังหวัดไม่ให้ซ้ำกันเกินไป
+    const uniquePm = []; const pmSet = new Set();
+    pm25Risks.forEach(item => { if(!pmSet.has(item.prov)){ pmSet.add(item.prov); uniquePm.push(item); }});
 
+    setNationwideSummary({ pm25: uniquePm.slice(0, 15), storm: stormRisks.slice(0, 15), heat: heatRisks.slice(0, 15) });
+  }, [pm25Stations, weatherStations, stationTemps]);
+
+  // จัดการการแสดงผลของหมุดและลิสต์รายชื่อ (สลับ 187 จุด กับ 77 จุด)
   useEffect(() => {
-    let result = [...allStations];
+    // 🚀 พระเอกของงานนี้: ถ้าโหมด PM2.5 ใช้ 187 จุด / ถ้าโหมดอากาศ ใช้ 77 จุด
+    const activeList = viewMode === 'pm25' ? pm25Stations : weatherStations;
+    let result = [...activeList];
+    
     if (selectedProvince) result = result.filter(s => extractProvince(s.areaTH) === selectedProvince);
     if (selectedStationId) result = result.filter(s => s.stationID === selectedStationId);
+    
     result.sort((a, b) => {
       let vA, vB;
       if (viewMode==='pm25') { vA = Number(a.AQILast?.PM25?.value); vB = Number(b.AQILast?.PM25?.value); }
@@ -248,13 +255,14 @@ export default function App() {
       else if (viewMode==='uv') { vA = stationTemps[a.stationID]?.uvMax; vB = stationTemps[b.stationID]?.uvMax; }
       else if (viewMode==='rain') { vA = stationTemps[a.stationID]?.rainProb; vB = stationTemps[b.stationID]?.rainProb; }
       else if (viewMode==='wind') { vA = stationTemps[a.stationID]?.windSpeed; vB = stationTemps[b.stationID]?.windSpeed; }
+      
       const validA = vA!==undefined && vA!==null && !isNaN(vA) && (viewMode==='rain'?true:vA!==0);
       const validB = vB!==undefined && vB!==null && !isNaN(vB) && (viewMode==='rain'?true:vB!==0);
       if (!validA && validB) return 1; if (validA && !validB) return -1; if (!validA && !validB) return 0;
       return sortOrder === 'desc' ? vB - vA : vA - vB;
     });
     setFilteredStations(result);
-  }, [selectedProvince, selectedStationId, allStations, viewMode, sortOrder, stationTemps]);
+  }, [selectedProvince, selectedStationId, pm25Stations, weatherStations, viewMode, sortOrder, stationTemps]);
 
   useEffect(() => {
     if (activeStation && currentPage === 'map') {
@@ -262,6 +270,7 @@ export default function App() {
       const marker = markerRefs.current[activeStation.stationID];
       if (marker && !showRadar) marker.openPopup(); 
       setActiveWeather(null); setActiveForecast(null);
+      
       const fetchCardDetails = async () => {
         try {
           const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7`;
@@ -356,15 +365,15 @@ export default function App() {
 
   useEffect(() => {
     if (currentPage === 'map') {
-      if (activeStation) fetchDashboardData(activeStation.lat, activeStation.long, `สถานี${activeStation.nameTH} (${extractProvince(activeStation.areaTH)})`);
+      if (activeStation) fetchDashboardData(activeStation.lat, activeStation.long, `พื้นที่: ${activeStation.nameTH}`);
       else if (selectedProvince) {
-        const pStat = allStations.filter(s => extractProvince(s.areaTH) === selectedProvince);
-        if (pStat.length > 0) fetchDashboardData(pStat.reduce((a,b)=>a+parseFloat(b.lat),0)/pStat.length, pStat.reduce((a,b)=>a+parseFloat(b.long),0)/pStat.length, `ค่าเฉลี่ย ${selectedProvince}`);
-      } else if (allStations.length > 0) {
-        fetchDashboardData(allStations.reduce((a,b)=>a+parseFloat(b.lat),0)/allStations.length, allStations.reduce((a,b)=>a+parseFloat(b.long),0)/allStations.length, 'ภาพรวมประเทศ');
+        const pStat = pm25Stations.filter(s => extractProvince(s.areaTH) === selectedProvince);
+        if (pStat.length > 0) fetchDashboardData(pStat.reduce((a,b)=>a+parseFloat(b.lat),0)/pStat.length, pStat.reduce((a,b)=>a+parseFloat(b.long),0)/pStat.length, `ค่าเฉลี่ย จ.${selectedProvince}`);
+      } else if (pm25Stations.length > 0) {
+        fetchDashboardData(13.75, 100.5, 'ภาพรวมประเทศ (อ้างอิงตอนกลาง)');
       }
     }
-  }, [activeStation, selectedProvince, allStations, currentPage]);
+  }, [activeStation, selectedProvince, pm25Stations, currentPage]);
 
   const handleReset = () => { setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); setCurrentPage('map'); };
   
@@ -372,7 +381,8 @@ export default function App() {
     if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); setLocating(true);
     navigator.geolocation.getCurrentPosition((pos) => {
       let nearest = null; let minD = Infinity;
-      allStations.forEach(s => { const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); if (d<minD){minD=d; nearest=s;} });
+      const activeList = viewMode === 'pm25' ? pm25Stations : weatherStations;
+      activeList.forEach(s => { const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); if (d<minD){minD=d; nearest=s;} });
       if (nearest) { setSelectedProvince(extractProvince(nearest.areaTH)); setSelectedStationId(nearest.stationID); setActiveStation(nearest); setShowRadar(false); setCurrentPage('map'); }
       setLocating(false);
     }, () => { alert('ดึงพิกัดไม่ได้'); setLocating(false); });
@@ -468,10 +478,10 @@ export default function App() {
 
   useEffect(() => {
     if (currentPage==='alerts' && !alertsLocationName) {
-      if(activeStation) fetchAlertsData(activeStation.lat, activeStation.long, `สถานี${activeStation.nameTH}`);
-      else if(allStations.length>0) fetchAlertsData(13.75, 100.5, 'กรุงเทพมหานคร (เริ่มต้น)');
+      if(activeStation) fetchAlertsData(activeStation.lat, activeStation.long, `พื้นที่: ${activeStation.nameTH}`);
+      else fetchAlertsData(13.75, 100.5, 'กรุงเทพมหานคร (เริ่มต้น)');
     }
-  }, [currentPage, activeStation, allStations, alertsLocationName]);
+  }, [currentPage, activeStation, alertsLocationName]);
 
   if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', fontSize:'1.5rem', color:'#555' }}>กำลังโหลด...</div>;
 
@@ -483,13 +493,7 @@ export default function App() {
   const activeChart = chartConfigs[viewMode] || chartConfigs['pm25']; 
 
   const validForecast = dashForecast.filter(d => d[activeChart.key] !== null && d[activeChart.key] !== undefined);
-
-  // 🚀 เพิ่มวันที่ภาษาไทย
-  const todayDateText = new Date().toLocaleDateString('th-TH', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  const todayDateText = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', backgroundColor:themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'auto', overflowX:'hidden' }}>
@@ -517,8 +521,8 @@ export default function App() {
                 <div style={{ width: '2px', height: '20px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📍</label>
-                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = allStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '220px', outline: 'none', cursor: 'pointer' }}>
-                    <option value="">-- เลือกสถานี --</option>
+                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '220px', outline: 'none', cursor: 'pointer' }}>
+                    <option value="">-- เลือกพื้นที่/สถานี --</option>
                     {filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(s => (<option key={s.stationID} value={s.stationID}>{s.nameTH}</option>))}
                   </select>
                 </div>
@@ -556,12 +560,9 @@ export default function App() {
                 <button onClick={toggleRadar} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: showRadar ? '#ef4444' : 'transparent', color: showRadar ? '#fff' : subTextColor }}>{showRadar ? '📡 ปิดเรดาร์' : '📡 เรดาร์ฝน'}</button>
               </div>
 
-              {/* 🚀 เพิ่มปุ่ม Refresh ตรงอัปเดตเวลา */}
               <div style={{ position: 'absolute', bottom: '25px', right: '70px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '6px 14px', borderRadius: '20px', fontSize: '0.75rem', color: subTextColor, backdropFilter: 'blur(4px)', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <span style={{ fontSize: '1rem' }}>⏱️</span> อัปเดต: {lastUpdateText || 'กำลังโหลด...'}
-                <button onClick={() => fetchAirQuality(false)} style={{ background: 'none', border: 'none', padding: '0 0 0 4px', cursor: 'pointer', fontSize: '1rem', color: '#0ea5e9' }} title="โหลดข้อมูลล่าสุดเดี๋ยวนี้">
-                  🔄
-                </button>
+                <button onClick={() => fetchAirQuality(false)} style={{ background: 'none', border: 'none', padding: '0 0 0 4px', cursor: 'pointer', fontSize: '1rem', color: '#0ea5e9' }} title="โหลดข้อมูลล่าสุดเดี๋ยวนี้">🔄</button>
               </div>
 
               <button onClick={handleFindNearest} disabled={locating} style={{ position: 'absolute', bottom: '25px', right: '15px', zIndex: 500, width: '44px', height: '44px', borderRadius: '50%', backgroundColor: cardBg, color: textColor, border: `1px solid ${borderColor}`, cursor: locating ? 'wait' : 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>{locating ? '⏳' : '🎯'}</button>
@@ -590,21 +591,31 @@ export default function App() {
                 <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} />
                 <FlyToActiveStation activeStation={activeStation} />
                 <RadarMapHandler showRadar={showRadar} />
+                
                 {!showRadar && filteredStations.map((station) => {
-                  const pmVal = Number(station.AQILast?.PM25?.value); const tObj = stationTemps[station.stationID];
+                  const isWeatherOnly = station.isWeatherStation; // แฟล็กที่เพิ่มมาในหลังบ้าน
+                  const pmVal = isWeatherOnly ? null : Number(station.AQILast?.PM25?.value); 
+                  const tObj = stationTemps[station.stationID];
+                  
                   let mVal = null;
                   if(isPm25Mode) mVal=pmVal; else if(isTempMode) mVal=tObj?.temp; else if(isHeatMode) mVal=tObj?.feelsLike; else if(isUvMode) mVal=tObj?.uvMax; else if(isRainMode) mVal=tObj?.rainProb; else if(isWindMode) mVal=tObj?.windSpeed;
+                  
                   return (
                     <Marker key={station.stationID} position={[parseFloat(station.lat), parseFloat(station.long)]} icon={createCustomMarker(viewMode, mVal, tObj)} ref={el => markerRefs.current[station.stationID]=el} eventHandlers={{ click: () => setActiveStation(station) }}>
                       <Popup minWidth={260}>
                         <div style={{ textAlign: 'center', fontFamily: 'Kanit', color: '#1e293b' }}>
                           <strong>{station.nameTH}</strong>
-                          <div style={{ margin: '10px 0', padding: '10px', background: '#f8f9fa', borderRadius: '8px' }}>
-                            <span style={{ fontSize: '1.2rem', color: getPM25Color(pmVal)==='#ffff00'?'#d4b500':getPM25Color(pmVal), fontWeight: 'bold' }}>PM2.5: {isNaN(pmVal)?'-':pmVal} µg/m³</span>
-                            <div style={{ fontSize: '0.85rem', color: '#666' }}>(AQI: {station.AQILast?.AQI?.aqi||'-'})</div>
-                          </div>
+                          
+                          {/* ถ้าเป็นโหมด PM2.5 จะโชว์กรอบ PM2.5 */}
+                          {!isWeatherOnly && (
+                            <div style={{ margin: '10px 0', padding: '10px', background: '#f8f9fa', borderRadius: '8px' }}>
+                              <span style={{ fontSize: '1.2rem', color: getPM25Color(pmVal)==='#ffff00'?'#d4b500':getPM25Color(pmVal), fontWeight: 'bold' }}>PM2.5: {isNaN(pmVal)?'-':pmVal} µg/m³</span>
+                              <div style={{ fontSize: '0.85rem', color: '#666' }}>(AQI: {station.AQILast?.AQI?.aqi||'-'})</div>
+                            </div>
+                          )}
+
                           {tObj && (
-                            <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '8px', fontSize: '0.85rem', color: '#334155', fontWeight:'bold' }}>
+                            <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '8px', fontSize: '0.85rem', color: '#334155', fontWeight:'bold', marginTop: isWeatherOnly?'10px':0 }}>
                               <div style={{ marginBottom: '8px', fontSize: '1.1rem', color:'#1e293b' }}>{getWeatherIcon(tObj.weatherCode).icon} {getWeatherIcon(tObj.weatherCode).text}</div>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left' }}>
                                 <span>🌡️ {tObj.temp?.toFixed(1)||'-'}°C</span><span>🥵 {tObj.feelsLike?.toFixed(1)||'-'}°C</span>
@@ -631,8 +642,11 @@ export default function App() {
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
                 {filteredStations.map((station) => {
-                  const pmVal = Number(station.AQILast?.PM25?.value); const tObj = stationTemps[station.stationID];
+                  const isWeatherOnly = station.isWeatherStation;
+                  const pmVal = isWeatherOnly ? null : Number(station.AQILast?.PM25?.value); 
+                  const tObj = stationTemps[station.stationID];
                   const isActive = activeStation?.stationID === station.stationID;
+                  
                   let disp = '-', unit = '', boxBg = '#ccc';
                   if(isPm25Mode){ disp=isNaN(pmVal)?'-':pmVal; unit='µg/m³'; boxBg=getPM25Color(pmVal); }
                   else if(isTempMode){ disp=tObj?.temp!==undefined?tObj.temp.toFixed(1):'-'; unit='°C'; boxBg=getTempColor(tObj?.temp).bar; }
@@ -640,6 +654,7 @@ export default function App() {
                   else if(isUvMode){ disp=tObj?.uvMax!==undefined?tObj.uvMax:'-'; unit='UV'; boxBg=tObj?getUvColor(tObj.uvMax).bar:'#ccc'; }
                   else if(isRainMode){ disp=tObj?.rainProb!==undefined?`${tObj.rainProb}%`:'-'; unit='ตก'; boxBg=tObj?getRainColor(tObj.rainProb).bar:'#ccc'; }
                   else if(isWindMode){ disp=tObj?.windSpeed!==undefined?tObj.windSpeed:'-'; unit='km/h'; boxBg=tObj?getWindColor(tObj.windSpeed).bar:'#ccc'; }
+                  
                   let hAdv = isPm25Mode?getPM25HealthAdvice(pmVal):isHeatMode?getHeatHealthAdvice(tObj?.feelsLike):isUvMode?getUvHealthAdvice(tObj?.uvMax):null;
 
                   return (
@@ -691,7 +706,7 @@ export default function App() {
                                   </div>
                                 </div>
                               );
-                            } else if (isPm25Mode) {
+                            } else if (isPm25Mode && !isWeatherOnly) {
                                return (
                                 <div>
                                   <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
@@ -804,7 +819,6 @@ export default function App() {
           
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
             <h2 style={{ fontSize: '2rem', color: textColor, marginBottom: '10px', fontWeight:'bold' }}>🔔 ศูนย์พยากรณ์และแจ้งเตือนภัย</h2>
-            {/* 🚀 แสดงวันที่ภาษาไทย */}
             <p style={{ color: subTextColor, fontSize:'1.1rem', marginBottom: '25px' }}>วิเคราะห์ข้อมูลเชิงลึก 24 ชั่วโมงข้างหน้า ประจำวันที่ <strong style={{color: '#0ea5e9'}}>{todayDateText}</strong></p>
             <button onClick={handleScanLocation} disabled={alertsLoading} style={{ backgroundColor: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '30px', padding: '15px 30px', fontSize: '1.1rem', fontWeight: 'bold', cursor: alertsLoading?'wait':'pointer', boxShadow: '0 4px 15px rgba(14,165,233,0.4)', transition: '0.2s' }}>
               {alertsLoading ? '⏳ กำลังประมวลผลผ่านดาวเทียม...' : '📍 ตรวจสอบพิกัดปัจจุบันของฉัน'}
@@ -856,9 +870,8 @@ export default function App() {
           {nationwideSummary && (
             <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: window.innerWidth < 768 ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
               <div style={{ textAlign: 'center', marginBottom: '25px' }}>
-                {/* 🚀 แสดงวันที่ภาษาไทย */}
                 <h3 style={{ fontSize: '1.5rem', color: textColor, margin: '0 0 5px 0', fontWeight:'bold' }}>🇹🇭 สรุปภาพรวมความเสี่ยงทั่วประเทศ ({todayDateText})</h3>
-                <p style={{ margin: 0, color: subTextColor, fontSize: '0.95rem' }}>วิเคราะห์ข้อมูลจากจุดตรวจวัดกว่า {allStations.length} จุดทั่วไทย เพื่อหาสถานที่ที่ต้องเฝ้าระวังเป็นพิเศษ</p>
+                <p style={{ margin: 0, color: subTextColor, fontSize: '0.95rem' }}>วิเคราะห์ข้อมูลจากจุดตรวจวัดทั่วไทย เพื่อหาสถานที่ที่ต้องเฝ้าระวังเป็นพิเศษ</p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
