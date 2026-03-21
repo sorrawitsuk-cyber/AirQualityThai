@@ -116,13 +116,14 @@ export default function App() {
   const [dashTitle, setDashTitle] = useState('ภาพรวมทั้งประเทศ');
 
   const [currentPage, setCurrentPage] = useState('map'); 
-  
-  // 🚀 เพิ่ม State สำหรับซ่อน/โชว์กราฟสถิติ (เปิดบนคอม, ซ่อนบนมือถือ)
   const [showStats, setShowStats] = useState(window.innerWidth >= 768);
 
   const [alertsData, setAlertsData] = useState({ warnings: [], normals: [] });
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsLocationName, setAlertsLocationName] = useState('');
+
+  // 🚀 สเตทใหม่สำหรับเก็บ "สรุปภาพรวมระดับประเทศ"
+  const [nationwideSummary, setNationwideSummary] = useState(null);
 
   const cardRefs = useRef({});
   const markerRefs = useRef({});
@@ -189,6 +190,49 @@ export default function App() {
     const intervalId = setInterval(() => { fetchAirQuality(true); }, 1800000); 
     return () => clearInterval(intervalId);
   }, []);
+
+  // 🚀 Logic สแกนและจัดกลุ่มความเสี่ยงระดับประเทศ (ทำงานเบื้องหลัง)
+  useEffect(() => {
+    if (allStations.length === 0 || Object.keys(stationTemps).length === 0) return;
+
+    const provData = {};
+    allStations.forEach(s => {
+      const prov = extractProvince(s.areaTH);
+      const t = stationTemps[s.stationID];
+      const pm = Number(s.AQILast?.PM25?.value) || 0;
+
+      if(!provData[prov]) provData[prov] = { pm: 0, rain: 0, heat: 0, wind: 0 };
+      // หาค่าสูงสุดของแต่ละจังหวัด
+      if(pm > provData[prov].pm) provData[prov].pm = pm;
+      if(t) {
+        if(t.rainProb > provData[prov].rain) provData[prov].rain = t.rainProb;
+        if(t.heatMax > provData[prov].heat) provData[prov].heat = t.heatMax;
+        if(t.windMax > provData[prov].wind) provData[prov].wind = t.windMax;
+      }
+    });
+
+    let pm25Risks = [];
+    let stormRisks = [];
+    let heatRisks = [];
+
+    Object.keys(provData).forEach(prov => {
+      const d = provData[prov];
+      if(d.pm >= 37.5) pm25Risks.push({ prov, val: d.pm });
+      if(d.rain >= 40 || d.wind >= 30) stormRisks.push({ prov, rain: d.rain, wind: d.wind });
+      if(d.heat >= 40) heatRisks.push({ prov, val: d.heat });
+    });
+
+    // เรียงจากหนักไปเบา
+    pm25Risks.sort((a,b)=>b.val - a.val);
+    stormRisks.sort((a,b)=>Math.max(b.rain, b.wind) - Math.max(a.rain, a.wind));
+    heatRisks.sort((a,b)=>b.val - a.val);
+
+    setNationwideSummary({ 
+      pm25: pm25Risks.slice(0, 15), // เอาแค่ 15 จังหวัดที่หนักสุดมาโชว์
+      storm: stormRisks.slice(0, 15), 
+      heat: heatRisks.slice(0, 15) 
+    });
+  }, [allStations, stationTemps]);
 
   useEffect(() => {
     let result = [...allStations];
@@ -750,20 +794,23 @@ export default function App() {
       ) : (
         // ======================= ALERTS TAB =======================
         <div style={{ flex: 1, padding: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+          
+          {/* ส่วนบน: สแกนพิกัดส่วนตัว */}
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
             <h2 style={{ fontSize: '2rem', color: textColor, marginBottom: '10px', fontWeight:'bold' }}>🔔 ศูนย์พยากรณ์และแจ้งเตือนภัย</h2>
             <p style={{ color: subTextColor, fontSize:'1.1rem', marginBottom: '25px' }}>วิเคราะห์ข้อมูลเชิงลึก 24 ชั่วโมงข้างหน้า เพื่อให้คุณวางแผนชีวิตได้ง่ายขึ้น</p>
             <button onClick={handleScanLocation} disabled={alertsLoading} style={{ backgroundColor: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '30px', padding: '15px 30px', fontSize: '1.1rem', fontWeight: 'bold', cursor: alertsLoading?'wait':'pointer', boxShadow: '0 4px 15px rgba(14,165,233,0.4)', transition: '0.2s' }}>
-              {alertsLoading ? '⏳ กำลังประมวลผลผ่านดาวเทียม...' : '📍 ตรวจสอบพิกัดปัจจุบัน'}
+              {alertsLoading ? '⏳ กำลังประมวลผลผ่านดาวเทียม...' : '📍 ตรวจสอบพิกัดปัจจุบันของฉัน'}
             </button>
             {alertsLocationName && !alertsLoading && <div style={{ marginTop: '20px', padding: '8px 15px', backgroundColor: darkMode?'#0f172a':'#f0f9ff', borderRadius: '20px', color: '#0ea5e9', fontWeight: 'bold', display:'inline-block' }}>พิกัดที่กำลังวิเคราะห์: {alertsLocationName}</div>}
           </div>
 
+          {/* ส่วนกลาง: แจ้งเตือนส่วนบุคคล (แสดงผลเมื่อกดสแกนแล้ว) */}
           {alertsLoading ? null : (alertsData.warnings.length > 0 || alertsData.normals.length > 0) && (
-            <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '25px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
               
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontSize: '1.3rem', color: '#ef4444', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #fecaca`, paddingBottom: '10px' }}>🚨 สิ่งที่ต้องเฝ้าระวัง</h3>
+                <h3 style={{ fontSize: '1.3rem', color: '#ef4444', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #fecaca`, paddingBottom: '10px' }}>🚨 สิ่งที่ต้องเฝ้าระวัง (พิกัดคุณ)</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {alertsData.warnings.length > 0 ? (
                     alertsData.warnings.map((al, idx) => (
@@ -782,7 +829,7 @@ export default function App() {
               </div>
 
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontSize: '1.3rem', color: '#10b981', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #bbf7d0`, paddingBottom: '10px' }}>✅ สภาวะปลอดภัย</h3>
+                <h3 style={{ fontSize: '1.3rem', color: '#10b981', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `2px solid #bbf7d0`, paddingBottom: '10px' }}>✅ สภาวะปลอดภัย (พิกัดคุณ)</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {alertsData.normals.length > 0 ? (
                     alertsData.normals.map((al, idx) => (
@@ -801,6 +848,75 @@ export default function App() {
 
             </div>
           )}
+
+          {/* 🚀 ส่วนล่าง: สรุปภาพรวมความเสี่ยงระดับประเทศ (Macro View) */}
+          {nationwideSummary && (
+            <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: window.innerWidth < 768 ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+              <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+                <h3 style={{ fontSize: '1.5rem', color: textColor, margin: '0 0 5px 0', fontWeight:'bold' }}>🇹🇭 สรุปภาพรวมความเสี่ยงทั่วประเทศ (วันนี้)</h3>
+                <p style={{ margin: 0, color: subTextColor, fontSize: '0.95rem' }}>วิเคราะห์ข้อมูลจากจุดตรวจวัดกว่า {allStations.length} จุดทั่วไทย เพื่อหาสถานที่ที่ต้องเฝ้าระวังเป็นพิเศษ</p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* พายุ/ฝน */}
+                <div style={{ padding: '20px', backgroundColor: darkMode ? '#1e293b' : '#eff6ff', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    ⛈️ พื้นที่เสี่ยงพายุฝน / ลมแรง
+                  </h4>
+                  <p style={{ margin: '0 0 15px 0', color: textColor, fontSize: '0.9rem' }}>จังหวัดที่มีโอกาสเกิดฝนตกหนักหรือพายุลมแรง (มักเกิดในช่วงบ่ายถึงค่ำ):</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {nationwideSummary.storm.length > 0 
+                      ? nationwideSummary.storm.map((item, i) => (
+                          <span key={i} style={{ padding: '6px 12px', backgroundColor: '#bfdbfe', color: '#1d4ed8', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                            {item.prov} {item.rain >= 50 ? `(ฝน ${item.rain}%)` : `(ลม ${item.wind}km/h)`}
+                          </span>
+                        ))
+                      : <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✅ ท้องฟ้าโปร่ง ไม่มีจังหวัดที่เสี่ยงพายุฝนรุนแรงในขณะนี้</span>
+                    }
+                  </div>
+                </div>
+
+                {/* PM2.5 */}
+                <div style={{ padding: '20px', backgroundColor: darkMode ? '#1e293b' : '#fffbeb', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    😷 พื้นที่เฝ้าระวังฝุ่น PM2.5
+                  </h4>
+                  <p style={{ margin: '0 0 15px 0', color: textColor, fontSize: '0.9rem' }}>จังหวัดที่มีค่าฝุ่นละอองสะสมเกินมาตรฐาน ควรหลีกเลี่ยงกิจกรรมกลางแจ้ง:</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {nationwideSummary.pm25.length > 0 
+                      ? nationwideSummary.pm25.map((item, i) => (
+                          <span key={i} style={{ padding: '6px 12px', backgroundColor: item.val >= 75 ? '#fecaca' : '#fef3c7', color: item.val >= 75 ? '#b91c1c' : '#b45309', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                            {item.prov} ({item.val} µg/m³)
+                          </span>
+                        ))
+                      : <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✅ อากาศดีเยี่ยมทั่วประเทศ ไม่มีพื้นที่เสี่ยงฝุ่น</span>
+                    }
+                  </div>
+                </div>
+
+                {/* อากาศร้อน */}
+                <div style={{ padding: '20px', backgroundColor: darkMode ? '#1e293b' : '#fef2f2', borderRadius: '12px', borderLeft: '4px solid #ef4444' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🥵 พื้นที่เฝ้าระวังอากาศร้อนจัด
+                  </h4>
+                  <p style={{ margin: '0 0 15px 0', color: textColor, fontSize: '0.9rem' }}>จังหวัดที่ดัชนีความร้อนพุ่งสูงปรี๊ด (มักพีคช่วง 13:00 - 15:00 น.) ระวังฮีทสโตรก:</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {nationwideSummary.heat.length > 0 
+                      ? nationwideSummary.heat.map((item, i) => (
+                          <span key={i} style={{ padding: '6px 12px', backgroundColor: '#fecaca', color: '#b91c1c', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                            {item.prov} (รู้สึกเหมือน {item.val}°C)
+                          </span>
+                        ))
+                      : <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✅ อุณหภูมิอยู่ในเกณฑ์ปกติทั่วประเทศ ไม่เป็นอันตราย</span>
+                    }
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+          
         </div>
       )}
     </div>
