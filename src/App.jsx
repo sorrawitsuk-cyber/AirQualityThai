@@ -20,7 +20,7 @@ const getRainColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:
 const getWindColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:'#333',bar:'#ccc',label:'ไม่มีข้อมูล'}:val<=10?{bg:'#00b0f0',text:'#fff',bar:'#00b0f0',label:'ลมอ่อน'}:val<=25?{bg:'#2ecc71',text:'#fff',bar:'#2ecc71',label:'ลมปานกลาง'}:val<=40?{bg:'#f1c40f',text:'#222',bar:'#f1c40f',label:'ลมแรง'}:val<=60?{bg:'#e67e22',text:'#fff',bar:'#e67e22',label:'ลมแรงมาก'}:{bg:'#e74c3c',text:'#fff',bar:'#e74c3c',label:'พายุ'}; };
 const getWeatherIcon = (c) => { if(c===undefined||c===null)return{icon:'❓',text:'ไม่ทราบ'}; if(c===0)return{icon:'☀️',text:'แจ่มใส'}; if(c===1)return{icon:'🌤️',text:'มีเมฆบางส่วน'}; if(c===2)return{icon:'⛅',text:'มีเมฆ'}; if(c===3)return{icon:'☁️',text:'มีเมฆมาก'}; if([45,48].includes(c))return{icon:'🌫️',text:'มีหมอก'}; if([51,53,55,56,57].includes(c))return{icon:'🌧️',text:'ฝนปรอย'}; if([61,63,65,66,67].includes(c))return{icon:'🌧️',text:'ฝนตก'}; if([71,73,75,77,85,86].includes(c))return{icon:'❄️',text:'หิมะ'}; if([80,81,82].includes(c))return{icon:'🌦️',text:'ฝนตกหย่อมๆ'}; if([95,96,99].includes(c))return{icon:'⛈️',text:'พายุฝน'}; return{icon:'🌤️',text:'ปกติ'}; };
 
-// 🚀 ฟังก์ชันดึงจังหวัดแบบกันหน้าเว็บพัง (Try-Catch Protected)
+// ฟังก์ชันดึงจังหวัดแบบกันหน้าเว็บพัง
 const extractProvince = (area) => { 
   try {
     if(!area || typeof area !== 'string') return 'ไม่ระบุ'; 
@@ -30,9 +30,7 @@ const extractProvince = (area) => {
     if (p.includes('จ.')) p = p.split('จ.').pop().trim();
     if (p.includes('กรุงเทพ') || p.includes('กทม')) return 'กรุงเทพมหานคร'; 
     return p; 
-  } catch (error) {
-    return 'ไม่ระบุ';
-  }
+  } catch (error) { return 'ไม่ระบุ'; }
 };
 
 const getWindDirTxt = (d) => { if(d===null||d===undefined)return'ไม่ทราบทิศ'; if(d>=337.5||d<22.5)return'เหนือ'; if(d>=22.5&&d<67.5)return'ตะวันออกเฉียงเหนือ'; if(d>=67.5&&d<112.5)return'ตะวันออก'; if(d>=112.5&&d<157.5)return'ตะวันออกเฉียงใต้'; if(d>=157.5&&d<202.5)return'ใต้'; if(d>=202.5&&d<247.5)return'ตะวันตกเฉียงใต้'; if(d>=247.5&&d<292.5)return'ตะวันตก'; return'ตะวันตกเฉียงเหนือ'; };
@@ -71,6 +69,7 @@ const createCustomMarker = (viewMode, value, extraData) => {
   return L.divIcon({ className: 'custom-div-icon', html: `<div style="background-color: ${bg}; width: 34px; height: 34px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; color: ${textColor}; font-weight: bold; font-size: ${fontSize}; font-family: 'Kanit', sans-serif; transition: all 0.3s ease;">${displayValue}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
 };
 
+// 🚀 ป้องกันพิกัดผีทำแผนที่พัง 100%
 function FitBounds({ stations, activeStation, selectedProvince }) {
   const map = useMap();
   useEffect(() => {
@@ -79,7 +78,7 @@ function FitBounds({ stations, activeStation, selectedProvince }) {
       if (!selectedProvince) {
         map.flyTo([13.5, 101.0], 6, { duration: 1.5 });
       } else { 
-        const validStations = stations.filter(s => s.lat && s.long && !isNaN(s.lat) && !isNaN(s.long) && parseFloat(s.lat) !== 0);
+        const validStations = stations.filter(s => s.lat && s.long && !isNaN(parseFloat(s.lat)) && !isNaN(parseFloat(s.long)) && parseFloat(s.lat) !== 0);
         if (validStations.length > 0) {
           const bounds = L.latLngBounds(validStations.map(s => [parseFloat(s.lat), parseFloat(s.long)])); 
           map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 }); 
@@ -92,7 +91,7 @@ function FitBounds({ stations, activeStation, selectedProvince }) {
 
 function FlyToActiveStation({ activeStation }) {
   const map = useMap();
-  useEffect(() => { if (activeStation) map.flyTo([parseFloat(activeStation.lat), parseFloat(activeStation.long)], 13, { duration: 1.5 }); }, [activeStation, map]);
+  useEffect(() => { if (activeStation && !isNaN(parseFloat(activeStation.lat))) map.flyTo([parseFloat(activeStation.lat), parseFloat(activeStation.long)], 13, { duration: 1.5 }); }, [activeStation, map]);
   return null;
 }
 
@@ -125,11 +124,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [lastUpdateText, setLastUpdateText] = useState('');
   const [locating, setLocating] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  
+  // 🚀 ป้องกัน LocalStorage ทำเว็บพังใน Vercel SSR
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return typeof window !== 'undefined' && localStorage.getItem('darkMode') === 'true'; } 
+    catch(e) { return false; }
+  });
+  
   const [showRadar, setShowRadar] = useState(false);
   const [radarTime, setRadarTime] = useState(null);
   
-  // 🚀 ระบบเช็กหน้าจอแบบป้องกันการพัง (Safe Window Check)
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
 
@@ -138,7 +142,7 @@ export default function App() {
       setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
       setIsTablet(typeof window !== 'undefined' && window.innerWidth < 1024);
     };
-    handleResize(); // เซ็ตค่าครั้งแรกหลังโหลดเว็บ
+    handleResize(); 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -154,7 +158,6 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('map'); 
   const [showStats, setShowStats] = useState(true);
 
-  // สลับการซ่อน/โชว์สถิติอัตโนมัติเมื่อขนาดหน้าจอเปลี่ยน
   useEffect(() => { setShowStats(!isMobile); }, [isMobile]);
 
   const [alertsData, setAlertsData] = useState({ warnings: [], normals: [] });
@@ -167,26 +170,29 @@ export default function App() {
   const markerRefs = useRef({});
 
   useEffect(() => {
-    localStorage.setItem('darkMode', darkMode);
+    try { localStorage.setItem('darkMode', darkMode); } catch(e){}
     if(darkMode) document.body.classList.add('dark-theme');
     else document.body.classList.remove('dark-theme');
   }, [darkMode]);
 
   const handleViewModeChange = (mode) => { setViewMode(mode); setSortOrder(mode === 'temp' ? 'asc' : 'desc'); setShowRadar(false); };
 
+  // 🚀 ป้องกัน Radar API ทำเว็บพัง
   const toggleRadar = async () => {
     if (!showRadar) {
       try {
         const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
         const data = await res.json();
-        setRadarTime(data.radar.past[data.radar.past.length - 1].time);
+        if (data?.radar?.past?.length > 0) {
+          setRadarTime(data.radar.past[data.radar.past.length - 1].time);
+        }
       } catch (err) { console.error("Error fetching radar:", err); }
     }
     setShowRadar(!showRadar);
   };
 
   const fetchAirQuality = async (isBackgroundLoad = false) => {
-    const cachedData = localStorage.getItem('dashboard_cache');
+    const cachedData = typeof window !== 'undefined' ? localStorage.getItem('dashboard_cache') : null;
     if (cachedData && !isBackgroundLoad) {
       try {
         const parsedCache = JSON.parse(cachedData);
@@ -213,7 +219,7 @@ export default function App() {
       const weather = parsedData.weather;
       
       if (stations && stations.length > 0) {
-        localStorage.setItem('dashboard_cache', JSON.stringify({ stations, weather }));
+        try { localStorage.setItem('dashboard_cache', JSON.stringify({ stations, weather })); } catch(e){}
         setAllStations(stations);
         setProvinces([...new Set(stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')));
         setLastUpdateText(`${stations[0].AQILast?.date || ''} เวลา ${stations[0].AQILast?.time || ''} น.`);
@@ -283,6 +289,7 @@ export default function App() {
       const marker = markerRefs.current[activeStation.stationID];
       if (marker && !showRadar) marker.openPopup(); 
       setActiveWeather(null); setActiveForecast(null);
+      
       const fetchCardDetails = async () => {
         try {
           const urlWeather = `https://api.open-meteo.com/v1/forecast?latitude=${activeStation.lat}&longitude=${activeStation.long}&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7`;
@@ -316,7 +323,11 @@ export default function App() {
             }
             setActiveForecast(pmF);
           }
-        } catch (err) { console.error("Card detail error", err); setActiveWeather('error'); }
+        } catch (err) { 
+          // 🚀 ดัก Error กันเว็บพัง เมื่อ API บล็อก (Rate Limit)
+          console.error("Card detail error", err); 
+          setActiveWeather({ isError: true }); 
+        }
       };
       fetchCardDetails();
     }
@@ -568,11 +579,14 @@ export default function App() {
                 <FlyToActiveStation activeStation={activeStation} />
                 <RadarMapHandler showRadar={showRadar} />
                 {!showRadar && filteredStations.map((station) => {
+                  const lat = parseFloat(station.lat); const lng = parseFloat(station.long);
+                  if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null; // 🚀 ป้องกันพิกัดผีทำเว็บพัง
+
                   const pmVal = Number(station.AQILast?.PM25?.value); const tObj = stationTemps[station.stationID];
                   let mVal = null;
                   if(isPm25Mode) mVal=pmVal; else if(isTempMode) mVal=tObj?.temp; else if(isHeatMode) mVal=tObj?.feelsLike; else if(isUvMode) mVal=tObj?.uvMax; else if(isRainMode) mVal=tObj?.rainProb; else if(isWindMode) mVal=tObj?.windSpeed;
                   return (
-                    <Marker key={station.stationID} position={[parseFloat(station.lat), parseFloat(station.long)]} icon={createCustomMarker(viewMode, mVal, tObj)} ref={el => markerRefs.current[station.stationID]=el} eventHandlers={{ click: () => setActiveStation(station) }}>
+                    <Marker key={station.stationID} position={[lat, lng]} icon={createCustomMarker(viewMode, mVal, tObj)} ref={el => markerRefs.current[station.stationID]=el} eventHandlers={{ click: () => setActiveStation(station) }}>
                       <Popup minWidth={260}>
                         <div style={{ textAlign: 'center', fontFamily: 'Kanit', color: '#1e293b' }}>
                           <strong>{station.nameTH}</strong>
@@ -638,29 +652,78 @@ export default function App() {
                         <div style={{ marginTop:'12px', padding:'10px', background:darkMode?'#1e293b':'#f8fafc', borderRadius:'8px', display:'flex', gap:'8px', border: `1px dashed ${boxBg}` }}><span>{hAdv.icon}</span><span style={{fontSize:'0.8rem',color:textColor}}>{hAdv.text}</span></div>
                       )}
 
-                      {/* MINI CHARTS */}
+                      {/* 🚀 ป้องกันแอปพังจาก API โดนบล็อก */}
                       {isActive && (
                         <div style={{ borderTop:`1px solid ${borderColor}`, marginTop:'15px', paddingTop:'15px' }}>
-                          {activeWeather ? (() => {
-                            if (isTempMode) {
+                          {activeWeather ? (
+                            activeWeather.isError ? (
+                              <div style={{width:'100%',textAlign:'center',color:'#ef4444',fontSize:'0.8rem',padding:'10px'}}>⚠️ ไม่สามารถโหลดพยากรณ์ล่วงหน้าได้ (API ขัดข้อง)</div>
+                            ) : (() => {
+                              if (isTempMode) {
+                                return (
+                                  <div>
+                                    <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์อุณหภูมิ 7 วัน (ต่ำสุด - สูงสุด)</h5>
+                                    <div style={{ height:'110px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
+                                      {activeWeather.tempForecast?.map((d,i)=>{
+                                        const globalMax = Math.max(...activeWeather.tempForecast.map(x=>x.val)) + 1;
+                                        const globalMin = Math.min(...activeWeather.tempForecast.map(x=>x.minVal)) - 1;
+                                        const range = globalMax - globalMin || 1;
+                                        const bottomP = Math.max(0, ((d.minVal - globalMin) / range) * 100);
+                                        const heightP = Math.max(8, ((d.val - d.minVal) / range) * 100);
+                                        return (
+                                          <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
+                                            <span style={{fontSize:'10px', color:textColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}°</span>
+                                            <div style={{width:'8px', flex:1, position:'relative', backgroundColor: darkMode?'#334155':'#e2e8f0', borderRadius:'4px', margin:'2px 0'}}>
+                                              <div style={{position:'absolute', bottom:`${bottomP}%`, height:`${heightP}%`, width:'100%', backgroundColor:d.colorInfo.bar, borderRadius:'4px', backgroundImage: `linear-gradient(to top, #60a5fa, ${d.colorInfo.bar})`}}></div>
+                                            </div>
+                                            <span style={{fontSize:'10px', color:'#3b82f6', fontWeight:'bold', marginTop:'4px'}}>{d.minVal}°</span>
+                                            <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              } else if (isPm25Mode) {
+                                 return (
+                                  <div>
+                                    <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
+                                    <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'3px' }}>
+                                      {activeForecast ? activeForecast.map((d,i)=>{
+                                        const maxVal = Math.max(...activeForecast.map(x=>x.val)) || 1;
+                                        const h = Math.max((d.val / maxVal) * 100, 5); 
+                                        return (
+                                          <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
+                                            <span style={{fontSize:'9px', color:subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
+                                            <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
+                                              <div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'3px 3px 0 0'}}></div>
+                                            </div>
+                                            <span style={{fontSize:'8px', color:subTextColor, marginTop:'4px', height:'12px'}}>{i%3===0?d.time:''}</span>
+                                          </div>
+                                        );
+                                      }) : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              let fData = isHeatMode?activeWeather.heatForecast:isUvMode?activeWeather.uvForecast:isRainMode?activeWeather.rainForecast:isWindMode?activeWeather.windForecast:[];
+                              fData = fData?.filter(d => d && d.val !== null && !isNaN(d.val)) || []; 
+                              if(fData.length === 0) return <div style={{textAlign:'center', color:subTextColor, fontSize:'0.8rem'}}>ไม่มีข้อมูลคาดการณ์</div>;
+                              
                               return (
                                 <div>
-                                  <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์อุณหภูมิ 7 วัน (ต่ำสุด - สูงสุด)</h5>
-                                  <div style={{ height:'110px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
-                                    {activeWeather.tempForecast.map((d,i)=>{
-                                      const globalMax = Math.max(...activeWeather.tempForecast.map(x=>x.val)) + 1;
-                                      const globalMin = Math.min(...activeWeather.tempForecast.map(x=>x.minVal)) - 1;
-                                      const range = globalMax - globalMin || 1;
-                                      const bottomP = Math.max(0, ((d.minVal - globalMin) / range) * 100);
-                                      const heightP = Math.max(8, ((d.val - d.minVal) / range) * 100);
-
+                                  <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์ {fData.length} วัน</h5>
+                                  <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
+                                    {fData.map((d,i)=>{
+                                      const maxVal = Math.max(...fData.map(x=>x.val)) + (isRainMode?10:5) || 1;
+                                      const h = Math.max((d.val / maxVal) * 100, 5);
                                       return (
                                         <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
-                                          <span style={{fontSize:'10px', color:textColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}°</span>
-                                          <div style={{width:'8px', flex:1, position:'relative', backgroundColor: darkMode?'#334155':'#e2e8f0', borderRadius:'4px', margin:'2px 0'}}>
-                                            <div style={{position:'absolute', bottom:`${bottomP}%`, height:`${heightP}%`, width:'100%', backgroundColor:d.colorInfo.bar, borderRadius:'4px', backgroundImage: `linear-gradient(to top, #60a5fa, ${d.colorInfo.bar})`}}></div>
+                                          <span style={{fontSize:'10px', color:d.colorInfo.color||subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
+                                          <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
+                                            <div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'3px 3px 0 0'}}></div>
                                           </div>
-                                          <span style={{fontSize:'10px', color:'#3b82f6', fontWeight:'bold', marginTop:'4px'}}>{d.minVal}°</span>
                                           <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
                                         </div>
                                       );
@@ -668,54 +731,8 @@ export default function App() {
                                   </div>
                                 </div>
                               );
-                            } else if (isPm25Mode) {
-                               return (
-                                <div>
-                                  <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
-                                  <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'3px' }}>
-                                    {activeForecast ? activeForecast.map((d,i)=>{
-                                      const maxVal = Math.max(...activeForecast.map(x=>x.val)) || 1;
-                                      const h = Math.max((d.val / maxVal) * 100, 5); 
-                                      return (
-                                        <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
-                                          <span style={{fontSize:'9px', color:subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
-                                          <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
-                                            <div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'3px 3px 0 0'}}></div>
-                                          </div>
-                                          <span style={{fontSize:'8px', color:subTextColor, marginTop:'4px', height:'12px'}}>{i%3===0?d.time:''}</span>
-                                        </div>
-                                      );
-                                    }) : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            let fData = isHeatMode?activeWeather.heatForecast:isUvMode?activeWeather.uvForecast:isRainMode?activeWeather.rainForecast:isWindMode?activeWeather.windForecast:[];
-                            fData = fData.filter(d => d && d.val !== null && !isNaN(d.val)); 
-                            if(fData.length === 0) return null;
-                            
-                            return (
-                              <div>
-                                <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์ {fData.length} วัน</h5>
-                                <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
-                                  {fData.map((d,i)=>{
-                                    const maxVal = Math.max(...fData.map(x=>x.val)) + (isRainMode?10:5) || 1;
-                                    const h = Math.max((d.val / maxVal) * 100, 5);
-                                    return (
-                                      <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
-                                        <span style={{fontSize:'10px', color:d.colorInfo.color||subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
-                                        <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
-                                          <div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'3px 3px 0 0'}}></div>
-                                        </div>
-                                        <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })() : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
+                            })()
+                          ) : <div style={{width:'100%',textAlign:'center',color:subTextColor,fontSize:'0.8rem'}}>กำลังโหลด...</div>}
                         </div>
                       )}
                     </div>
@@ -797,12 +814,14 @@ export default function App() {
                   setAlertProvince(prov);
                   if (prov) {
                     const provStations = allStations.filter(s => extractProvince(s.areaTH) === prov);
-                    if (provStations.length > 0) {
-                      const avgLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length;
-                      const avgLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length;
+                    // 🚀 ป้องกันการดึงพิกัดผีไปคำนวณแจ้งเตือน
+                    const validStations = provStations.filter(s => s.lat && s.long && !isNaN(parseFloat(s.lat)) && !isNaN(parseFloat(s.long)) && parseFloat(s.lat) !== 0);
+                    if (validStations.length > 0) {
+                      const avgLat = validStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / validStations.length;
+                      const avgLon = validStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / validStations.length;
                       fetchAlertsData(avgLat, avgLon, `จังหวัด${prov}`);
                     } else {
-                      alert('ขออภัย ไม่พบสถานีตรวจวัดในจังหวัดนี้');
+                      alert('ขออภัย ไม่พบสถานีตรวจวัดในจังหวัดนี้ หรือข้อมูลขัดข้อง');
                     }
                   }
                 }}
