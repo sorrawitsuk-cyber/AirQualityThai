@@ -42,7 +42,7 @@ const legendData = {
   pm25: { title: 'ระดับ PM2.5 (µg/m³)', items: [{color:'#00b0f0',label:'0-15.0 (ดีมาก)'},{color:'#92d050',label:'15.1-25.0 (ดี)'},{color:'#ffff00',label:'25.1-37.5 (ปานกลาง)'},{color:'#ffc000',label:'37.6-75.0 (เริ่มมีผลกระทบฯ)'},{color:'#ff0000',label:'> 75.0 (มีผลกระทบฯ)'}] },
   temp: { title: 'อุณหภูมิ (°C)', items: [{color:'#3498db',label:'< 27 (เย็นสบาย)'},{color:'#2ecc71',label:'27-32 (ปกติ)'},{color:'#f1c40f',label:'33-35 (ร้อน)'},{color:'#e67e22',label:'36-38 (ร้อนมาก)'},{color:'#e74c3c',label:'> 38 (ร้อนจัด)'}] },
   heat: { title: 'ดัชนีความร้อน (°C)', items: [{color:'#3b82f6',label:'< 27.0 (ปกติ)'},{color:'#22c55e',label:'27.0-32.9 (เฝ้าระวัง)'},{color:'#eab308',label:'33.0-41.9 (เตือนภัย)'},{color:'#f97316',label:'42.0-51.9 (อันตราย)'},{color:'#ef4444',label:'≥ 52.0 (อันตรายมาก)'}] },
-  uv: { title: 'รังสี UV', items: [{color:'#2ecc71',label:'0-2 (ต่ำ)'},{color:'#f1c40f',label:'3-5 (ปานกลาง)'},{color:'#e67e22',label:'6-7 (สูง)'},{color:'#e74c3c',label:'8-10 (สูงมาก)'},{color:'#9b59b6',label:'> 10 (อันตราย)'}] },
+  uv: { title: 'รังสี UV สูงสุดของวัน', items: [{color:'#2ecc71',label:'0-2 (ต่ำ)'},{color:'#f1c40f',label:'3-5 (ปานกลาง)'},{color:'#e67e22',label:'6-7 (สูง)'},{color:'#e74c3c',label:'8-10 (สูงมาก)'},{color:'#9b59b6',label:'> 10 (อันตราย)'}] },
   rain: { title: 'โอกาสเกิดฝน (%)', items: [{color:'#95a5a6',label:'0 (ไม่มีฝน)'},{color:'#74b9ff',label:'1-30 (โอกาสต่ำ)'},{color:'#0984e3',label:'31-60 (ปานกลาง)'},{color:'#273c75',label:'61-80 (โอกาสสูง)'},{color:'#192a56',label:'> 80 (ตกหนัก)'}] },
   wind: { title: 'ความเร็วลม (km/h)', items: [{color:'#00b0f0',label:'0-10 (ลมอ่อน)'},{color:'#2ecc71',label:'11-25 (ลมปานกลาง)'},{color:'#f1c40f',label:'26-40 (ลมแรง)'},{color:'#e67e22',label:'41-60 (ลมแรงมาก)'},{color:'#e74c3c',label:'> 60 (พายุ)'}] }
 };
@@ -51,7 +51,7 @@ const chartConfigs = {
   pm25: { key: 'pm25', name: 'PM2.5', unit: 'µg/m³', color: '#f59e0b', hasLY: false, type: 'area' },
   temp: { key: 'temp', keyLY: 'tempLY', name: 'อุณหภูมิสูงสุด', unit: '°C', color: '#ef4444', hasLY: true, type: 'line' },
   heat: { key: 'heat', keyLY: 'heatLY', name: 'Heat Index สูงสุด', unit: '°C', color: '#ea580c', hasLY: true, type: 'line' },
-  uv:   { key: 'uv', keyLY: null, name: 'ดัชนีรังสี UV', unit: 'UV', color: '#a855f7', hasLY: false, type: 'area' },
+  uv:   { key: 'uv', keyLY: null, name: 'รังสี UV สูงสุดของวัน', unit: 'UV', color: '#a855f7', hasLY: false, type: 'area' },
   rain: { key: 'rain', keyLY: 'rainLY', name: 'ปริมาณฝนสะสม', unit: 'mm', color: '#3b82f6', hasLY: true, type: 'bar' },
   wind: { key: 'wind', keyLY: 'windLY', name: 'ความเร็วลมสูงสุด', unit: 'km/h', color: '#64748b', hasLY: true, type: 'line' },
 };
@@ -480,8 +480,8 @@ export default function App() {
              const idx = nIdx+i; if(dW.hourly.uv_index[idx] > mUv) { mUv = dW.hourly.uv_index[idx]; uTime = t; }
          });
       }
-      if (mUv >= 8) warns.push({ icon:'☀️', color:'#a855f7', title:'รังสี UV สูงมาก', desc:`ดัชนี UV ถึงระดับ ${mUv} (${fmt(uTime)}) เสี่ยงผิวไหมรุนแรง ควรทากันแดด SPF50+ และกางร่ม`});
-      else norms.push({ icon:'🌤️', color:'#3b82f6', title:'รังสี UV ระดับปลอดภัย', desc:`ดัชนี UV สูงสุดระดับ ${mUv} (${fmt(uTime)}) สามารถออกแดดได้ ไม่เป็นอันตรายรุนแรง`});
+      if (mUv >= 8) warns.push({ icon:'☀️', color:'#a855f7', title:'รังสี UV สูงสุดของวัน (อันตราย)', desc:`ดัชนี UV จะพุ่งสูงสุดถึงระดับ ${mUv} (ช่วงเวลา ${fmt(uTime)}) เสี่ยงผิวไหม้รุนแรง ควรกางร่มและทากันแดด`});
+      else norms.push({ icon:'🌤️', color:'#3b82f6', title:'รังสี UV สูงสุดของวัน (ปลอดภัย)', desc:`ดัชนี UV จะขึ้นสูงสุดแค่ระดับ ${mUv} (ช่วงเวลา ${fmt(uTime)}) สามารถออกแดดได้ ไม่เป็นอันตรายรุนแรง`});
 
       setAlertsData({ warnings: warns, normals: norms });
     } catch(e) { console.error("Alert err:", e); } finally { setAlertsLoading(false); }
@@ -593,48 +593,8 @@ export default function App() {
                   </div>
                 </div>
               )}
-                {/* 🚨 แถบเตือนภัยฉุกเฉินระยะประชิด (Nowcasting Alert) โผล่ทับบนแผนที่ */}
-              {activeStation && (() => {
-                const isWeatherOnly = activeStation.isWeatherStation;
-                const pmVal = isWeatherOnly ? null : Number(activeStation.AQILast?.PM25?.value);
-                const tObj = stationTemps[activeStation.stationID];
-                let alerts = [];
-
-                // เช็คเงื่อนไขวิกฤต "ณ ปัจจุบัน" หรือ "กำลังจะเกิด"
-                if (!isWeatherOnly && pmVal >= 75) alerts.push({ text: `วิกฤต! ฝุ่น PM2.5 ทะลุ ${pmVal} µg/m³ ควรงดออกนอกอาคารเด็ดขาด`, color: '#ef4444' });
-                else if (!isWeatherOnly && pmVal >= 37.5) alerts.push({ text: `เตือนภัย: ฝุ่นเริ่มหนาแน่น (${pmVal} µg/m³) ควรใส่หน้ากาก N95`, color: '#f59e0b' });
-                
-                if (tObj?.rainProb >= 60) alerts.push({ text: `เตือนภัย: พื้นที่นี้มีโอกาสฝนตกสูงถึง ${tObj.rainProb}% ในขณะนี้! แนะนำให้เปิดดูเรดาร์ฝน`, color: '#3b82f6', action: 'radar' });
-                
-                if (tObj?.feelsLike >= 42) alerts.push({ text: `อันตราย! ดัชนีความร้อนพุ่งสูง ${tObj.feelsLike.toFixed(1)}°C เสี่ยงฮีทสโตรกเฉียบพลัน`, color: '#ef4444' });
-                else if (tObj?.feelsLike >= 35) alerts.push({ text: `อากาศร้อนจัด รู้สึกเหมือน ${tObj.feelsLike.toFixed(1)}°C ควรหลีกเลี่ยงแดดจัด`, color: '#f97316' });
-
-                if (tObj?.windSpeed >= 40) alerts.push({ text: `ระวัง! ลมกระโชกแรง ความเร็วลม ${tObj.windSpeed} km/h`, color: '#8b5cf6' });
-
-                if (alerts.length === 0) return null;
-
-                return (
-                  <div style={{ position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, width: '90%', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {alerts.map((al, idx) => (
-                      <div key={idx} style={{ backgroundColor: al.color, color: '#fff', padding: '12px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 6px 20px rgba(0,0,0,0.25)', animation: 'pulse 2s infinite' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.95rem', fontWeight: 'bold' }}>
-                          <span style={{ fontSize: '1.4rem' }}>🚨</span> {al.text}
-                        </div>
-                        {al.action === 'radar' && !showRadar && (
-                          <button onClick={toggleRadar} style={{ backgroundColor: '#fff', color: al.color, border: 'none', padding: '6px 12px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                            📡 เปิดเรดาร์
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    {/* ใส่ CSS Animation ดุ๊กดิ๊กให้ป้ายเตือนภัย */}
-                    <style>{`@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }`}</style>
-                  </div>
-                );
-              })()}
 
               <MapContainer center={[13.5, 101.0]} zoom={6} style={{ height: '100%', width: '100%', zIndex: 1, backgroundColor: darkMode ? '#1a202c' : '#bae6fd' }}>
-                {/* ... (โค้ด MapContainer เดิม) ... */}
                 <LayersControl position="bottomleft">
                   <LayersControl.BaseLayer checked name="🗺️ แผนที่ปกติ (Default)">
                     <TileLayer url={darkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"} />
@@ -675,7 +635,7 @@ export default function App() {
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left' }}>
                                 <span>🌡️ {tObj.temp?.toFixed(1)||'-'}°C</span><span>🥵 {tObj.feelsLike?.toFixed(1)||'-'}°C</span>
                                 <span style={{color:'#0ea5e9'}}>💧 {tObj.humidity||'-'}%</span><span style={{color:'#0ea5e9'}}>🌧️ {tObj.rainProb||'0'}%</span>
-                                <span style={{color:'#a855f7'}}>☀️ UV: {tObj.uvMax||'-'}</span><span>🌬️ {tObj.windSpeed||'-'}</span>
+                                <span style={{color:'#a855f7'}}>☀️ UV สูงสุด: {tObj.uvMax||'-'}</span><span>🌬️ {tObj.windSpeed||'-'}</span>
                               </div>
                             </div>
                           )}
