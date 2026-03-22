@@ -180,7 +180,7 @@ export default function App() {
   const [dashLoading, setDashLoading] = useState(false);
   const [dashTitle, setDashTitle] = useState('ภาพรวมทั้งประเทศ');
 
-  const [currentPage, setCurrentPage] = useState('map'); 
+   const [currentPage, setCurrentPage] = useState(window.innerWidth < 768 ? 'alerts' : 'map');
   const [showStats, setShowStats] = useState(window.innerWidth >= 768);
 
   const [alertsData, setAlertsData] = useState({ urgent: [], daily: [] });
