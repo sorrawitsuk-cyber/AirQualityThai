@@ -486,77 +486,67 @@ export default function App() {
       const [rW, rA] = await Promise.all([fetch(urlW), fetch(urlA)]);
       const [dW, dA] = await Promise.all([rW.json(), rA.json()]);
 
-      let warns = [];
-      let norms = [];
+      let urgent = [];
+      let daily = [];
       const nIdx = new Date().getHours();
       const fmt = (iso) => `${new Date(iso).getHours()}:00 น.`;
 
+      // ================= 1. วิเคราะห์ 3 ชม. ข้างหน้า (Urgent Nowcasting) =================
       let rain3hP = 0, rain3hV = 0, rain3hT = '';
-      let rain24hList = [];
-      if(dW.hourly && dW.hourly.time) {
-        dW.hourly.time.slice(nIdx, nIdx+3).forEach((t, i) => {
-          const idx = nIdx+i;
-          if (dW.hourly.precipitation_probability[idx] > rain3hP) { rain3hP=dW.hourly.precipitation_probability[idx]; rain3hV=dW.hourly.precipitation[idx]; rain3hT=t; }
-        });
-        dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-           const idx = nIdx+i;
-           if(dW.hourly.precipitation_probability[idx] >= 20) {
-               rain24hList.push({ t, p: dW.hourly.precipitation_probability[idx], v: dW.hourly.precipitation[idx] });
-           }
-        });
+      let heat3h = 0, heat3hT = '';
+      let pm3h = 0, pm3hT = '';
+      let wind3h = 0, wind3hT = '';
+
+      if(dW.hourly && dW.hourly.time && dA.hourly && dA.hourly.pm2_5) {
+        for (let i=0; i<3; i++) {
+          const idx = nIdx + i;
+          if (dW.hourly.precipitation_probability[idx] > rain3hP) { rain3hP=dW.hourly.precipitation_probability[idx]; rain3hV=dW.hourly.precipitation[idx]; rain3hT=dW.hourly.time[idx]; }
+          if (dW.hourly.apparent_temperature[idx] > heat3h) { heat3h=dW.hourly.apparent_temperature[idx]; heat3hT=dW.hourly.time[idx]; }
+          if (dA.hourly.pm2_5[idx] > pm3h) { pm3h=dA.hourly.pm2_5[idx]; pm3hT=dA.hourly.time[idx]; }
+          if (dW.hourly.wind_speed_10m[idx] > wind3h) { wind3h=dW.hourly.wind_speed_10m[idx]; wind3hT=dW.hourly.time[idx]; }
+        }
       }
 
-      if (rain3hP >= 30 || rain3hV > 0.1) {
-          warns.push({ icon:'🌧️', color:'#3b82f6', title:'เตรียมพกร่ม! (ฝนใน 3 ชม.)', desc:`พบกลุ่มฝน โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm ช่วงเวลา ${fmt(rain3hT)}` });
-      } else if (rain24hList.length > 0) {
-          let peak = rain24hList.reduce((max, obj) => obj.p > max.p ? obj : max, rain24hList[0]);
-          if (peak.p >= 50) warns.push({ icon:'🌦️', color:'#0ea5e9', title:'แนวโน้มฝนตกใน 24 ชม.', desc:`วันนี้มีโอกาสฝนตก ${peak.p}% ช่วงเวลาประมาณ ${fmt(peak.t)} เตรียมตัวและเผื่อเวลาเดินทาง` });
-          else norms.push({ icon:'🌥️', color:'#0ea5e9', title:'โอกาสเกิดฝนเล็กน้อย (24 ชม.)', desc:`อาจมีละอองฝนช่วง ${fmt(peak.t)} (${peak.p}%) แต่โดยรวมสามารถทำกิจกรรมได้ตามปกติ` });
-      } else {
-          norms.push({ icon:'☀️', color:'#10b981', title:'ไม่มีฝน (ตลอด 24 ชม.)', desc:`โอกาสเกิดฝนต่ำมาก ท้องฟ้าโปร่ง สามารถทำกิจกรรมกลางแจ้ง ซักผ้า หรือเดินทางได้เต็มที่` });
+      let hasUrgent = false;
+      if (rain3hP >= 30 || rain3hV > 0.1) { urgent.push({ icon:'🌧️', color:'#3b82f6', title:'ฝนกำลังจะตก!', desc:`โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm เวลาประมาณ ${fmt(rain3hT)}` }); hasUrgent = true; }
+      if (heat3h >= 40) { urgent.push({ icon:'🥵', color:'#ef4444', title:'อากาศร้อนจัดระวังฮีทสโตรก', desc:`ดัชนีความร้อนพุ่งถึง ${heat3h.toFixed(1)}°C (${fmt(heat3hT)})`}); hasUrgent = true; }
+      if (pm3h >= 37.5) { urgent.push({ icon:'😷', color:'#f59e0b', title:'ฝุ่น PM2.5 หนาแน่น', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ (${fmt(pm3hT)}) ควรใส่หน้ากาก N95`}); hasUrgent = true; }
+      if (wind3h >= 40) { urgent.push({ icon:'🌪️', color:'#8b5cf6', title:'ลมกระโชกแรง', desc:`ความเร็วลม ${wind3h.toFixed(1)} km/h (${fmt(wind3hT)}) ระวังสิ่งของปลิว`}); hasUrgent = true; }
+
+      if (!hasUrgent) {
+        urgent.push({ icon:'✨', color:'#10b981', title:'สภาพอากาศปกติ', desc:'ไม่มีสภาวะรุนแรงใน 3 ชั่วโมงนี้ สามารถทำกิจกรรมได้ตามปกติ' });
       }
 
-      let mWindS = 0, mWindD = 0, windT = '';
-      if(dW.hourly && dW.hourly.time) {
-          dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-              const idx = nIdx+i;
-              if(dW.hourly.wind_speed_10m[idx] > mWindS) { mWindS = dW.hourly.wind_speed_10m[idx]; mWindD = dW.hourly.wind_direction_10m[idx]; windT = t; }
-          });
-      }
-      let windDirTxt = getWindDirTxt(mWindD);
-      if (mWindS >= 40) warns.push({ icon:'🌪️', color:'#f59e0b', title:'เตือนภัยลมกระโชกแรง', desc:`ลมพัดแรงจากทิศ${windDirTxt} ความเร็วสูงสุด ${mWindS} km/h (${fmt(windT)}) ระวังสิ่งของปลิวหรือกิ่งไม้หัก`});
-      else norms.push({ icon:'🍃', color:'#10b981', title:'สภาพลมปกติ', desc:`ลมพัดเบาถึงปานกลาง จากทิศ${windDirTxt} ความเร็วสูงสุด ${mWindS} km/h (${fmt(windT)}) อากาศถ่ายเทได้ดี`});
+      // ================= 2. วิเคราะห์ 24 ชม. (Daily Overview) =================
+      let rain24P = 0, rain24T = '';
+      let heat24 = 0, heat24T = '';
+      let pm24 = 0, pm24T = '';
+      let uv24 = 0, uv24T = '';
 
-      let mHeat = 0, hTime = '';
-      if(dW.hourly && dW.hourly.time) {
-         dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-             const idx = nIdx+i; if (dW.hourly.apparent_temperature[idx] > mHeat) { mHeat = dW.hourly.apparent_temperature[idx]; hTime = t; }
-         });
+      if(dW.hourly && dW.hourly.time && dA.hourly && dA.hourly.pm2_5) {
+        for (let i=0; i<24; i++) {
+          const idx = nIdx + i;
+          if (dW.hourly.precipitation_probability[idx] > rain24P) { rain24P=dW.hourly.precipitation_probability[idx]; rain24T=dW.hourly.time[idx]; }
+          if (dW.hourly.apparent_temperature[idx] > heat24) { heat24=dW.hourly.apparent_temperature[idx]; heat24T=dW.hourly.time[idx]; }
+          if (dA.hourly.pm2_5[idx] > pm24) { pm24=dA.hourly.pm2_5[idx]; pm24T=dA.hourly.time[idx]; }
+          if (dW.hourly.uv_index[idx] > uv24) { uv24=dW.hourly.uv_index[idx]; uv24T=dW.hourly.time[idx]; }
+        }
       }
-      if (mHeat >= 42) warns.push({ icon:'🥵', color:'#ef4444', title:'อากาศร้อนอันตราย!', desc:`ดัชนีความร้อนจะแตะ ${mHeat.toFixed(1)}°C (${fmt(hTime)}) ควรงดกิจกรรมกลางแจ้งเด็ดขาด`});
-      else if (mHeat >= 33) warns.push({ icon:'😰', color:'#ea580c', title:'เตือนภัยอากาศร้อน', desc:`ดัชนีความร้อนแตะ ${mHeat.toFixed(1)}°C (${fmt(hTime)}) ควรลดระยะเวลากิจกรรมและดื่มน้ำบ่อยๆ`});
-      else norms.push({ icon:'😎', color:'#22c55e', title:'อุณหภูมิเกณฑ์ปลอดภัย', desc:`ดัชนีความร้อนสูงสุด ${mHeat.toFixed(1)}°C (${fmt(hTime)}) อากาศกำลังดี ไม่เป็นอันตรายต่อสุขภาพ`});
 
-      let mPm = 0, pTime = '';
-      if(dA.hourly && dA.hourly.pm2_5) {
-         dA.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-             const idx = nIdx+i; if(dA.hourly.pm2_5[idx] > mPm) { mPm = dA.hourly.pm2_5[idx]; pTime = t; }
-         });
-      }
-      if (mPm >= 75) warns.push({ icon:'☠️', color:'#dc2626', title:'ฝุ่น PM2.5 ระดับอันตราย', desc:`ฝุ่นสูงสุด ${mPm.toFixed(1)} µg/m³ (${fmt(pTime)}) ควรงดออกจากบ้าน หรือใส่หน้ากาก N95 ตลอดเวลา`});
-      else if (mPm >= 37.5) warns.push({ icon:'😷', color:'#f59e0b', title:'ฝุ่น PM2.5 เริ่มมีผลกระทบ', desc:`ฝุ่นจะแตะ ${mPm.toFixed(1)} µg/m³ (${fmt(pTime)}) กลุ่มเสี่ยงควรหลีกเลี่ยงพื้นที่โล่งแจ้ง`});
-      else norms.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ปริมาณฝุ่นสูงสุดเพียง ${mPm.toFixed(1)} µg/m³ หายใจได้เต็มปอด ไร้กังวลเรื่องฝุ่น`});
+      if (rain24P >= 40) daily.push({ icon:'🌦️', color:'#0ea5e9', title:`แนวโน้มฝนตก (${rain24P}%)`, desc:`คาดว่าจะมีฝนช่วง ${fmt(rain24T)} เผื่อเวลาเดินทางด้วยนะครับ` });
+      else daily.push({ icon:'☀️', color:'#10b981', title:'โอกาสฝนตกต่ำ', desc:'วันนี้ท้องฟ้าโปร่ง โอกาสเกิดฝนมีน้อยมาก' });
 
-      let mUv = 0, uTime = '';
-      if(dW.hourly && dW.hourly.time) {
-         dW.hourly.time.slice(nIdx, nIdx+24).forEach((t, i) => {
-             const idx = nIdx+i; if(dW.hourly.uv_index[idx] > mUv) { mUv = dW.hourly.uv_index[idx]; uTime = t; }
-         });
-      }
-      if (mUv >= 8) warns.push({ icon:'☀️', color:'#a855f7', title:'รังสี UV สูงสุดของวัน (อันตราย)', desc:`ดัชนี UV จะพุ่งสูงสุดถึงระดับ ${mUv} (ช่วงเวลา ${fmt(uTime)}) เสี่ยงผิวไหม้รุนแรง ควรกางร่มและทากันแดด`});
-      else norms.push({ icon:'🌤️', color:'#3b82f6', title:'รังสี UV สูงสุดของวัน (ปลอดภัย)', desc:`ดัชนี UV จะขึ้นสูงสุดแค่ระดับ ${mUv} (ช่วงเวลา ${fmt(uTime)}) สามารถออกแดดได้ ไม่เป็นอันตรายรุนแรง`});
+      if (heat24 >= 42) daily.push({ icon:'🔥', color:'#ef4444', title:'อากาศร้อนอันตราย', desc:`พุ่งสูงสุด ${heat24.toFixed(1)}°C ช่วง ${fmt(heat24T)}` });
+      else daily.push({ icon:'😎', color:'#f59e0b', title:`อากาศร้อนปานกลาง`, desc:`อุณหภูมิสูงสุดช่วง ${fmt(heat24T)} รู้สึกเหมือน ${heat24.toFixed(1)}°C` });
 
-      setAlertsData({ warnings: warns, normals: norms });
+      if (pm24 >= 50) daily.push({ icon:'🌫️', color:'#dc2626', title:'แนวโน้มฝุ่น PM2.5 สูง', desc:`จะหนาแน่นสุด ${pm24.toFixed(1)} µg/m³ ช่วง ${fmt(pm24T)}` });
+      else if (pm24 >= 25) daily.push({ icon:'🤧', color:'#f59e0b', title:'แนวโน้มฝุ่น PM2.5 ปานกลาง', desc:`สูงสุด ${pm24.toFixed(1)} µg/m³ ช่วง ${fmt(pm24T)}` });
+      else daily.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ฝุ่นสูงสุดในวันนี้เพียง ${pm24.toFixed(1)} µg/m³` });
+
+      if (uv24 >= 8) daily.push({ icon:'🔆', color:'#a855f7', title:`รังสี UV อันตราย (ระดับ ${uv24})`, desc:`แดดแรงจัดช่วง ${fmt(uv24T)} ควรทากันแดด SPF50+` });
+
+      // บันทึกใส่ State ใหม่ที่เราแบ่งไว้
+      setAlertsData({ urgent, daily });
     } catch(e) { console.error("Alert err:", e); } finally { setAlertsLoading(false); }
   };
 
