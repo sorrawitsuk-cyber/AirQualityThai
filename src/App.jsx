@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster'; // 🚀 นำเข้าปลั๊กอินจัดกลุ่มหมุด
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -21,8 +21,24 @@ const getRainColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:
 const getWindColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:'#333',bar:'#ccc',label:'ไม่มีข้อมูล'}:val<=10?{bg:'#00b0f0',text:'#fff',bar:'#00b0f0',label:'ลมอ่อน'}:val<=25?{bg:'#2ecc71',text:'#fff',bar:'#2ecc71',label:'ลมปานกลาง'}:val<=40?{bg:'#f1c40f',text:'#222',bar:'#f1c40f',label:'ลมแรง'}:val<=60?{bg:'#e67e22',text:'#fff',bar:'#e67e22',label:'ลมแรงมาก'}:{bg:'#e74c3c',text:'#fff',bar:'#e74c3c',label:'พายุ'}; };
 const getWeatherIcon = (c) => { if(c===undefined||c===null)return{icon:'❓',text:'ไม่ทราบ'}; if(c===0)return{icon:'☀️',text:'แจ่มใส'}; if(c===1)return{icon:'🌤️',text:'มีเมฆบางส่วน'}; if(c===2)return{icon:'⛅',text:'มีเมฆ'}; if(c===3)return{icon:'☁️',text:'มีเมฆมาก'}; if([45,48].includes(c))return{icon:'🌫️',text:'มีหมอก'}; if([51,53,55,56,57].includes(c))return{icon:'🌧️',text:'ฝนปรอย'}; if([61,63,65,66,67].includes(c))return{icon:'🌧️',text:'ฝนตก'}; if([71,73,75,77,85,86].includes(c))return{icon:'❄️',text:'หิมะ'}; if([80,81,82].includes(c))return{icon:'🌦️',text:'ฝนตกหย่อมๆ'}; if([95,96,99].includes(c))return{icon:'⛈️',text:'พายุฝน'}; return{icon:'🌤️',text:'ปกติ'}; };
 
-// ฐานข้อมูลจังหวัด
-const thaiProvinces = ["กรุงเทพมหานคร","กระบี่","กาญจนบุรี","กาฬสินธุ์","กำแพงเพชร","ขอนแก่น","จันทบุรี","ฉะเชิงเทรา","ชลบุรี","ชัยนาท","ชัยภูมิ","ชุมพร","เชียงราย","เชียงใหม่","ตรัง","ตราด","ตาก","นครนายก","นครปฐม","นครพนม","นครราชสีมา","นครศรีธรรมราช","นครสวรรค์","นนทบุรี","นราธิวาส","น่าน","บึงกาฬ","บุรีรัมย์","ปทุมธานี","ประจวบคีรีขันธ์","ปราจีนบุรี","ปัตตานี","พระนครศรีอยุธยา","พะเยา","พังงา","พัทลุง","พิจิตร","พิษณุโลก","เพชรบุรี","เพชรบูรณ์","แพร่","ภูเก็ต","มหาสารคาม","มุกดาหาร","แม่ฮ่องสอน","ยโสธร","ยะลา","ร้อยเอ็ด","ระนอง","ระยอง","ราชบุรี","ลพบุรี","ลำปาง","ลำพูน","เลย","ศรีสะเกษ","สกลนคร","สงขลา","สตูล","สมุทรปราการ","สมุทรสงคราม","สมุทรสาคร","สระแก้ว","สระบุรี","สิงห์บุรี","สุโขทัย","สุพรรณบุรี","สุราษฎร์ธานี","สุรินทร์","หนองคาย","หนองบัวลำภู","อ่างทอง","อำนาจเจริญ","อุดรธานี","อุตรดิตถ์","อุทัยธานี","อุบลราชธานี"];
+// 📍 ฐานข้อมูลภูมิภาคและจังหวัด
+const regionMapping = {
+  "ภาคเหนือ": ["เชียงใหม่", "เชียงราย", "แพร่", "น่าน", "พะเยา", "ลำปาง", "ลำพูน", "แม่ฮ่องสอน", "อุตรดิตถ์"],
+  "ภาคตะวันออกเฉียงเหนือ": ["กาฬสินธุ์", "ขอนแก่น", "ชัยภูมิ", "นครพนม", "นครราชสีมา", "บึงกาฬ", "บุรีรัมย์", "มหาสารคาม", "มุกดาหาร", "ยโสธร", "ร้อยเอ็ด", "เลย", "สกลนคร", "สุรินทร์", "ศรีสะเกษ", "หนองคาย", "หนองบัวลำภู", "อุดรธานี", "อุบลราชธานี", "อำนาจเจริญ"],
+  "ภาคกลาง": ["กรุงเทพมหานคร", "กำแพงเพชร", "ชัยนาท", "นครนายก", "นครปฐม", "นครสวรรค์", "นนทบุรี", "ปทุมธานี", "พระนครศรีอยุธยา", "พิจิตร", "พิษณุโลก", "เพชรบูรณ์", "ลพบุรี", "สมุทรปราการ", "สมุทรสงคราม", "สมุทรสาคร", "สิงห์บุรี", "สุโขทัย", "สุพรรณบุรี", "สระบุรี", "อ่างทอง", "อุทัยธานี"],
+  "ภาคตะวันออก": ["จันทบุรี", "ฉะเชิงเทรา", "ชลบุรี", "ตราด", "ปราจีนบุรี", "ระยอง", "สระแก้ว"],
+  "ภาคตะวันตก": ["กาญจนบุรี", "ตาก", "ประจวบคีรีขันธ์", "เพชรบุรี", "ราชบุรี"],
+  "ภาคใต้": ["กระบี่", "ชุมพร", "ตรัง", "นครศรีธรรมราช", "นราธิวาส", "ปัตตานี", "พังงา", "พัทลุง", "ภูเก็ต", "ระนอง", "สตูล", "สงขลา", "สุราษฎร์ธานี", "ยะลา"]
+};
+
+const thaiProvinces = Object.values(regionMapping).flat();
+
+const getRegion = (province) => {
+  for (const [region, provinces] of Object.entries(regionMapping)) {
+    if (provinces.includes(province)) return region;
+  }
+  return "อื่นๆ";
+};
 
 const extractProvince = (area) => { 
   if(!area) return 'ไม่ระบุ'; 
@@ -73,12 +89,12 @@ const createCustomMarker = (viewMode, value, extraData) => {
   return L.divIcon({ className: 'custom-div-icon', html: `<div style="background-color: ${bg}; width: 34px; height: 34px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; color: ${textColor}; font-weight: bold; font-size: ${fontSize}; font-family: 'Kanit', sans-serif; transition: all 0.3s ease;">${displayValue}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
 };
 
-function FitBounds({ stations, activeStation, selectedProvince }) {
+function FitBounds({ stations, activeStation, selectedProvince, selectedRegion }) {
   const map = useMap();
   useEffect(() => {
     if (activeStation) return; 
     if (stations && stations.length > 0) {
-      if (!selectedProvince) { map.flyTo([13.5, 101.0], 6, { duration: 1.5 }); } 
+      if (!selectedProvince && !selectedRegion) { map.flyTo([13.5, 101.0], 6, { duration: 1.5 }); } 
       else { 
         const validStations = stations.filter(s => s.lat && s.long && !isNaN(parseFloat(s.lat)) && !isNaN(parseFloat(s.long)) && parseFloat(s.lat) !== 0);
         if (validStations.length > 0) {
@@ -87,7 +103,7 @@ function FitBounds({ stations, activeStation, selectedProvince }) {
         }
       }
     }
-  }, [stations, map, activeStation, selectedProvince]);
+  }, [stations, map, activeStation, selectedProvince, selectedRegion]);
   return null;
 }
 
@@ -123,11 +139,11 @@ function deg2rad(deg) { return deg * (Math.PI/180) }
 // 3. Main App Component
 // ==============================================================
 export default function App() {
-  // 🚀 ตอนนี้เราใช้ 187 จุดสำหรับทุกโหมดแล้ว (ลบ weatherStations ทิ้ง)
   const [stations, setStations] = useState([]); 
   const [filteredStations, setFilteredStations] = useState([]);
   
   const [provinces, setProvinces] = useState([]);
+  const [selectedRegion, setSelectedRegion] = useState(''); // 🚀 เพิ่ม State ภูมิภาค
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedStationId, setSelectedStationId] = useState('');
   const [viewMode, setViewMode] = useState('pm25'); 
@@ -160,6 +176,11 @@ export default function App() {
   const cardRefs = useRef({});
   const markerRefs = useRef({});
 
+  // 🚀 กรองรายชื่อจังหวัดตามภูมิภาคที่เลือก
+  const availableProvinces = selectedRegion 
+    ? provinces.filter(p => getRegion(p) === selectedRegion) 
+    : provinces;
+
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode);
     if(darkMode) document.body.classList.add('dark-theme');
@@ -185,7 +206,6 @@ export default function App() {
     setShowRadar(!showRadar);
   };
 
-  // 🚀 ฟังก์ชันดึงสภาพอากาศ Open-Meteo สำหรับ 187 จุด (แบ่งยิงทีละ 50 จุด)
   const fetchOpenMeteoBulk = async (stationsList) => {
     try {
       let allWeather = {};
@@ -201,7 +221,6 @@ export default function App() {
         
         const res = await fetch(url);
         const data = await res.json();
-        
         const results = Array.isArray(data) ? data : [data];
         
         results.forEach((r, idx) => {
@@ -238,17 +257,13 @@ export default function App() {
       const PROJECT_ID = "thai-env-dashboard"; 
       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/weatherData/latest?t=${new Date().getTime()}`;
       
-      // 1. ดึง 187 จุดจาก Firebase
       const firebaseRes = await fetch(url, { cache: 'no-store' }).then(res => res.json());
       const payloadString = firebaseRes.fields.jsonData.stringValue;
       const parsedData = JSON.parse(payloadString);
       const stData = parsedData.stations || [];
       
       if (stData.length > 0) {
-        // กรองเฉพาะพิกัดที่ใช้งานได้
         const validStations = stData.filter(s => !isNaN(parseFloat(s.lat)) && !isNaN(parseFloat(s.long)) && parseFloat(s.lat) !== 0);
-        
-        // 2. ดึงสภาพอากาศจาก Open-Meteo ทันที
         const openMeteoData = await fetchOpenMeteoBulk(validStations);
         
         setStations(validStations);
@@ -256,9 +271,7 @@ export default function App() {
         setLastUpdateText(`${validStations[0]?.AQILast?.date || ''} เวลา ${validStations[0]?.AQILast?.time || ''} น.`);
         setStationTemps(openMeteoData); 
       }
-    } catch (err) { 
-      console.error("Fetch error:", err); 
-    } 
+    } catch (err) { console.error("Fetch error:", err); } 
     finally { if (!isBackgroundLoad) setLoading(false); }
   };
 
@@ -303,6 +316,8 @@ export default function App() {
   useEffect(() => {
     let result = [...stations];
     
+    // 🚀 เพิ่มการกรองตามภูมิภาค
+    if (selectedRegion) result = result.filter(s => getRegion(extractProvince(s.areaTH)) === selectedRegion);
     if (selectedProvince) result = result.filter(s => extractProvince(s.areaTH) === selectedProvince);
     if (selectedStationId) result = result.filter(s => s.stationID === selectedStationId);
     
@@ -321,7 +336,7 @@ export default function App() {
       return sortOrder === 'desc' ? vB - vA : vA - vB;
     });
     setFilteredStations(result);
-  }, [selectedProvince, selectedStationId, stations, viewMode, sortOrder, stationTemps]);
+  }, [selectedRegion, selectedProvince, selectedStationId, stations, viewMode, sortOrder, stationTemps]);
 
   useEffect(() => {
     if (activeStation && currentPage === 'map') {
@@ -434,14 +449,23 @@ export default function App() {
     }
   }, [activeStation, selectedProvince, stations, currentPage]);
 
-  const handleReset = () => { setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); setCurrentPage('map'); window.scrollTo({top:0, behavior:'smooth'}); };
+  const handleReset = () => { setSelectedRegion(''); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); setCurrentPage('map'); window.scrollTo({top:0, behavior:'smooth'}); };
   
   const handleFindNearest = () => {
     if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); setLocating(true);
     navigator.geolocation.getCurrentPosition((pos) => {
       let nearest = null; let minD = Infinity;
       stations.forEach(s => { const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); if (d<minD){minD=d; nearest=s;} });
-      if (nearest) { setSelectedProvince(extractProvince(nearest.areaTH)); setSelectedStationId(nearest.stationID); setActiveStation(nearest); setShowRadar(false); setCurrentPage('map'); window.scrollTo({top:0, behavior:'smooth'}); }
+      if (nearest) { 
+        const prov = extractProvince(nearest.areaTH);
+        setSelectedRegion(getRegion(prov));
+        setSelectedProvince(prov); 
+        setSelectedStationId(nearest.stationID); 
+        setActiveStation(nearest); 
+        setShowRadar(false); 
+        setCurrentPage('map'); 
+        window.scrollTo({top:0, behavior:'smooth'}); 
+      }
       setLocating(false);
     }, () => { alert('ดึงพิกัดไม่ได้'); setLocating(false); });
   };
@@ -540,7 +564,6 @@ export default function App() {
   const validForecast = dashForecast.filter(d => d[activeChart.key] != null);
   const todayDateText = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  // 🚀 คำนวณเวลา 3 ชั่วโมงข้างหน้า
   const currentHr = new Date().getHours();
   const next3Hr = (currentHr + 3) % 24;
   const timeStr3h = `${String(currentHr).padStart(2, '0')}:00 - ${String(next3Hr).padStart(2, '0')}:00 น.`;
@@ -562,21 +585,36 @@ export default function App() {
             <>
               <div style={{ width: '1px', height: '35px', backgroundColor: 'rgba(255,255,255,0.3)', display: window.innerWidth < 1024 ? 'none' : 'block' }}></div>
               <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '6px 15px', borderRadius: '30px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                
+                {/* 🚀 Dropdown เลือกภูมิภาค (ภาค) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>🗺️</label>
-                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '150px', outline: 'none', cursor: 'pointer' }}>
-                    <option value="">ทุกจังหวัด</option>{provinces.map(p => (<option key={p} value={p}>{p}</option>))}
+                  <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📍</label>
+                  <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer' }}>
+                    <option value="">ทุกภูมิภาค</option>
+                    {Object.keys(regionMapping).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div style={{ width: '2px', height: '20px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
+
+                {/* Dropdown เลือกจังหวัด */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📍</label>
-                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '220px', outline: 'none', cursor: 'pointer' }}>
-                    <option value="">-- เลือกพื้นที่/สถานี --</option>
+                  <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>🗺️</label>
+                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '120px', outline: 'none', cursor: 'pointer' }}>
+                    <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
+                  </select>
+                </div>
+                <div style={{ width: '2px', height: '20px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
+
+                {/* Dropdown เลือกสถานี */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📌</label>
+                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowRadar(false);} }} style={{ padding: '8px 12px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#1e293b', minWidth: '180px', outline: 'none', cursor: 'pointer' }}>
+                    <option value="">-- เลือกสถานี --</option>
                     {filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(s => (<option key={s.stationID} value={s.stationID}>{s.nameTH}</option>))}
                   </select>
                 </div>
-                <button onClick={handleReset} style={{ padding: '8px 16px', backgroundColor: '#fff', color: '#0ea5e9', border: 'none', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>🏠 หน้าแรก</button>
+
+                <button onClick={handleReset} style={{ padding: '8px 16px', backgroundColor: '#fff', color: '#0ea5e9', border: 'none', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '5px' }}>🏠 รีเซ็ต</button>
               </div>
             </>
           )}
@@ -640,13 +678,13 @@ export default function App() {
                 {showRadar && radarTime && <TileLayer url={`https://tilecache.rainviewer.com/v2/radar/${radarTime}/256/{z}/{x}/{y}/2/1_1.png`} opacity={0.65} zIndex={10} maxNativeZoom={12} />}
                 
                 <MapFix /> 
-                <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} />
+                <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} selectedRegion={selectedRegion} />
                 <FlyToActiveStation activeStation={activeStation} />
                 <RadarMapHandler showRadar={showRadar} />
                 
-                {/* 🚀 เปิดใช้งานระบบ Marker Clustering */}
+                {/* 🚀 ระบบ Marker Clustering ตั้งค่า disableClusteringAtZoom={11} เพื่อให้ กทม. กระจายตัวออกเวลาซูมดู */}
                 {!showRadar && (
-                  <MarkerClusterGroup chunkedLoading maxClusterRadius={40}>
+                  <MarkerClusterGroup chunkedLoading maxClusterRadius={45} disableClusteringAtZoom={11} spiderfyOnMaxZoom={true}>
                     {filteredStations.map((station) => {
                       const lat = parseFloat(station.lat);
                       const lon = parseFloat(station.long);
