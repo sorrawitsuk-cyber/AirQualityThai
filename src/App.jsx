@@ -484,7 +484,7 @@ export default function App() {
       const nIdx = new Date().getHours();
       const fmt = (iso) => `${new Date(iso).getHours()}:00 น.`;
 
-      // ================= 1. วิเคราะห์ 3 ชม. ข้างหน้า (Urgent / Short-term) =================
+      // ================= 1. วิเคราะห์ 3 ชม. ข้างหน้า =================
       let rain3hP = 0, rain3hV = 0, rain3hT = '';
       let heat3h = 0, heat3hT = '';
       let pm3h = 0, pm3hT = '';
@@ -502,27 +502,30 @@ export default function App() {
         }
       }
 
-      // 💧 ประเมินฝน (3 ชม.)
-      if (rain3hP >= 30 || rain3hV > 0.1) { urgent.push({ icon:'🌧️', color:'#3b82f6', title:'ฝนกำลังจะตก!', desc:`โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm เวลาประมาณ ${fmt(rain3hT)}` }); }
-      else { urgent.push({ icon:'🌤️', color:'#10b981', title:'โอกาสฝนตกต่ำ', desc:'ไม่มีแนวโน้มฝนตกใน 3 ชั่วโมงนี้ สามารถเดินทางได้ปกติ' }); }
+      // 💧 ประเมินฝน (Level 2=ตก, 1=ไม่ตก)
+      if (rain3hP >= 30 || rain3hV > 0.1) { urgent.push({ icon:'🌧️', color:'#3b82f6', title:'ฝนกำลังจะตก!', desc:`โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm เวลาประมาณ ${fmt(rain3hT)}`, level: 2 }); }
+      else { urgent.push({ icon:'🌤️', color:'#10b981', title:'โอกาสฝนตกต่ำ', desc:'ไม่มีแนวโน้มฝนตกใน 3 ชั่วโมงนี้ สามารถเดินทางได้ปกติ', level: 1 }); }
 
-      // 🌡️ ประเมินความร้อน (3 ชม.)
-      if (heat3h >= 42) { urgent.push({ icon:'🔥', color:'#ef4444', title:'ร้อนจัดระวังฮีทสโตรก', desc:`ดัชนีความร้อนพุ่งถึง ${heat3h.toFixed(1)}°C (${fmt(heat3hT)}) ควรงดกิจกรรมกลางแจ้ง`}); }
-      else if (heat3h >= 33) { urgent.push({ icon:'🥵', color:'#f59e0b', title:'อากาศค่อนข้างร้อน', desc:`ดัชนีความร้อน ${heat3h.toFixed(1)}°C ควรดื่มน้ำบ่อยๆ`}); }
-      else { urgent.push({ icon:'😎', color:'#10b981', title:'อุณหภูมิปกติ', desc:`ดัชนีความร้อนสูงสุด ${heat3h.toFixed(1)}°C อากาศกำลังดี`}); }
+      // 🌡️ ประเมินความร้อน
+      if (heat3h >= 42) { urgent.push({ icon:'🔥', color:'#ef4444', title:'ร้อนจัดระวังฮีทสโตรก', desc:`ดัชนีความร้อนพุ่งถึง ${heat3h.toFixed(1)}°C (${fmt(heat3hT)}) ควรงดกิจกรรมกลางแจ้ง`, level: 3}); }
+      else if (heat3h >= 33) { urgent.push({ icon:'🥵', color:'#f59e0b', title:'อากาศค่อนข้างร้อน', desc:`ดัชนีความร้อน ${heat3h.toFixed(1)}°C ควรดื่มน้ำบ่อยๆ`, level: 2}); }
+      else { urgent.push({ icon:'😎', color:'#10b981', title:'อุณหภูมิปกติ', desc:`ดัชนีความร้อนสูงสุด ${heat3h.toFixed(1)}°C อากาศกำลังดี`, level: 1}); }
 
-      // 😷 ประเมินฝุ่น PM2.5 (3 ชม.)
-      if (pm3h >= 75) { urgent.push({ icon:'☠️', color:'#dc2626', title:'ฝุ่น PM2.5 ระดับอันตราย', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ ควรงดออกนอกอาคารเด็ดขาด`}); }
-      else if (pm3h >= 37.5) { urgent.push({ icon:'😷', color:'#f59e0b', title:'ฝุ่น PM2.5 เริ่มหนาแน่น', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ ควรสวมหน้ากาก N95`}); }
-      else { urgent.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ หายใจได้เต็มปอด`}); }
+      // 😷 ประเมินฝุ่น PM2.5
+      if (pm3h >= 75) { urgent.push({ icon:'☠️', color:'#dc2626', title:'ฝุ่น PM2.5 ระดับอันตราย', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ ควรงดออกนอกอาคารเด็ดขาด`, level: 3}); }
+      else if (pm3h >= 37.5) { urgent.push({ icon:'😷', color:'#f59e0b', title:'ฝุ่น PM2.5 เริ่มหนาแน่น', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ ควรสวมหน้ากาก N95`, level: 2}); }
+      else { urgent.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ หายใจได้เต็มปอด`, level: 1}); }
 
-      // ☀️ ประเมินรังสี UV (3 ชม.)
-      if (uv3h >= 8) { urgent.push({ icon:'🔆', color:'#a855f7', title:'รังสี UV แรงจัด', desc:`ดัชนี UV แตะระดับ ${uv3h} ควรหลีกเลี่ยงการออกแดดจัด`}); }
-      else if (uv3h >= 6) { urgent.push({ icon:'☀️', color:'#f59e0b', title:'รังสี UV ปานกลาง', desc:`ดัชนี UV ระดับ ${uv3h} ควรทากันแดดหรือกางร่ม`}); }
-      else { urgent.push({ icon:'🌙', color:'#10b981', title:'รังสี UV ต่ำ', desc:`ดัชนี UV ระดับ ${uv3h} ปลอดภัยต่อผิวหนัง`}); }
+      // ☀️ ประเมินรังสี UV
+      if (uv3h >= 8) { urgent.push({ icon:'🔆', color:'#a855f7', title:'รังสี UV แรงจัด', desc:`ดัชนี UV แตะระดับ ${uv3h} ควรหลีกเลี่ยงการออกแดดจัด`, level: 3}); }
+      else if (uv3h >= 6) { urgent.push({ icon:'☀️', color:'#f59e0b', title:'รังสี UV ปานกลาง', desc:`ดัชนี UV ระดับ ${uv3h} ควรทากันแดดหรือกางร่ม`, level: 2}); }
+      else { urgent.push({ icon:'🌙', color:'#10b981', title:'รังสี UV ต่ำ', desc:`ดัชนี UV ระดับ ${uv3h} ปลอดภัยต่อผิวหนัง`, level: 1}); }
 
-      // 🌪️ ประเมินลม (แทรกเตือนเฉพาะลมแรงผิดปกติ)
-      if (wind3h >= 40) { urgent.push({ icon:'🌪️', color:'#8b5cf6', title:'ลมกระโชกแรง', desc:`ความเร็วลม ${wind3h.toFixed(1)} km/h (${fmt(wind3hT)}) ระวังสิ่งของปลิว`}); }
+      // 🌪️ ประเมินลม (แทรกเตือนเฉพาะตอนลมพัดแรง)
+      if (wind3h >= 40) { urgent.push({ icon:'🌪️', color:'#8b5cf6', title:'ลมกระโชกแรง', desc:`ความเร็วลม ${wind3h.toFixed(1)} km/h (${fmt(wind3hT)}) ระวังสิ่งของปลิว`, level: 2}); }
+
+      // 🚀 ทำการเรียงลำดับ เอาความเสี่ยงมากสุด (Level 3 -> 2 -> 1) ดันขึ้นไปอยู่บนสุด
+      urgent.sort((a, b) => b.level - a.level);
 
 
       // ================= 2. วิเคราะห์ 24 ชม. (Daily) =================
@@ -541,27 +544,24 @@ export default function App() {
         }
       }
 
-      if (rain24P >= 40) daily.push({ icon:'🌦️', color:'#0ea5e9', title:`แนวโน้มฝนตก (${rain24P}%)`, desc:`คาดว่าจะมีฝนช่วง ${fmt(rain24T)} เผื่อเวลาเดินทางด้วยนะครับ` });
-      else daily.push({ icon:'☀️', color:'#10b981', title:'โอกาสฝนตกต่ำ', desc:'วันนี้ท้องฟ้าโปร่ง โอกาสเกิดฝนมีน้อยมาก' });
+      if (rain24P >= 40) daily.push({ icon:'🌦️', color:'#0ea5e9', title:`แนวโน้มฝนตก (${rain24P}%)`, desc:`คาดว่าจะมีฝนช่วง ${fmt(rain24T)} เผื่อเวลาเดินทางด้วยนะครับ`, level: 2 });
+      else daily.push({ icon:'☀️', color:'#10b981', title:'โอกาสฝนตกต่ำ', desc:'วันนี้ท้องฟ้าโปร่ง โอกาสเกิดฝนมีน้อยมาก', level: 1 });
 
-      if (heat24 >= 42) daily.push({ icon:'🔥', color:'#ef4444', title:'อากาศร้อนอันตราย', desc:`พุ่งสูงสุด ${heat24.toFixed(1)}°C ช่วง ${fmt(heat24T)}` });
-      else daily.push({ icon:'😎', color:'#f59e0b', title:`อากาศร้อนปานกลาง`, desc:`อุณหภูมิสูงสุดช่วง ${fmt(heat24T)} รู้สึกเหมือน ${heat24.toFixed(1)}°C` });
+      if (heat24 >= 42) daily.push({ icon:'🔥', color:'#ef4444', title:'อากาศร้อนอันตราย', desc:`พุ่งสูงสุด ${heat24.toFixed(1)}°C ช่วง ${fmt(heat24T)}`, level: 3 });
+      else daily.push({ icon:'😎', color:'#f59e0b', title:`อากาศร้อนปานกลาง`, desc:`อุณหภูมิสูงสุดช่วง ${fmt(heat24T)} รู้สึกเหมือน ${heat24.toFixed(1)}°C`, level: 2 });
 
-      if (pm24 >= 50) daily.push({ icon:'🌫️', color:'#dc2626', title:'แนวโน้มฝุ่น PM2.5 สูง', desc:`จะหนาแน่นสุด ${pm24.toFixed(1)} µg/m³ ช่วง ${fmt(pm24T)}` });
-      else if (pm24 >= 25) daily.push({ icon:'🤧', color:'#f59e0b', title:'แนวโน้มฝุ่น PM2.5 ปานกลาง', desc:`สูงสุด ${pm24.toFixed(1)} µg/m³ ช่วง ${fmt(pm24T)}` });
-      else daily.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ฝุ่นสูงสุดในวันนี้เพียง ${pm24.toFixed(1)} µg/m³` });
+      if (pm24 >= 50) daily.push({ icon:'🌫️', color:'#dc2626', title:'แนวโน้มฝุ่น PM2.5 สูง', desc:`จะหนาแน่นสุด ${pm24.toFixed(1)} µg/m³ ช่วง ${fmt(pm24T)}`, level: 3 });
+      else if (pm24 >= 25) daily.push({ icon:'🤧', color:'#f59e0b', title:'แนวโน้มฝุ่น PM2.5 ปานกลาง', desc:`สูงสุด ${pm24.toFixed(1)} µg/m³ ช่วง ${fmt(pm24T)}`, level: 2 });
+      else daily.push({ icon:'🌿', color:'#10b981', title:'คุณภาพอากาศดี', desc:`ฝุ่นสูงสุดในวันนี้เพียง ${pm24.toFixed(1)} µg/m³`, level: 1 });
 
-      if (uv24 >= 8) daily.push({ icon:'🔆', color:'#a855f7', title:`รังสี UV อันตราย (ระดับ ${uv24})`, desc:`แดดแรงจัดช่วง ${fmt(uv24T)} ควรทากันแดด SPF50+` });
-      // เพิ่ม UV ระดับปกติสำหรับ 24 ชม. ด้วย ให้มันบาลานซ์กัน
-      else daily.push({ icon:'🌤️', color:'#10b981', title:`รังสี UV ปลอดภัย (ระดับ ${uv24})`, desc:`แดดไม่แรงมากในช่วง ${fmt(uv24T)} สามารถทำกิจกรรมกลางแจ้งได้` });
+      if (uv24 >= 8) daily.push({ icon:'🔆', color:'#a855f7', title:`รังสี UV อันตราย (ระดับ ${uv24})`, desc:`แดดแรงจัดช่วง ${fmt(uv24T)} ควรทากันแดด SPF50+`, level: 3 });
+      else daily.push({ icon:'🌤️', color:'#10b981', title:`รังสี UV ปลอดภัย (ระดับ ${uv24})`, desc:`แดดไม่แรงมากในช่วง ${fmt(uv24T)} สามารถทำกิจกรรมกลางแจ้งได้`, level: 1 });
+
+      // 🚀 เรียงลำดับความเสี่ยง 24 ชม. เช่นกัน
+      daily.sort((a, b) => b.level - a.level);
 
       setAlertsData({ urgent, daily });
     } catch(e) { console.error("Alert err:", e); } finally { setAlertsLoading(false); }
-  };
-
-  const handleScanLocation = () => {
-    if (!navigator.geolocation) return alert('ไม่รองรับ GPS');
-    navigator.geolocation.getCurrentPosition((pos) => fetchAlertsData(pos.coords.latitude, pos.coords.longitude, '📍 พิกัดปัจจุบันของคุณ'), () => alert('ไม่อนุญาต GPS'));
   };
 
   useEffect(() => {
