@@ -590,18 +590,19 @@ export default function App() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', backgroundColor:themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'auto', overflowX:'hidden' }}>
       
-      {/* HEADER */}
+     {/* HEADER */}
       <header style={{ flexShrink: 0, minHeight: '65px', background: darkMode ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)', color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px', flexWrap: 'nowrap', overflowX: 'auto' }} className="hide-scrollbar">
         
-        {/* โซนด้านซ้าย (โลโก้) */}
+        {/* โซนด้านซ้าย (โลโก้ + ชื่อแอป) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          <div style={{ fontSize: '1.4rem', background: '#fff', borderRadius: '50%', padding: '4px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{darkMode ? '🌙' : '🌤️'}</div>
-          <div style={{ display: window.innerWidth < 1024 ? 'none' : 'block' }}>
-            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Thai Env Dashboard</h1>
+          <div style={{ fontSize: '1.4rem', background: '#fff', borderRadius: '50%', padding: '4px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>{darkMode ? '🌙' : '🌤️'}</div>
+          <div style={{ display: window.innerWidth < 1024 ? 'none' : 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <h1 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 'bold', whiteSpace: 'nowrap', lineHeight: '1.2' }}>Thai Env Dashboard</h1>
+            <span style={{ fontSize: '0.75rem', color: darkMode ? '#94a3b8' : '#e0f2fe', whiteSpace: 'nowrap', fontWeight: 'normal' }}>ระบบพยากรณ์และเตือนภัย</span>
           </div>
         </div>
 
-        {/* ตรงกลาง: ตัวกรอง + ปุ่ม Home */}
+        {/* ตรงกลาง: ตัวกรอง + ปุ่ม Home (แสดงเฉพาะหน้าแผนที่) */}
         {currentPage === 'map' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, maxWidth: window.innerWidth >= 768 ? '65%' : '100%' }}>
             
@@ -652,6 +653,7 @@ export default function App() {
           </div>
           <button onClick={() => setDarkMode(!darkMode)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{darkMode ? '☀️' : '🌙'}</button>
         </div>
+        
       </header>
 
       {/* BODY CONTENT */}
