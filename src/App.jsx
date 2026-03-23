@@ -515,7 +515,7 @@ export default function App() {
       }
 
       let hasUrgent = false;
-      if (rain3hP >= 30 || rain3hV > 0.1) { urgent.push({ icon:'🌧️', color:'#3b82f6', title:'ฝนกำลังจะตก!', desc:`โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm เวลาประมาณ ${fmt(rain3hT)}` }); hasUrgent = true; }
+      if (rain3hP >= 30 || rain3hV > 0.1) { urgent.push({ icon:'🌧️', color:'#3b82f6', title:'อาจจะมีฝน!', desc:`โอกาสตก ${rain3hP}% ปริมาณ ${rain3hV.toFixed(1)}mm เวลาประมาณ ${fmt(rain3hT)}` }); hasUrgent = true; }
       if (heat3h >= 40) { urgent.push({ icon:'🥵', color:'#ef4444', title:'อากาศร้อนจัดระวังฮีทสโตรก', desc:`ดัชนีความร้อนพุ่งถึง ${heat3h.toFixed(1)}°C (${fmt(heat3hT)})`}); hasUrgent = true; }
       if (pm3h >= 37.5) { urgent.push({ icon:'😷', color:'#f59e0b', title:'ฝุ่น PM2.5 หนาแน่น', desc:`ระดับฝุ่น ${pm3h.toFixed(1)} µg/m³ (${fmt(pm3hT)}) ควรใส่หน้ากาก N95`}); hasUrgent = true; }
       if (wind3h >= 40) { urgent.push({ icon:'🌪️', color:'#8b5cf6', title:'ลมกระโชกแรง', desc:`ความเร็วลม ${wind3h.toFixed(1)} km/h (${fmt(wind3hT)}) ระวังสิ่งของปลิว`}); hasUrgent = true; }
@@ -940,7 +940,7 @@ export default function App() {
                   {/* คอลัมน์ 1: 3 ชั่วโมงข้างหน้า (Urgent) */}
                   <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '20px', border: `1px solid ${borderColor}`, borderTop: alertsData?.urgent?.some(a => a.color !== '#10b981') ? '4px solid #ef4444' : '4px solid #10b981', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
                     <h3 style={{ fontSize: '1.2rem', color: alertsData?.urgent?.some(a => a.color !== '#10b981') ? '#ef4444' : '#10b981', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {alertsData?.urgent?.some(a => a.color !== '#10b981') ? `🚨 เฝ้าระวังด่วน (${timeStr3h})` : `✅ สถานการณ์ปกติ (${timeStr3h})`}
+                      {alertsData?.urgent?.some(a => a.color !== '#10b981') ? `🚨 เฝ้าระวัง (${timeStr3h})` : `✅ สถานการณ์ปกติ (${timeStr3h})`}
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {alertsData?.urgent?.map((al, idx) => (
