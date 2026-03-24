@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from 'r
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
 import './App.css';
 
 // ==============================================================
@@ -32,24 +32,14 @@ const regionMapping = {
 };
 
 const thaiProvinces = Object.values(regionMapping).flat();
-
-const getRegion = (province) => {
-  for (const [region, provinces] of Object.entries(regionMapping)) {
-    if (provinces.includes(province)) return region;
-  }
-  return "อื่นๆ";
-};
-
+const getRegion = (province) => { for (const [region, provinces] of Object.entries(regionMapping)) { if (provinces.includes(province)) return region; } return "อื่นๆ"; };
 const extractProvince = (area) => { 
   if(!area) return 'ไม่ระบุ'; 
   if (area.includes('กรุงเทพ') || area.includes('กทม')) return 'กรุงเทพมหานคร';
-  for (let i = 0; i < thaiProvinces.length; i++) {
-    if (area.includes(thaiProvinces[i])) return thaiProvinces[i];
-  }
+  for (let i = 0; i < thaiProvinces.length; i++) { if (area.includes(thaiProvinces[i])) return thaiProvinces[i]; }
   if (area.includes('เขต')) return 'กรุงเทพมหานคร';
   let p = area.includes(',') ? area.split(',').pop() : area.trim().split(/\s+/).pop(); 
-  p = p.trim().replace(/^(จ\.|จังหวัด)/, '').trim();
-  if (p.includes('จ.')) p = p.split('จ.').pop().trim();
+  p = p.trim().replace(/^(จ\.|จังหวัด)/, '').trim(); if (p.includes('จ.')) p = p.split('จ.').pop().trim();
   return p; 
 };
 
@@ -72,19 +62,21 @@ const chartConfigs = {
 };
 
 // ==============================================================
-// 2. Map Components
+// 2. Map Components & Skeleton
 // ==============================================================
 const createCustomMarker = (viewMode, value, extraData) => {
-  let bg, textColor, displayValue;
-  const fontSize = String(value).length > 2 ? '9px' : '11px';
+  let bg, textColor, displayValue; const fontSize = String(value).length > 2 ? '9px' : '11px';
   if (viewMode === 'pm25') { bg = getPM25Color(value); textColor = (value > 25.0 && value <= 37.5) ? '#222' : '#fff'; displayValue = (value === 0 || isNaN(value)) ? '-' : value; }
   else if (viewMode === 'temp') { const tInfo = getTempColor(value); bg = tInfo.bg; textColor = tInfo.text; displayValue = (value == null || isNaN(value)) ? '-' : Math.round(value); }
   else if (viewMode === 'heat') { const hInfo = getHeatIndexAlert(value); bg = value != null ? hInfo.bar : '#cccccc'; textColor = '#fff'; displayValue = (value == null || isNaN(value)) ? '-' : Math.round(value); }
   else if (viewMode === 'uv') { const uInfo = getUvColor(value); bg = value != null ? uInfo.bar : '#cccccc'; textColor = (value > 2 && value <= 5) ? '#222' : '#fff'; displayValue = (value == null || isNaN(value)) ? '-' : Math.round(value); }
   else if (viewMode === 'rain') { const rInfo = getRainColor(value); bg = value != null ? rInfo.bar : '#cccccc'; textColor = (value <= 30 && value > 0) ? '#222' : '#fff'; displayValue = (value == null || isNaN(value)) ? '-' : `${Math.round(value)}%`; }
   else if (viewMode === 'wind') { const wInfo = getWindColor(value); bg = value != null ? wInfo.bar : '#cccccc'; textColor = (value > 10 && value <= 40) ? '#222' : '#fff'; const dir = extraData?.windDir || 0; displayValue = value == null ? '-' : `<div style="display:flex; flex-direction:column; align-items:center; line-height:1;"><span style="transform: rotate(${dir}deg); font-size: 14px; margin-bottom: -1px; font-weight: bold;">↓</span><span style="font-size: 9px;">${Math.round(value)}</span></div>`; }
-
   return L.divIcon({ className: 'custom-div-icon', html: `<div style="background-color: ${bg}; width: 34px; height: 34px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; color: ${textColor}; font-weight: bold; font-size: ${fontSize}; font-family: 'Kanit', sans-serif; transition: all 0.3s ease;">${displayValue}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+};
+
+const createClusterCustomIcon = function (cluster) {
+  return L.divIcon({ html: `<div style="background-color: #0ea5e9; color: white; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-family: 'Kanit', sans-serif;">${cluster.getChildCount()}</div>`, className: 'custom-marker-cluster', iconSize: [34, 34], iconAnchor: [17, 17] });
 };
 
 function FitBounds({ stations, activeStation, selectedProvince, selectedRegion }) {
@@ -95,44 +87,31 @@ function FitBounds({ stations, activeStation, selectedProvince, selectedRegion }
       if (!selectedProvince && !selectedRegion) { map.flyTo([13.5, 101.0], 6, { duration: 1.5 }); } 
       else { 
         const validStations = stations.filter(s => s.lat && s.long && !isNaN(parseFloat(s.lat)) && !isNaN(parseFloat(s.long)) && parseFloat(s.lat) !== 0);
-        if (validStations.length > 0) {
-          const bounds = L.latLngBounds(validStations.map(s => [parseFloat(s.lat), parseFloat(s.long)])); 
-          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 });
-        }
+        if (validStations.length > 0) { const bounds = L.latLngBounds(validStations.map(s => [parseFloat(s.lat), parseFloat(s.long)])); map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 }); }
       }
     }
-  }, [stations, map, activeStation, selectedProvince, selectedRegion]);
-  return null;
+  }, [stations, map, activeStation, selectedProvince, selectedRegion]); return null;
 }
-
-function FlyToActiveStation({ activeStation }) {
-  const map = useMap();
-  useEffect(() => { if (activeStation && !isNaN(parseFloat(activeStation.lat))) map.flyTo([parseFloat(activeStation.lat), parseFloat(activeStation.long)], 13, { duration: 1.5 }); }, [activeStation, map]);
-  return null;
-}
-
-function RadarMapHandler({ showRadar }) {
-  const map = useMap();
-  useEffect(() => { if (showRadar && map.getZoom() > 8) map.flyTo([13.5, 101.0], 6, { duration: 1.2 }); }, [showRadar, map]);
-  return null;
-}
-
-function MapFix() {
-  const map = useMap();
-  useEffect(() => {
-    const timer = setTimeout(() => { map.invalidateSize(); }, 400);
-    return () => clearTimeout(timer);
-  }, [map]);
-  return null;
-}
-
-function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-  var R = 6371; var dLat = deg2rad(lat2-lat1); var dLon = deg2rad(lon2-lon1); 
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-  return R * c;
-}
+function FlyToActiveStation({ activeStation }) { const map = useMap(); useEffect(() => { if (activeStation && !isNaN(parseFloat(activeStation.lat))) map.flyTo([parseFloat(activeStation.lat), parseFloat(activeStation.long)], 13, { duration: 1.5 }); }, [activeStation, map]); return null; }
+function RadarMapHandler({ showRadar }) { const map = useMap(); useEffect(() => { if (showRadar && map.getZoom() > 8) map.flyTo([13.5, 101.0], 6, { duration: 1.2 }); }, [showRadar, map]); return null; }
+function MapFix() { const map = useMap(); useEffect(() => { const timer = setTimeout(() => { map.invalidateSize(); }, 400); return () => clearTimeout(timer); }, [map]); return null; }
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) { var R = 6371; var dLat = deg2rad(lat2-lat1); var dLon = deg2rad(lon2-lon1); var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c; }
 function deg2rad(deg) { return deg * (Math.PI/180) }
+
+// 💀 Skeleton Loading Component
+const SkeletonLoading = ({ darkMode }) => {
+  const bg = darkMode ? '#0f172a' : '#f1f5f9'; const pulseColor = darkMode ? '#1e293b' : '#e2e8f0';
+  return (
+    <div style={{ height: '100vh', backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <style>{`@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } } .skeleton { animation: pulse 1.5s infinite ease-in-out; border-radius: 12px; }`}</style>
+      <div className="skeleton" style={{ height: '65px', backgroundColor: pulseColor, borderRadius: '0' }}></div>
+      <div style={{ display: 'flex', gap: '15px', padding: '15px', flex: 1, flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
+        <div className="skeleton" style={{ flex: 7, backgroundColor: pulseColor, minHeight: window.innerWidth < 768 ? '50vh' : 'auto' }}></div>
+        <div className="skeleton" style={{ flex: 3, backgroundColor: pulseColor, display: window.innerWidth < 768 ? 'none' : 'block' }}></div>
+      </div>
+    </div>
+  );
+};
 // ==============================================================
 // 3. Main App Component
 // ==============================================================
@@ -164,7 +143,10 @@ export default function App() {
   const [dashTitle, setDashTitle] = useState('ภาพรวมทั้งประเทศ');
 
   const [currentPage, setCurrentPage] = useState(window.innerWidth < 768 ? 'alerts' : 'map'); 
-  const [showStats, setShowStats] = useState(window.innerWidth >= 768);
+  
+  // ℹ️ State ใหม่สำหรับเปิด/ปิด สัญลักษณ์แผนที่ และ Modal
+  const [showLegend, setShowLegend] = useState(window.innerWidth >= 768);
+  const [showStatsModal, setShowStatsModal] = useState(false);
 
   const [alertsData, setAlertsData] = useState({ urgent: [], daily: [] });
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -173,8 +155,8 @@ export default function App() {
 
   const [aiSummaryJson, setAiSummaryJson] = useState(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiTimestamp, setAiTimestamp] = useState(''); // ⏱️ เก็บเวลา AI สรุป
 
-  // 📱 โหมด Mobile UI State
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const cardRefs = useRef({});
@@ -188,7 +170,7 @@ export default function App() {
     else document.body.classList.remove('dark-theme');
   }, [darkMode]);
 
-  useEffect(() => { setAiSummaryJson(null); }, [alertsLocationName, activeStation]);
+  useEffect(() => { setAiSummaryJson(null); setAiTimestamp(''); }, [alertsLocationName, activeStation]);
 
   const handleViewModeChange = (mode) => { 
     setViewMode(mode); setSortOrder(mode === 'temp' ? 'asc' : 'desc'); setShowRadar(false); setSelectedStationId(''); setActiveStation(null);
@@ -207,18 +189,13 @@ export default function App() {
 
   const fetchOpenMeteoBulk = async (stationsList) => {
     try {
-      let allWeather = {};
-      const chunkSize = 50; 
+      let allWeather = {}; const chunkSize = 50; 
       for (let i = 0; i < stationsList.length; i += chunkSize) {
-        const chunk = stationsList.slice(i, i + chunkSize);
-        if(chunk.length === 0) continue;
-        const lats = chunk.map(s => s.lat).join(',');
-        const lons = chunk.map(s => s.long).join(',');
+        const chunk = stationsList.slice(i, i + chunkSize); if(chunk.length === 0) continue;
+        const lats = chunk.map(s => s.lat).join(','); const lons = chunk.map(s => s.long).join(',');
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=Asia%2FBangkok`;
-        
         const res = await fetch(url); const data = await res.json();
         const results = Array.isArray(data) ? data : [data];
-        
         results.forEach((r, idx) => {
            if (r && r.current && r.daily) {
              allWeather[chunk[idx].stationID] = {
@@ -228,7 +205,7 @@ export default function App() {
         });
       }
       return allWeather;
-    } catch (error) { console.error("Open-Meteo fetch error:", error); return {}; }
+    } catch (error) { return {}; }
   };
 
   const fetchAirQuality = async (isBackgroundLoad = false) => {
@@ -239,7 +216,6 @@ export default function App() {
       const firebaseRes = await fetch(url, { cache: 'no-store' }).then(res => res.json());
       const parsedData = JSON.parse(firebaseRes.fields.jsonData.stringValue);
       const stData = parsedData.stations || [];
-      
       if (stData.length > 0) {
         const validStations = stData.filter(s => !isNaN(parseFloat(s.lat)) && !isNaN(parseFloat(s.long)) && parseFloat(s.lat) !== 0);
         const openMeteoData = await fetchOpenMeteoBulk(validStations);
@@ -248,27 +224,20 @@ export default function App() {
         setLastUpdateText(`${validStations[0]?.AQILast?.date || ''} เวลา ${validStations[0]?.AQILast?.time || ''} น.`);
         setStationTemps(openMeteoData); 
       }
-    } catch (err) { console.error("Fetch error:", err); } 
+    } catch (err) { console.error(err); } 
     finally { if (!isBackgroundLoad) setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchAirQuality();
-    const intervalId = setInterval(() => { fetchAirQuality(true); }, 1800000); 
-    return () => clearInterval(intervalId);
-  }, []);
+  useEffect(() => { fetchAirQuality(); const intervalId = setInterval(() => { fetchAirQuality(true); }, 1800000); return () => clearInterval(intervalId); }, []);
 
   useEffect(() => {
     if (stations.length === 0 || Object.keys(stationTemps).length === 0) return;
     let pm25Risks = []; let stormRisks = []; let heatRisks = [];
     stations.forEach(s => {
-      const pm = Number(s.AQILast?.PM25?.value);
-      if(pm >= 37.5) pm25Risks.push({ prov: extractProvince(s.areaTH), val: pm });
+      const pm = Number(s.AQILast?.PM25?.value); if(pm >= 37.5) pm25Risks.push({ prov: extractProvince(s.areaTH), val: pm });
       const t = stationTemps[s.stationID];
-      if(t) {
-        if(t.rainProb >= 40 || t.windMax >= 30) stormRisks.push({ prov: extractProvince(s.areaTH), rain: t.rainProb, wind: t.windMax });
-        if(t.heatMax >= 40) heatRisks.push({ prov: extractProvince(s.areaTH), val: t.heatMax });
-      }
+      if(t) { if(t.rainProb >= 40 || t.windMax >= 30) stormRisks.push({ prov: extractProvince(s.areaTH), rain: t.rainProb, wind: t.windMax });
+              if(t.heatMax >= 40) heatRisks.push({ prov: extractProvince(s.areaTH), val: t.heatMax }); }
     });
     pm25Risks.sort((a,b)=>b.val - a.val); stormRisks.sort((a,b)=>Math.max(b.rain, b.wind) - Math.max(a.rain, a.wind)); heatRisks.sort((a,b)=>b.val - a.val);
     const uniquePm = []; const pmSet = new Set(); pm25Risks.forEach(item => { if(!pmSet.has(item.prov)){ pmSet.add(item.prov); uniquePm.push(item); }});
@@ -282,7 +251,6 @@ export default function App() {
     if (selectedRegion) result = result.filter(s => getRegion(extractProvince(s.areaTH)) === selectedRegion);
     if (selectedProvince) result = result.filter(s => extractProvince(s.areaTH) === selectedProvince);
     if (selectedStationId) result = result.filter(s => s.stationID === selectedStationId);
-    
     result.sort((a, b) => {
       let vA, vB;
       if (viewMode==='pm25') { vA = Number(a.AQILast?.PM25?.value); vB = Number(b.AQILast?.PM25?.value); }
@@ -291,8 +259,7 @@ export default function App() {
       else if (viewMode==='uv') { vA = stationTemps[a.stationID]?.uvMax; vB = stationTemps[b.stationID]?.uvMax; }
       else if (viewMode==='rain') { vA = stationTemps[a.stationID]?.rainProb; vB = stationTemps[b.stationID]?.rainProb; }
       else if (viewMode==='wind') { vA = stationTemps[a.stationID]?.windSpeed; vB = stationTemps[b.stationID]?.windSpeed; }
-      const validA = vA!=null && !isNaN(vA) && (viewMode==='rain'?true:vA!==0);
-      const validB = vB!=null && !isNaN(vB) && (viewMode==='rain'?true:vB!==0);
+      const validA = vA!=null && !isNaN(vA) && (viewMode==='rain'?true:vA!==0); const validB = vB!=null && !isNaN(vB) && (viewMode==='rain'?true:vB!==0);
       if (!validA && validB) return 1; if (validA && !validB) return -1; if (!validA && !validB) return 0;
       return sortOrder === 'desc' ? vB - vA : vA - vB;
     });
@@ -339,7 +306,7 @@ export default function App() {
             }
             setActiveForecast(pmF);
           }
-        } catch (err) { console.error("Card detail error", err); setActiveWeather('error'); }
+        } catch (err) { console.error(err); setActiveWeather('error'); }
       };
       fetchCardDetails();
     }
@@ -370,8 +337,7 @@ export default function App() {
             }
           }
           let item = {
-            date: dObj.toLocaleDateString('th-TH',{day:'numeric',month:'short'}),
-            dayName: ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'][dObj.getDay()],
+            date: dObj.toLocaleDateString('th-TH',{day:'numeric',month:'short'}), dayName: ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'][dObj.getDay()],
             temp: dW.daily.temperature_2m_max[i] ?? null, heat: dW.daily.apparent_temperature_max[i] ?? null,
             rain: dW.daily.precipitation_sum[i] ?? null, wind: dW.daily.wind_speed_10m_max[i] ?? null,
             uv: dW.daily.uv_index_max ? (dW.daily.uv_index_max[i] ?? null) : null, pm25: avgPm
@@ -382,14 +348,11 @@ export default function App() {
             item.rainLY = dArc.daily?.precipitation_sum?(dArc.daily.precipitation_sum[i]||0):0;
             item.windLY = dArc.daily?.wind_speed_10m_max?(dArc.daily.wind_speed_10m_max[i]||0):0;
             hArr.push(item);
-          } else {
-            if(i===14) item.date='วันนี้'; if(i===15) item.date='พรุ่งนี้';
-            fArr.push(item);
-          }
+          } else { if(i===14) item.date='วันนี้'; if(i===15) item.date='พรุ่งนี้'; fArr.push(item); }
         }
       }
       setDashHistory(hArr); setDashForecast(fArr);
-    } catch (e) { console.error("Dash error:", e); } finally { setDashLoading(false); }
+    } catch (e) { console.error(e); } finally { setDashLoading(false); }
   };
 
   useEffect(() => {
@@ -398,9 +361,7 @@ export default function App() {
       else if (selectedProvince) {
         const pStat = stations.filter(s => extractProvince(s.areaTH) === selectedProvince);
         if (pStat.length > 0) fetchDashboardData(pStat.reduce((a,b)=>a+parseFloat(b.lat),0)/pStat.length, pStat.reduce((a,b)=>a+parseFloat(b.long),0)/pStat.length, `ค่าเฉลี่ย จ.${selectedProvince}`);
-      } else if (stations.length > 0) {
-        fetchDashboardData(13.75, 100.5, 'ภาพรวมประเทศ (อ้างอิงตอนกลาง)');
-      }
+      } else if (stations.length > 0) { fetchDashboardData(13.75, 100.5, 'ภาพรวมประเทศ (อ้างอิงตอนกลาง)'); }
     }
   }, [activeStation, selectedProvince, stations, currentPage]);
 
@@ -412,8 +373,7 @@ export default function App() {
       let nearest = null; let minD = Infinity;
       stations.forEach(s => { const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); if (d<minD){minD=d; nearest=s;} });
       if (nearest) { 
-        const prov = extractProvince(nearest.areaTH);
-        setSelectedRegion(getRegion(prov)); setSelectedProvince(prov); setSelectedStationId(nearest.stationID); 
+        const prov = extractProvince(nearest.areaTH); setSelectedRegion(getRegion(prov)); setSelectedProvince(prov); setSelectedStationId(nearest.stationID); 
         setActiveStation(nearest); setShowRadar(false); setCurrentPage('map'); window.scrollTo({top:0, behavior:'smooth'}); 
       }
       setLocating(false);
@@ -486,7 +446,7 @@ export default function App() {
       daily.sort((a, b) => b.level - a.level);
 
       setAlertsData({ urgent, daily });
-    } catch(e) { console.error("Alert err:", e); } finally { setAlertsLoading(false); }
+    } catch(e) { console.error(e); } finally { setAlertsLoading(false); }
   };
 
   const handleScanLocation = () => {
@@ -502,13 +462,11 @@ export default function App() {
   }, [currentPage, activeStation, alertsLocationName]);
 
   const generateAISummary = async (topic = 'general') => {
-    setIsGeneratingAI(true); setAiSummaryJson(null);
+    setIsGeneratingAI(true); setAiSummaryJson(null); setAiTimestamp('');
     try {
-      const loc = alertsLocationName || "ประเทศไทย";
-      let contextData = `พิกัด/พื้นที่: ${loc}\n\n[ข้อมูลพยากรณ์ด่วน 3 ชม.]\n`;
+      const loc = alertsLocationName || "ประเทศไทย"; let contextData = `พิกัด/พื้นที่: ${loc}\n\n[ข้อมูลพยากรณ์ด่วน 3 ชม.]\n`;
       alertsData.urgent.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
-      contextData += `\n[ข้อมูลภาพรวม 24 ชั่วโมง]\n`;
-      alertsData.daily.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
+      contextData += `\n[ข้อมูลภาพรวม 24 ชั่วโมง]\n`; alertsData.daily.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
 
       let promptText = '';
       if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปภาพรวมสภาพอากาศจากข้อมูลต่อไปนี้ (เน้นความเสี่ยงช่วง 3 ชม.นี้) เป็น JSON วิเคราะห์หัวข้อ: 1.ภาพรวมสภาพอากาศ 2.ความปลอดภัยในการเดินทาง 3.สุขภาพ/ภูมิแพ้:\n\n${contextData}`; } 
@@ -519,14 +477,23 @@ export default function App() {
       const response = await fetch('/api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, topic: topic }) });
       const data = await response.json();
       if (data.jsonText) {
-        try { const parsedData = JSON.parse(data.jsonText); setAiSummaryJson(parsedData); } 
+        try { const parsedData = JSON.parse(data.jsonText); setAiSummaryJson(parsedData); setAiTimestamp(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'); } 
         catch (e) { setAiSummaryJson([{ label: "Error", icon: "❌", status: "no", reason: "AI ส่งข้อมูลผิดรูปแบบ ลองกดปุ่มใหม่อีกครั้ง" }]); }
       } else { setAiSummaryJson([{ label: "No Summary", icon: "😶", status: "warning", reason: "AI ไม่สามารถสรุปได้ในขณะนี้" }]); }
     } catch (error) { console.error(error); setAiSummaryJson([{ label: "Server Error", icon: "🚑", status: "no", reason: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); } 
     finally { setIsGeneratingAI(false); }
   };
 
-  if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', fontSize:'1.5rem', color:'#555' }}>กำลังโหลด...</div>;
+  // 🚀 ฟังก์ชันแชร์ข้อความ AI (Share Button)
+  const handleShareAI = () => {
+    if(!aiSummaryJson) return;
+    const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.label}: ${i.reason}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Env Dashboard`;
+    if (navigator.share) { navigator.share({ title: 'สรุปสภาพอากาศจาก AI', text: shareText }).catch(console.error); } 
+    else { navigator.clipboard.writeText(shareText); alert('คัดลอกข้อความสรุปแล้ว! สามารถนำไปวางส่งให้เพื่อนได้เลยครับ'); }
+  };
+
+  // 💀 โชว์ Skeleton แทนข้อความโล้นๆ ตอนเข้าเว็บ
+  if (loading) return <SkeletonLoading darkMode={darkMode} />;
 
   const isPm25Mode = viewMode === 'pm25'; const isTempMode = viewMode === 'temp'; const isHeatMode = viewMode === 'heat';
   const isUvMode = viewMode === 'uv'; const isRainMode = viewMode === 'rain'; const isWindMode = viewMode === 'wind';
@@ -554,8 +521,6 @@ export default function App() {
 
         {currentPage === 'map' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, maxWidth: window.innerWidth >= 768 ? '65%' : '100%', justifyContent: window.innerWidth < 768 ? 'flex-end' : 'flex-start' }}>
-            
-            {/* 📱 Mobile UX: ปุ่มค้นหาแทนแถบยาวๆ */}
             {window.innerWidth >= 768 ? (
               <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '5px 12px', borderRadius: '30px', overflowX: 'auto', whiteSpace: 'nowrap', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -580,17 +545,13 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <button onClick={() => setShowMobileFilters(true)} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#0ea5e9', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-                🔍 ค้นหาสถานที่
-              </button>
+              <button onClick={() => setShowMobileFilters(true)} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#0ea5e9', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>🔍 ค้นหาสถานที่</button>
             )}
-
             <button onClick={handleReset} title="รีเซ็ตแผนที่" style={{ flexShrink: 0, backgroundColor: '#fff', border: 'none', borderRadius: '50%', width: '38px', height: '38px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.15)', fontSize: '1.2rem', color: '#0ea5e9' }}>🏠</button>
           </div>
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: 'auto' }}>
-          {/* 📱 Mobile UX: ซ่อนปุ่มสลับหน้าเว็บบนมือถือ (ย้ายลง Bottom Nav แทน) */}
           {window.innerWidth >= 768 && (
             <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '25px', padding: '4px' }}>
               <button onClick={() => { setCurrentPage('map'); window.scrollTo({top:0, behavior:'smooth'}); }} style={{ padding: '5px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: currentPage === 'map' ? '#fff' : 'transparent', color: currentPage === 'map' ? '#0ea5e9' : '#fff' }}>🗺️ แผนที่</button>
@@ -603,7 +564,6 @@ export default function App() {
 
       {/* BODY CONTENT */}
       {currentPage === 'map' ? (
-        // 📱 Mobile UX: เพิ่ม Padding เผื่อ Bottom Nav ไม่ให้บังเนื้อหา
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingBottom: window.innerWidth < 768 ? '65px' : '0' }}>
           <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px' }}>
             
@@ -629,14 +589,22 @@ export default function App() {
                 {locating ? <span style={{ fontSize: '1.2rem' }}>⏳</span> : <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="6"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line></svg>}
               </button>
 
+              {/* ℹ️ Legend แบบพับได้ */}
               {!showRadar && (
-                <div style={{ position: 'absolute', bottom: '25px', left: window.innerWidth < 768 ? '15px' : '60px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: textColor }}>{legendData[viewMode].title}</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {legendData[viewMode].items.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '14px', height: '14px', backgroundColor: item.color, borderRadius: '50%' }}></span><span style={{ fontSize: '0.8rem', color: subTextColor }}>{item.label}</span></div>
-                    ))}
-                  </div>
+                <div style={{ position: 'absolute', bottom: '25px', left: window.innerWidth < 768 ? '15px' : '60px', zIndex: 500, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <button onClick={() => setShowLegend(!showLegend)} style={{ padding: '6px 12px', borderRadius: '20px', backgroundColor: darkMode ? '#1e293b' : '#fff', color: textColor, border: `1px solid ${borderColor}`, fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: showLegend ? '8px' : '0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🗺️ สัญลักษณ์ <span style={{fontSize:'0.6rem'}}>{showLegend ? '▼' : '▲'}</span>
+                  </button>
+                  {showLegend && (
+                    <div style={{ background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '12px', borderRadius: '10px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: textColor }}>{legendData[viewMode].title}</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        {legendData[viewMode].items.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '14px', height: '14px', backgroundColor: item.color, borderRadius: '50%' }}></span><span style={{ fontSize: '0.8rem', color: subTextColor }}>{item.label}</span></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -683,7 +651,7 @@ export default function App() {
                 })}
 
                 {!showRadar && (
-                  <MarkerClusterGroup chunkedLoading maxClusterRadius={45} disableClusteringAtZoom={11} spiderfyOnMaxZoom={true}>
+                  <MarkerClusterGroup chunkedLoading maxClusterRadius={45} disableClusteringAtZoom={11} spiderfyOnMaxZoom={true} iconCreateFunction={createClusterCustomIcon}>
                     {filteredStations.filter(s => extractProvince(s.areaTH) === 'กรุงเทพมหานคร').map((station) => {
                       const lat = parseFloat(station.lat); const lon = parseFloat(station.long); if (isNaN(lat) || isNaN(lon)) return null;
                       const pmVal = Number(station.AQILast?.PM25?.value); const tObj = stationTemps[station.stationID];
@@ -719,12 +687,19 @@ export default function App() {
 
             {/* SIDEBAR RIGHT LIST */}
             <div style={{ flex: 3, minWidth: window.innerWidth < 768 ? '100%' : '380px', maxWidth: window.innerWidth < 768 ? '100%' : '450px', backgroundColor: cardBg, borderRadius: '12px', display: 'flex', flexDirection: 'column', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? 'auto' : 'calc(100vh - 120px)', maxHeight: window.innerWidth < 768 ? '50vh' : 'none' }}>
-              <div style={{ padding: '15px', background: darkMode ? '#0f172a' : '#f0f9ff', borderBottom: `1px solid ${borderColor}`, display: 'flex', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
-                <h2 style={{ fontSize: '1rem', color: textColor, margin: 0, fontWeight: 'bold' }}>{activeChart.name} <span style={{fontSize:'0.85rem', color:subTextColor}}>({filteredStations.length} จุด)</span></h2>
-                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: cardBg, color: textColor, outline:'none' }}>
-                  <option value="desc">⬇️ มากไปน้อย</option><option value="asc">⬆️ น้อยไปมาก</option>
-                </select>
+              <div style={{ padding: '15px', background: darkMode ? '#0f172a' : '#f0f9ff', borderBottom: `1px solid ${borderColor}`, position: 'sticky', top: 0, zIndex: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h2 style={{ fontSize: '1rem', color: textColor, margin: 0, fontWeight: 'bold' }}>{activeChart.name} <span style={{fontSize:'0.85rem', color:subTextColor}}>({filteredStations.length} จุด)</span></h2>
+                  <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: cardBg, color: textColor, outline:'none', border: `1px solid ${borderColor}` }}>
+                    <option value="desc">⬇️ มากไปน้อย</option><option value="asc">⬆️ น้อยไปมาก</option>
+                  </select>
+                </div>
+                {/* 📊 Modal Trigger Button */}
+                <button onClick={() => setShowStatsModal(true)} style={{ width: '100%', padding: '8px', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 2px 5px rgba(59,130,246,0.3)' }}>
+                  📊 ดูกราฟสถิติ 14 วัน (พื้นที่นี้)
+                </button>
               </div>
+
               <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
                 {filteredStations.map((station) => {
                   const pmVal = Number(station.AQILast?.PM25?.value); 
@@ -748,7 +723,7 @@ export default function App() {
                           <h4 style={{ margin:'0 0 2px 0', color:textColor, fontSize:'1rem' }}>{station.nameTH}</h4>
                           <p style={{ margin:0, color:'#3b82f6', fontSize:'0.8rem', fontWeight:'bold' }}>{extractProvince(station.areaTH)}</p>
                           <div style={{ marginTop:'10px', fontSize:'0.85rem', color:subTextColor, fontWeight:'bold' }}>
-                            {isPm25Mode ? `AQI: ${station.AQILast?.AQI?.aqi||'--'}` : tObj ? (isUvMode?`ระดับ: ${getUvColor(tObj?.uvMax).label}`:isRainMode?`💧 ชื้น: ${tObj.humidity}%`:isWindMode?`ลมสูงสุด: ${tObj.windMax} km/h`:`ต่ำ ${tObj.tempMin!=null?Number(tObj.tempMin).toFixed(1):'-'}° | สูง ${tObj.tempMax!=null?Number(tObj.tempMax).toFixed(1):'-'}°`) : 'ไม่มีข้อมูล'}
+                            {isPm25Mode ? <span title="ค่า AQI คือดัชนีภาพรวมที่รวมค่าฝุ่นและก๊าซพิษเข้าด้วยกัน">AQI: {station.AQILast?.AQI?.aqi||'--'} <span style={{cursor:'help',color:'#94a3b8'}}>ⓘ</span></span> : tObj ? (isUvMode?`ระดับ: ${getUvColor(tObj?.uvMax).label}`:isRainMode?`💧 ชื้น: ${tObj.humidity}%`:isWindMode?`ลมสูงสุด: ${tObj.windMax} km/h`:`ต่ำ ${tObj.tempMin!=null?Number(tObj.tempMin).toFixed(1):'-'}° | สูง ${tObj.tempMax!=null?Number(tObj.tempMax).toFixed(1):'-'}°`) : 'ไม่มีข้อมูล'}
                           </div>
                         </div>
                         <div style={{ backgroundColor:boxBg, color:(isPm25Mode && pmVal>25&&pmVal<=37.5) || (isUvMode&&tObj?.uvMax<=5)?'#1e293b':'#fff', width:'60px', height:'60px', borderRadius:'12px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
@@ -770,12 +745,8 @@ export default function App() {
                                   <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์อุณหภูมิ 7 วัน (ต่ำสุด - สูงสุด)</h5>
                                   <div style={{ height:'110px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
                                     {activeWeather.tempForecast.map((d,i)=>{
-                                      const globalMax = Math.max(...activeWeather.tempForecast.map(x=>x.val)) + 1;
-                                      const globalMin = Math.min(...activeWeather.tempForecast.map(x=>x.minVal)) - 1;
-                                      const range = globalMax - globalMin || 1;
-                                      const bottomP = Math.max(0, ((d.minVal - globalMin) / range) * 100);
-                                      const heightP = Math.max(8, ((d.val - d.minVal) / range) * 100);
-
+                                      const globalMax = Math.max(...activeWeather.tempForecast.map(x=>x.val)) + 1; const globalMin = Math.min(...activeWeather.tempForecast.map(x=>x.minVal)) - 1;
+                                      const range = globalMax - globalMin || 1; const bottomP = Math.max(0, ((d.minVal - globalMin) / range) * 100); const heightP = Math.max(8, ((d.val - d.minVal) / range) * 100);
                                       return (
                                         <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
                                           <span style={{fontSize:'10px', color:textColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}°</span>
@@ -796,14 +767,11 @@ export default function App() {
                                   <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 แนวโน้ม PM2.5 ล่วงหน้า 72 ชม.</h5>
                                   <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'3px' }}>
                                     {activeForecast ? activeForecast.map((d,i)=>{
-                                      const maxVal = Math.max(...activeForecast.map(x=>x.val)) || 1;
-                                      const h = Math.max((d.val / maxVal) * 100, 5); 
+                                      const maxVal = Math.max(...activeForecast.map(x=>x.val)) || 1; const h = Math.max((d.val / maxVal) * 100, 5); 
                                       return (
                                         <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
                                           <span style={{fontSize:'9px', color:subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
-                                          <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
-                                            <div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'3px 3px 0 0'}}></div>
-                                          </div>
+                                          <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}><div style={{width:'100%', height:`${h}%`, backgroundColor:d.color, borderRadius:'3px 3px 0 0'}}></div></div>
                                           <span style={{fontSize:'8px', color:subTextColor, marginTop:'4px', height:'12px'}}>{i%3===0?d.time:''}</span>
                                         </div>
                                       );
@@ -814,22 +782,18 @@ export default function App() {
                             }
 
                             let fData = isHeatMode?activeWeather.heatForecast:isUvMode?activeWeather.uvForecast:isRainMode?activeWeather.rainForecast:isWindMode?activeWeather.windForecast:[];
-                            fData = fData.filter(d => d.val != null && !isNaN(d.val)); 
-                            if(fData.length === 0) return null;
+                            fData = fData.filter(d => d.val != null && !isNaN(d.val)); if(fData.length === 0) return null;
                             
                             return (
                               <div>
                                 <h5 style={{ fontSize:'0.85rem', fontWeight:'bold', color:subTextColor, marginBottom:'10px' }}>📈 คาดการณ์ {fData.length} วัน</h5>
                                 <div style={{ height:'100px', display:'flex', alignItems:'flex-end', gap:'6px' }}>
                                   {fData.map((d,i)=>{
-                                    const maxVal = Math.max(...fData.map(x=>x.val)) + (isRainMode?10:5) || 1;
-                                    const h = Math.max((d.val / maxVal) * 100, 5);
+                                    const maxVal = Math.max(...fData.map(x=>x.val)) + (isRainMode?10:5) || 1; const h = Math.max((d.val / maxVal) * 100, 5);
                                     return (
                                       <div key={i} style={{flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', alignItems:'center'}}>
                                         <span style={{fontSize:'10px', color:d.colorInfo.color||subTextColor, fontWeight:'bold', marginBottom:'4px'}}>{d.val}</span>
-                                        <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}>
-                                          <div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'3px 3px 0 0'}}></div>
-                                        </div>
+                                        <div style={{width:'100%', flex:1, display:'flex', alignItems:'flex-end'}}><div style={{width:'100%', height:`${h}%`, backgroundColor:d.colorInfo.bar, borderRadius:'3px 3px 0 0'}}></div></div>
                                         <span style={{fontSize:'10px', color:i<=1?'#0ea5e9':subTextColor, marginTop:'4px'}}>{d.time}</span>
                                       </div>
                                     );
@@ -846,60 +810,9 @@ export default function App() {
               </div>
             </div>
           </div>
-
-          {/* DASHBOARD BOTTOM */}
-          <div style={{ padding: '15px' }}>
-            <div style={{ backgroundColor: cardBg, borderRadius: '12px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-              <div onClick={() => setShowStats(!showStats)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.3rem', color: textColor, margin: '0 0 5px 0', fontWeight:'bold' }}>📊 ข้อมูลเชิงลึก: {activeChart.name}</h2>
-                  <p style={{ margin: 0, color: subTextColor, fontSize: '0.9rem' }}>พื้นที่วิเคราะห์: <strong style={{color: '#0ea5e9'}}>{dashTitle}</strong></p>
-                </div>
-                <div style={{ padding: '8px 15px', backgroundColor: darkMode ? '#334155' : '#f1f5f9', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold', color: textColor }}>
-                  {showStats ? '🔼 ซ่อนสถิติ' : '🔽 ดูกราฟสถิติ'}
-                </div>
-              </div>
-              
-              {showStats && (
-                <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: `1px solid ${borderColor}` }}>
-                  {dashLoading ? <div style={{ textAlign:'center', color:subTextColor, padding:'50px' }}>⏳ กำลังประมวลผลข้อมูลดาวเทียม...</div> : dashHistory.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 1fr', gap: '20px' }}>
-                      <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
-                        <h3 style={{ fontSize: '1rem', color: textColor, textAlign: 'center', fontWeight:'bold' }}>⏳ ย้อนหลัง 14 วัน</h3>
-                        <div style={{ height: '220px', marginTop:'15px' }}>
-                          <ResponsiveContainer>
-                            {activeChart.type === 'bar' ? (
-                              <BarChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><Tooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} />{activeChart.hasLY && <Bar dataKey={activeChart.keyLY} fill="#94a3b8" radius={[4,4,0,0]} />}</BarChart>
-                            ) : activeChart.type === 'area' ? (
-                              <AreaChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><Tooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={2} /></AreaChart>
-                            ) : (
-                              <LineChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><Tooltip /><Line type="monotone" dataKey={activeChart.key} stroke={activeChart.color} strokeWidth={3} />{activeChart.hasLY && <Line type="monotone" dataKey={activeChart.keyLY} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={2} />}</LineChart>
-                            )}
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                      <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
-                        <h3 style={{ fontSize: '1rem', color: textColor, textAlign: 'center', fontWeight:'bold' }}>🔮 พยากรณ์ล่วงหน้า {validForecast.length} วัน (Forecast)</h3>
-                        <div style={{ height: '220px', marginTop:'15px' }}>
-                          <ResponsiveContainer>
-                            {activeChart.type === 'bar' ? (
-                              <BarChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><Tooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} /></BarChart>
-                            ) : (
-                              <AreaChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={['auto', 'auto']} /><Tooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={3} /></AreaChart>
-                            )}
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-                  ) : <div style={{ textAlign:'center', color:subTextColor, padding:'50px' }}>ไม่มีข้อมูลสถิติของพื้นที่นี้</div>}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       ) : (
         // ======================= ALERTS TAB =======================
-        // 📱 Mobile UX: เพิ่ม Padding เผื่อ Bottom Nav ไม่ให้บังเนื้อหา
         <div style={{ flex: 1, padding: '20px', paddingBottom: window.innerWidth < 768 ? '90px' : '20px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
           
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
@@ -912,7 +825,6 @@ export default function App() {
               </button>
               <span style={{ color: subTextColor, fontWeight: 'bold', fontSize: '0.9rem' }}>หรือ</span>
               
-              {/* 📱 Mobile UX: ปรับช่องค้นหาในหน้าแจ้งเตือนให้กระชับขึ้น */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 15px', backgroundColor: darkMode ? '#1e293b' : '#f0f9ff', borderRadius: '30px', border: `1px solid ${borderColor}` }}>
                 <label style={{ fontWeight: 'bold', color: '#0ea5e9', fontSize: '0.95rem' }}>🎯</label>
                 <select 
@@ -951,6 +863,12 @@ export default function App() {
                     <h3 style={{ fontSize: '1.2rem', color: textColor, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
                       <span style={{ fontSize: '1.5rem' }}>✨</span> AI ผู้ช่วยส่วนตัว
                     </h3>
+                    {/* 🚀 ปุ่ม Share อยู่ตรงมุมขวาบนของการ์ด AI */}
+                    {aiSummaryJson && (
+                      <button onClick={handleShareAI} style={{ background: darkMode?'#334155':'#f1f5f9', border: `1px solid ${borderColor}`, padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: textColor, fontWeight: 'bold' }}>
+                        📤 แชร์สรุปนี้
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' }}>
@@ -982,6 +900,12 @@ export default function App() {
                               </div>
                            );
                          })}
+                         {/* ⏱️ Timestamp ด้านล่าง */}
+                         {aiTimestamp && (
+                           <div style={{ textAlign: 'right', fontSize: '0.75rem', color: subTextColor, marginTop: '5px', fontStyle: 'italic' }}>
+                             AI วิเคราะห์ข้อมูลล่าสุดเมื่อ: {aiTimestamp}
+                           </div>
+                         )}
                        </div>
                     ) : ( <div style={{ color: subTextColor, fontSize: '0.9rem', textAlign: 'center', padding: '10px' }}>👆 กดปุ่มด้านบนเพื่อให้ AI วิเคราะห์สภาพอากาศตามที่คุณต้องการได้เลยครับ</div> )}
                   </div>
@@ -1049,7 +973,7 @@ export default function App() {
                       </div>
                     </div>
                     <div style={{ padding: '15px', backgroundColor: darkMode ? '#0f172a' : '#fef2f2', borderRadius: '12px', border: `1px solid ${darkMode?'#7f1d1d':'#fecaca'}` }}>
-                      <h4 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span>🥵 ดัชนีความร้อนสูงสุด</span></h4>
+                      <h4 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span><span title="อุณหภูมิที่ร่างกายรู้สึกจริงเมื่อรวมกับความชื้น" style={{cursor:'help', borderBottom:'1px dotted #dc2626'}}>🥵 ดัชนีความร้อนสูงสุด</span></span></h4>
                       <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
                         {nationwideSummary.heat.length > 0 ? nationwideSummary.heat.map((item, i) => (
                           <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'0.9rem', color:textColor, padding:'8px', background:darkMode?'#1e293b':'#fff', borderRadius:'6px' }}>
@@ -1064,6 +988,61 @@ export default function App() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* 📊 Modal Stats (หน้าต่างป๊อปอัปสถิติ 14 วัน) */}
+      {/* ========================================== */}
+      {showStatsModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)', padding: '20px' }}>
+          <div style={{ backgroundColor: cardBg, width: '100%', maxWidth: '900px', maxHeight: '90vh', borderRadius: '20px', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', animation: 'slideUp 0.3s ease-out' }}>
+            
+            {/* Header Modal */}
+            <div style={{ padding: '20px', borderBottom: `1px solid ${borderColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: cardBg, borderTopLeftRadius: '20px', borderTopRightRadius: '20px', zIndex: 10 }}>
+              <div>
+                <h2 style={{ fontSize: '1.3rem', color: textColor, margin: '0 0 5px 0', fontWeight:'bold' }}>📊 ข้อมูลเชิงลึก: {activeChart.name}</h2>
+                <p style={{ margin: 0, color: subTextColor, fontSize: '0.9rem' }}>พื้นที่วิเคราะห์: <strong style={{color: '#0ea5e9'}}>{dashTitle}</strong></p>
+              </div>
+              <button onClick={() => setShowStatsModal(false)} style={{ background: darkMode ? '#334155' : '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: subTextColor, cursor: 'pointer', transition: '0.2s' }}>✕</button>
+            </div>
+
+            {/* Content Modal */}
+            <div className="hide-scrollbar" style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+              {dashLoading ? (
+                <div style={{ textAlign:'center', color:subTextColor, padding:'50px', fontSize: '1.1rem' }}>⏳ กำลังประมวลผลข้อมูลดาวเทียม...</div>
+              ) : dashHistory.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 1fr', gap: '20px' }}>
+                  <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '15px', border: `1px solid ${borderColor}` }}>
+                    <h3 style={{ fontSize: '1.1rem', color: textColor, textAlign: 'center', fontWeight:'bold', marginBottom: '15px' }}>⏳ ย้อนหลัง 14 วัน</h3>
+                    <div style={{ height: '250px' }}>
+                      <ResponsiveContainer>
+                        {activeChart.type === 'bar' ? (
+                          <BarChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} />{activeChart.hasLY && <Bar dataKey={activeChart.keyLY} fill="#94a3b8" radius={[4,4,0,0]} />}</BarChart>
+                        ) : activeChart.type === 'area' ? (
+                          <AreaChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={2} /></AreaChart>
+                        ) : (
+                          <LineChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Line type="monotone" dataKey={activeChart.key} stroke={activeChart.color} strokeWidth={3} />{activeChart.hasLY && <Line type="monotone" dataKey={activeChart.keyLY} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={2} />}</LineChart>
+                        )}
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '15px', border: `1px solid ${borderColor}` }}>
+                    <h3 style={{ fontSize: '1.1rem', color: textColor, textAlign: 'center', fontWeight:'bold', marginBottom: '15px' }}>🔮 พยากรณ์ล่วงหน้า {validForecast.length} วัน</h3>
+                    <div style={{ height: '250px' }}>
+                      <ResponsiveContainer>
+                        {activeChart.type === 'bar' ? (
+                          <BarChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} /></BarChart>
+                        ) : (
+                          <AreaChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={['auto', 'auto']} /><RechartsTooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={3} /></AreaChart>
+                        )}
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              ) : <div style={{ textAlign:'center', color:subTextColor, padding:'50px' }}>ไม่มีข้อมูลสถิติของพื้นที่นี้</div>}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1116,14 +1095,11 @@ export default function App() {
                 </select>
               </div>
 
-              <button onClick={() => setShowMobileFilters(false)} style={{ width: '100%', padding: '14px', backgroundColor: '#0ea5e9', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 'bold', marginTop: '10px', boxShadow: '0 4px 12px rgba(14,165,233,0.3)' }}>
-                ดูข้อมูล
-              </button>
+              <button onClick={() => setShowMobileFilters(false)} style={{ width: '100%', padding: '14px', backgroundColor: '#0ea5e9', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 'bold', marginTop: '10px', boxShadow: '0 4px 12px rgba(14,165,233,0.3)' }}>ดูข้อมูล</button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
