@@ -86,6 +86,15 @@ const createCustomMarker = (viewMode, value, extraData) => {
 
   return L.divIcon({ className: 'custom-div-icon', html: `<div style="background-color: ${bg}; width: 34px; height: 34px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; color: ${textColor}; font-weight: bold; font-size: ${fontSize}; font-family: 'Kanit', sans-serif; transition: all 0.3s ease;">${displayValue}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
 };
+// โค้ดสำหรับตกแต่งตัวเลขจัดกลุ่ม (Cluster) ไม่ให้เป็นสีดำโล้นๆ
+const createClusterCustomIcon = function (cluster) {
+  return L.divIcon({
+    html: `<div style="background-color: #0ea5e9; color: white; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-family: 'Kanit', sans-serif;">${cluster.getChildCount()}</div>`,
+    className: 'custom-marker-cluster',
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
+  });
+};
 
 function FitBounds({ stations, activeStation, selectedProvince, selectedRegion }) {
   const map = useMap();
