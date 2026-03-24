@@ -363,42 +363,31 @@ export default function App() {
     setIsGeneratingAI(true); setAiSummaryJson(null); setAiTimestamp('');
     try {
       const loc = alertsLocationName || "ประเทศไทย"; 
-      
-      // ⏱️ สร้างตัวแปรเวลาเพื่อบังคับให้ AI รู้เวลาปัจจุบันและ 3 ชม. ข้างหน้าเป๊ะๆ
-      const now = new Date();
-      const currentHrStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-      const next3Hr = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-      const next3HrStr = next3Hr.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const now = new Date(); const currentHrStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const next3Hr = new Date(now.getTime() + 3 * 60 * 60 * 1000); const next3HrStr = next3Hr.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
       let contextData = `พิกัด/พื้นที่: ${loc}\nเวลาปัจจุบันคือ: ${currentHrStr} น.\n\n[ข้อมูลพยากรณ์ด่วน 3 ชม. (ตั้งแต่ ${currentHrStr} ถึง ${next3HrStr} น.)]\n`; 
       alertsData.urgent.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
       contextData += `\n[ข้อมูลภาพรวม 24 ชั่วโมง]\n`; 
       alertsData.daily.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
       if (alertsData.rawHourlyText) contextData += `\n${alertsData.rawHourlyText}`;
+      
+      // 🌟 ดึงข้อมูล "พรุ่งนี้" จากกราฟสถิติ ส่งให้ AI ด้วย!
+      if (dashForecast && dashForecast.length > 1) {
+        const tmr = dashForecast[1];
+        contextData += `\n[พยากรณ์ภาพรวมวันพรุ่งนี้]: อุณหภูมิสูงสุด ${tmr.temp}°C, รู้สึกเหมือน ${tmr.heat}°C, ปริมาณฝน ${tmr.rain}mm, ลม ${tmr.wind}km/h, รังสี UV ${tmr.uv}\n`;
+      }
 
-      // 🧠 หัวใจสำคัญ: ปรับ Prompt ให้ระบุเวลาชัดเจนในทุกๆ ปุ่ม!
       let promptText = '';
-      if (topic === 'general') { 
-        promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศเน้นเฉพาะ **3 ชั่วโมงข้างหน้า (${currentHrStr} - ${next3HrStr} น.)** เป็น JSON วิเคราะห์ 3 ข้อ: 1.สภาพอากาศ 3 ชม.นี้ 2.การเดินทาง 3.ข้อควรระวัง\n*กฎสำคัญ: ต้องเขียนคำว่า "ภายใน 3 ชม.นี้ (${currentHrStr}-${next3HrStr})" ไว้ในข้อแรกเสมอ:\n\n${contextData}`; 
-      } 
-      else if (topic === 'hourly') { 
-        promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลรายชั่วโมง เป็น JSON สรุปย่อ **เลือกมาแค่ 3 ช่วงเวลาที่สำคัญที่สุดของวันนี้** (ไม่เอาทุกชั่วโมง เอาแค่เด่นๆ) ห้ามอธิบายยาว\n*กฎสำคัญ: ต้องเขียน "ช่วงเวลา" ลงใน "label" ของ JSON เสมอ (เช่น "ช่วง 14:00 - 17:00 น."):\n\n${contextData}`; 
-      } 
-      else if (topic === 'travel') { 
-        promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศวันนี้ เป็น JSON แนะนำการท่องเที่ยว (ไม่เอาเรื่องเสื้อผ้า): 1.การทำกิจกรรมกลางแจ้ง 2.ประเภทสถานที่แนะนำ (เช่น คาเฟ่, ห้าง, ธรรมชาติ) 3.อุปสรรคการเดินทางพร้อมระบุเวลา:\n\n${contextData}`; 
-      }
-      else if (topic === 'lifestyle') { 
-        promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.เวลาไหนเหมาะตากผ้าที่สุด? (ระบุเวลาชัดเจน) 2.เหมาะจะล้างรถไหม? 3.ต้องพกร่มช่วงไหน:\n\n${contextData}`; 
-      } 
-      else if (topic === 'exercise') { 
-        promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.ออกกำลังกายกลางแจ้งได้ไหม? 2.ช่วงเวลาที่ดีที่สุด (ระบุเวลาชัดเจน) 3.ข้อควรระวัง:\n\n${contextData}`; 
-      } 
-      else if (topic === 'health') { 
-        promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.ความปลอดภัยระบบหายใจ 2.ช่วงเวลาที่ฝุ่น/แดดอันตรายที่สุด (ระบุเวลาชัดเจน) 3.การงดออกจากบ้าน:\n\n${contextData}`; 
-      }
-      else if (topic === 'agriculture') { 
-        promptText = `คุณคือผู้เชี่ยวชาญการเกษตร วิเคราะห์สภาพอากาศ (ฝน, ลม, แดด) เป็น JSON แนะนำ: 1.ช่วงเวลาปลอดภัยพ่นปุ๋ย/ยา (ระบุเวลาชัดเจน) 2.การรดน้ำ 3.การตากผลผลิต:\n\n${contextData}`; 
-      }
+      if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศเน้นเฉพาะ **3 ชั่วโมงข้างหน้า (${currentHrStr} - ${next3HrStr} น.)** เป็น JSON วิเคราะห์ 3 ข้อ: 1.สภาพอากาศ 3 ชม.นี้ 2.การเดินทาง 3.ข้อควรระวัง\n*กฎสำคัญ: ต้องเขียนคำว่า "ภายใน 3 ชม.นี้ (${currentHrStr}-${next3HrStr})" ไว้ในข้อแรกเสมอ:\n\n${contextData}`; } 
+      else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลรายชั่วโมง เป็น JSON สรุปย่อ **เลือกมาแค่ 3 ช่วงเวลาที่สำคัญที่สุดของวันนี้** ห้ามอธิบายยาว\n*กฎสำคัญ: ต้องเขียน "ช่วงเวลา" ลงใน "label" ของ JSON เสมอ:\n\n${contextData}`; } 
+      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศวันนี้ เป็น JSON แนะนำการท่องเที่ยว: 1.การทำกิจกรรมกลางแจ้ง 2.ประเภทสถานที่แนะนำ (เช่น คาเฟ่, ห้าง, ธรรมชาติ) 3.อุปสรรคการเดินทางพร้อมระบุเวลา:\n\n${contextData}`; }
+      else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.เวลาไหนเหมาะตากผ้าที่สุด? (ระบุเวลาชัดเจน) 2.เหมาะจะล้างรถไหม? 3.ต้องพกร่มช่วงไหน:\n\n${contextData}`; } 
+      else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.ออกกำลังกายกลางแจ้งได้ไหม? 2.ช่วงเวลาที่ดีที่สุด (ระบุเวลาชัดเจน) 3.ข้อควรระวัง:\n\n${contextData}`; } 
+      else if (topic === 'health') { promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.ความปลอดภัยระบบหายใจ 2.ช่วงเวลาที่ฝุ่น/แดดอันตรายที่สุด (ระบุเวลาชัดเจน) 3.การงดออกจากบ้าน:\n\n${contextData}`; }
+      else if (topic === 'agriculture') { promptText = `คุณคือผู้เชี่ยวชาญการเกษตร วิเคราะห์สภาพอากาศ เป็น JSON แนะนำ: 1.ช่วงเวลาปลอดภัยพ่นปุ๋ย/ยา (ระบุเวลาชัดเจน) 2.การรดน้ำ 3.การตากผลผลิต:\n\n${contextData}`; }
+      // 🌟 เพิ่ม Prompt สำหรับ "วันพรุ่งนี้"
+      else if (topic === 'tomorrow') { promptText = `คุณคือนักวางแผนชีวิต วิเคราะห์สภาพอากาศ **"สำหรับวันพรุ่งนี้โดยเฉพาะ"** เป็น JSON เพื่อให้ผู้ใช้วางแผนล่วงหน้า: 1.ภาพรวมอากาศพรุ่งนี้ 2.การเตรียมตัว/สิ่งที่ต้องพก 3.กิจกรรมที่ควรเลี่ยง:\n\n${contextData}`; }
 
       const response = await fetch('/api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, topic: topic }) });
       const data = await response.json();
@@ -780,13 +769,15 @@ export default function App() {
                     )}
                   </div>
 
+                  {/* 🚀 ปุ่ม AI ทั้ง 7 หมวดหมู่ */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' }}>
                     <button onClick={() => generateAISummary('general')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #3b82f6`, backgroundColor: darkMode ? 'rgba(59,130,246,0.1)' : '#eff6ff', color: '#3b82f6', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌤️ สรุปภาพรวม</button>
+                    {/* 🌟 ปุ่มใหม่: แผนพรุ่งนี้ */}
+                    <button onClick={() => generateAISummary('tomorrow')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #8b5cf6`, backgroundColor: darkMode ? 'rgba(139,92,246,0.1)' : '#f3e8ff', color: '#8b5cf6', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🔮 แผนพรุ่งนี้</button>
                     <button onClick={() => generateAISummary('hourly')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #6366f1`, backgroundColor: darkMode ? 'rgba(99,102,241,0.1)' : '#e0e7ff', color: '#4f46e5', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>⏱️ วางแผนราย ชม.</button>
+                    <button onClick={() => generateAISummary('travel')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #db2777`, backgroundColor: darkMode ? 'rgba(219,39,119,0.1)' : '#fce7f3', color: '#db2777', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🎒 ท่องเที่ยว</button>
                     <button onClick={() => generateAISummary('lifestyle')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #10b981`, backgroundColor: darkMode ? 'rgba(16,185,129,0.1)' : '#f0fdf4', color: '#10b981', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>👕 ซักผ้า/ล้างรถ</button>
                     <button onClick={() => generateAISummary('exercise')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #f59e0b`, backgroundColor: darkMode ? 'rgba(245,158,11,0.1)' : '#fffbeb', color: '#f59e0b', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🏃‍♂️ ออกกำลังกาย</button>
-                    <button onClick={() => generateAISummary('health')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #ef4444`, backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', color: '#ef4444', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>😷 สุขภาพ/ภูมิแพ้</button>
-                    <button onClick={() => generateAISummary('travel')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #db2777`, backgroundColor: darkMode ? 'rgba(219,39,119,0.1)' : '#fce7f3', color: '#db2777', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🎒 ท่องเที่ยว</button>
                     <button onClick={() => generateAISummary('agriculture')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #84cc16`, backgroundColor: darkMode ? 'rgba(132,204,22,0.1)' : '#ecfccb', color: '#65a30d', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌾 เกษตรกร</button>
                   </div>
 
