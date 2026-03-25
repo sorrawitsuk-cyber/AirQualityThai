@@ -373,42 +373,69 @@ export default function App() {
     setIsGeneratingAI(true); setAiSummaryJson(null); setAiTimestamp('');
     try {
       const loc = alertsLocationName || "ประเทศไทย"; 
-      const now = new Date(); const currentHrStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-      const next3Hr = new Date(now.getTime() + 3 * 60 * 60 * 1000); const next3HrStr = next3Hr.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const now = new Date();
+      let targetDate = new Date(now); targetDate.setDate(now.getDate() + aiTargetDay);
+      const targetDateStr = targetDate.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' });
 
-      let contextData = `พิกัด/พื้นที่: ${loc}\nเวลาปัจจุบันคือ: ${currentHrStr} น.\n\n[ข้อมูลพยากรณ์ด่วน 3 ชม. (ตั้งแต่ ${currentHrStr} ถึง ${next3HrStr} น.)]\n`; 
-      alertsData.urgent.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
-      contextData += `\n[ข้อมูลภาพรวม 24 ชั่วโมง]\n`; alertsData.daily.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
-      if (alertsData.rawHourlyText) contextData += `\n${alertsData.rawHourlyText}`;
-      
-      // ดึงข้อมูล "พรุ่งนี้" จากสถิติ ส่งให้ AI
-      if (dashForecast && dashForecast.length > 1) {
-        const tmr = dashForecast[1];
-        contextData += `\n[พยากรณ์ภาพรวมวันพรุ่งนี้]: อุณหภูมิสูงสุด ${tmr.temp}°C, รู้สึกเหมือน ${tmr.heat}°C, ปริมาณฝน ${tmr.rain}mm, ลม ${tmr.wind}km/h, รังสี UV ${tmr.uv}\n`;
+      let contextData = `พิกัด/พื้นที่: ${loc}\nวันที่ต้องการวิเคราะห์: ${aiTargetDay === 0 ? 'วันนี้' : targetDateStr}\n\n`; 
+
+      if (aiTargetDay === 0) {
+          const currentHrStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          const next3Hr = new Date(now.getTime() + 3 * 60 * 60 * 1000); const next3HrStr = next3Hr.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          contextData += `[พยากรณ์ด่วน 3 ชม. (${currentHrStr}-${next3HrStr} น.)]\n`; 
+          if(alertsData.urgent) alertsData.urgent.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
+          contextData += `\n[ภาพรวมวันนี้]\n`; 
+          if(alertsData.daily) alertsData.daily.forEach(a => contextData += `- ${a.title}: ${a.desc}\n`);
+          if (alertsData.rawHourlyText) contextData += `\n${alertsData.rawHourlyText}`;
+      } else if (aiTargetDay === 1) {
+          if (dashForecast && dashForecast.length > 1) { 
+              const tF = dashForecast[1]; 
+              contextData += `[ภาพรวมพรุ่งนี้]: อุณหภูมิสูงสุด ${tF.temp}°C, โอกาสฝน ${tF.rainProb || 0}%, ปริมาณฝน ${tF.rain || 0}mm, ลม ${tF.wind || 0}km/h, UV ${tF.uv || 0}\n`; 
+          }
+          if (alertsData.tomorrowHourlyText) contextData += `\n${alertsData.tomorrowHourlyText}`;
+      } else {
+          if (dashForecast && dashForecast.length > aiTargetDay) { 
+              const tF = dashForecast[aiTargetDay]; 
+              contextData += `[ภาพรวมวันที่ ${targetDateStr}]: อุณหภูมิสูงสุด ${tF.temp}°C, โอกาสฝน ${tF.rainProb || 0}%, ปริมาณฝน ${tF.rain || 0}mm, ลม ${tF.wind || 0}km/h, UV ${tF.uv || 0}\n`; 
+              contextData += `(ไม่มีข้อมูลรายชั่วโมง ให้ประเมินจากภาพรวม)`;
+          } else { contextData += `(ไม่มีข้อมูล)`; }
       }
 
+      const dayWord = aiTargetDay === 0 ? 'วันนี้' : `วันที่ ${targetDateStr}`;
+      
+      // 🌟 ปลดล็อกให้ AI คิดข้อความในป้ายกำกับ (Badge) และเลือกสีเองได้เลย!
+      const jsonInstruction = `\n\n**ข้อบังคับสำคัญ: คุณต้องตอบเป็น JSON Array แท้ๆ เท่านั้น ห้ามมีข้อความอื่นปนเด็ดขาด** ตัวอย่าง:\n[\n  { "label": "หัวข้อ", "icon": "☀️", "status_color": "green/red/yellow/blue", "status_text": "คำสั้นๆในป้าย (เช่น ปกติ, ไม่มีฝน, อันตราย, เลี่ยงได้เลี่ยง)", "reason": "อธิบายสั้นๆ" }\n]`;
+
       let promptText = '';
-      if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศเน้นเฉพาะ **3 ชั่วโมงข้างหน้า (${currentHrStr} - ${next3HrStr} น.)** เป็น JSON วิเคราะห์ 3 ข้อ: 1.สภาพอากาศ 3 ชม.นี้ 2.การเดินทาง 3.ข้อควรระวัง\n*กฎสำคัญ: ต้องเขียนคำว่า "ภายใน 3 ชม.นี้ (${currentHrStr}-${next3HrStr})" ไว้ในข้อแรกเสมอ:\n\n${contextData}`; } 
-      else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลรายชั่วโมง เป็น JSON สรุปย่อ **เลือกมาแค่ 3 ช่วงเวลาที่สำคัญที่สุดของวันนี้** ห้ามอธิบายยาว\n*กฎสำคัญ: ต้องเขียน "ช่วงเวลา" ลงใน "label" ของ JSON เสมอ:\n\n${contextData}`; } 
-      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศวันนี้ เป็น JSON แนะนำการท่องเที่ยว: 1.การทำกิจกรรมกลางแจ้ง 2.ประเภทสถานที่แนะนำ (เช่น คาเฟ่, ห้าง, ธรรมชาติ) 3.อุปสรรคการเดินทางพร้อมระบุเวลา:\n\n${contextData}`; }
-      else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.เวลาไหนเหมาะตากผ้าที่สุด? (ระบุเวลาชัดเจน) 2.เหมาะจะล้างรถไหม? 3.ต้องพกร่มช่วงไหน:\n\n${contextData}`; } 
-      else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.ออกกำลังกายกลางแจ้งได้ไหม? 2.ช่วงเวลาที่ดีที่สุด (ระบุเวลาชัดเจน) 3.ข้อควรระวัง:\n\n${contextData}`; } 
-      else if (topic === 'health') { promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศวันนี้ เป็น JSON: 1.ความปลอดภัยระบบหายใจ 2.ช่วงเวลาที่ฝุ่น/แดดอันตรายที่สุด (ระบุเวลาชัดเจน) 3.การงดออกจากบ้าน:\n\n${contextData}`; }
-      else if (topic === 'agriculture') { promptText = `คุณคือผู้เชี่ยวชาญการเกษตร วิเคราะห์สภาพอากาศ เป็น JSON แนะนำ: 1.ช่วงเวลาปลอดภัยพ่นปุ๋ย/ยา (ระบุเวลาชัดเจน) 2.การรดน้ำ 3.การตากผลผลิต:\n\n${contextData}`; }
-      else if (topic === 'tomorrow') { promptText = `คุณคือนักวางแผนชีวิต วิเคราะห์สภาพอากาศ **"สำหรับวันพรุ่งนี้โดยเฉพาะ"** เป็น JSON เพื่อให้ผู้ใช้วางแผนล่วงหน้า: 1.ภาพรวมอากาศพรุ่งนี้ 2.การเตรียมตัว/สิ่งที่ต้องพก 3.กิจกรรมที่ควรเลี่ยง:\n\n${contextData}`; }
+      if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศสำหรับ **${dayWord}** วิเคราะห์ 3 ข้อ: 1.สภาพอากาศภาพรวม 2.การเดินทาง 3.ข้อควรระวัง:\n\n${contextData}`; } 
+      else if (topic === 'rain') { promptText = `คุณคือนักอุตุนิยมวิทยา วิเคราะห์แนวโน้ม "ฝนตก" สำหรับ **${dayWord}** วิเคราะห์: 1. ภาพรวมฝน (โอกาสกี่เปอร์เซ็นต์ หนักแค่ไหน) 2. ช่วงเวลาที่คาดว่าฝนจะตก (ให้ระบุเวลาชัดเจนจากข้อมูล) 3. คำแนะนำการเดินทาง:\n\n${contextData}`; }
+      else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลสำหรับ **${dayWord}** **เลือกมาแค่ 3 ช่วงเวลาของวันที่น่าสนใจที่สุด** ห้ามอธิบายยาว (ถ้าไม่มีรายชั่วโมงให้วิเคราะห์จากภาพรวม):\n\n${contextData}`; } 
+      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำการท่องเที่ยว: 1.การทำกิจกรรมกลางแจ้ง 2.ประเภทสถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
+      else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ช่วงไหนเหมาะตากผ้าที่สุด? 2.เหมาะจะล้างรถไหม? 3.ต้องพกร่มไหม:\n\n${contextData}`; } 
+      else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ออกกำลังกายกลางแจ้งได้ไหม? 2.ช่วงเวลาที่ดีที่สุด 3.ข้อควรระวัง:\n\n${contextData}`; } 
+      else if (topic === 'health') { promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ความปลอดภัยระบบหายใจ 2.ช่วงเวลาที่ฝุ่น/แดดอันตรายที่สุด 3.คำแนะนำพิเศษ:\n\n${contextData}`; }
+      else if (topic === 'agriculture') { promptText = `คุณคือผู้เชี่ยวชาญการเกษตร วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำ: 1.ความปลอดภัยพ่นปุ๋ย/ยา 2.การรดน้ำ 3.การตากผลผลิต:\n\n${contextData}`; }
+
+      promptText += jsonInstruction;
 
       const response = await fetch('/api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, topic: topic }) });
       const data = await response.json();
+      
       if (data.jsonText) {
-        try { const parsedData = JSON.parse(data.jsonText); setAiSummaryJson(parsedData); setAiTimestamp(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'); } 
-        catch (e) { setAiSummaryJson([{ label: "Error", icon: "❌", status: "no", reason: "AI ส่งข้อมูลผิดรูปแบบ ลองกดปุ่มใหม่อีกครั้ง" }]); }
-      } else { setAiSummaryJson([{ label: "No Summary", icon: "😶", status: "warning", reason: "AI ไม่สามารถสรุปได้ในขณะนี้" }]); }
-    } catch (error) { console.error(error); setAiSummaryJson([{ label: "Server Error", icon: "🚑", status: "no", reason: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); } 
+        try { 
+            const cleanText = data.jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsedData = JSON.parse(cleanText); 
+            setAiSummaryJson(parsedData); 
+            setAiTimestamp(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'); 
+        } 
+        catch (e) { setAiSummaryJson([{ label: "Error", icon: "❌", status_color: "red", status_text: "ข้อผิดพลาด", reason: "รูปแบบข้อมูลจาก AI ผิดพลาด ลองกดปุ่มใหม่อีกครั้ง" }]); }
+      } else { setAiSummaryJson([{ label: "No Summary", icon: "😶", status_color: "yellow", status_text: "รอข้อมูล", reason: "AI ไม่สามารถสรุปได้ในขณะนี้" }]); }
+    } catch (error) { console.error(error); setAiSummaryJson([{ label: "Server Error", icon: "🚑", status_color: "red", status_text: "ข้อผิดพลาด", reason: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); } 
     finally { setIsGeneratingAI(false); }
   };
 
   const handleShareAI = () => {
-    if(!aiSummaryJson) return; const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.label}: ${i.reason}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Env Dashboard`;
+    if(!aiSummaryJson) return; const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.label}: ${i.reason}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Weather Dashboard`;
     if (navigator.share) { navigator.share({ title: 'สรุปสภาพอากาศจาก AI', text: shareText }).catch(console.error); } else { navigator.clipboard.writeText(shareText); alert('คัดลอกข้อความสรุปแล้ว! สามารถนำไปวางส่งให้เพื่อนได้เลยครับ'); }
   };
 
@@ -433,7 +460,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <div style={{ fontSize: '1.8rem', background: '#fff', borderRadius: '50%', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }}>{darkMode ? '🌙' : '🌤️'}</div>
           <div style={{ display: window.innerWidth < 1024 ? 'none' : 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', whiteSpace: 'nowrap', lineHeight: '1.1', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Thai Env Dashboard</h1>
+            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', whiteSpace: 'nowrap', lineHeight: '1.1', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Thai Weather Dashboard</h1>
             <span style={{ fontSize: '0.8rem', color: darkMode ? '#94a3b8' : '#e0f2fe', whiteSpace: 'nowrap', fontWeight: 'normal' }}>ระบบพยากรณ์และเตือนภัย</span>
           </div>
         </div>
@@ -464,9 +491,9 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <button onClick={() => setShowMobileFilters(true)} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#0ea5e9', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>🔍 ค้นหาสถานที่</button>
+              <button onClick={() => setShowMobileFilters(true)} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', color: '#0ea5e9', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>🔍 ค้นหา</button>
             )}
-            <button onClick={handleReset} title="รีเซ็ตแผนที่" style={{ flexShrink: 0, backgroundColor: '#fff', border: 'none', borderRadius: '50%', width: '38px', height: '38px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.15)', fontSize: '1.2rem', color: '#0ea5e9' }}>🏠</button>
+            <button onClick={handleReset} title="รีเซ็ตแผนที่ (ดูทั้งประเทศ)" style={{ flexShrink: 0, backgroundColor: '#fff', border: 'none', borderRadius: '50%', width: '38px', height: '38px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.15)', fontSize: '1.2rem', color: '#0ea5e9' }}>🏠</button>
           </div>
         )}
 
@@ -488,7 +515,14 @@ export default function App() {
             
             {/* MAP AREA */}
             <div style={{ flex: 7, width: '100%', borderRadius: '12px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '100%' : '100%' }}>
-              <div className="hide-scrollbar" style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: '30px', display: 'flex', gap: '8px', overflowX: 'auto', whiteSpace: 'nowrap', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+              
+              <div 
+                className="hide-scrollbar" 
+                onTouchStart={(e) => e.stopPropagation()} 
+                onMouseDown={(e) => e.stopPropagation()} 
+                onWheel={(e) => e.stopPropagation()} 
+                style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: '30px', display: 'flex', gap: '8px', overflowX: 'auto', whiteSpace: 'nowrap', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', maxWidth: window.innerWidth < 768 ? 'calc(100vw - 30px)' : 'auto' }}
+              >
                 <button onClick={() => handleViewModeChange('pm25')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isPm25Mode ? '#0ea5e9' : 'transparent', color: isPm25Mode ? '#fff' : subTextColor }}>☁️ PM2.5</button>
                 <button onClick={() => handleViewModeChange('temp')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isTempMode ? '#22c55e' : 'transparent', color: isTempMode ? '#fff' : subTextColor }}>🌡️ อุณหภูมิ</button>
                 <button onClick={() => handleViewModeChange('heat')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isHeatMode ? '#f97316' : 'transparent', color: isHeatMode ? '#fff' : subTextColor }}>🥵 Heat</button>
@@ -499,20 +533,21 @@ export default function App() {
                 <button onClick={toggleRadar} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: showRadar ? '#ef4444' : 'transparent', color: showRadar ? '#fff' : subTextColor }}>{showRadar ? '📡 ปิดเรดาร์' : '📡 เรดาร์ฝน'}</button>
               </div>
 
-              <div style={{ position: 'absolute', bottom: '25px', right: '70px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '6px 14px', borderRadius: '20px', fontSize: '0.75rem', color: subTextColor, backdropFilter: 'blur(4px)', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+              <div style={{ position: 'absolute', bottom: '25px', right: window.innerWidth < 768 ? '70px' : '70px', zIndex: 500, background: darkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)', padding: '6px 14px', borderRadius: '20px', fontSize: '0.75rem', color: subTextColor, backdropFilter: 'blur(4px)', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <span style={{ fontSize: '1rem' }}>⏱️</span> อัปเดต: {lastUpdateText || 'กำลังโหลด...'}
                 <button onClick={() => fetchAirQuality(false)} style={{ background: 'none', border: 'none', padding: '0 0 0 4px', cursor: 'pointer', fontSize: '1rem', color: '#0ea5e9' }} title="โหลดข้อมูลล่าสุด">🔄</button>
               </div>
 
+              {window.innerWidth < 768 && !isMobileListOpen && (
+                <button onClick={() => setIsMobileListOpen(true)} title="ดูรายชื่อสถานี" style={{ position: 'absolute', bottom: '85px', right: '15px', zIndex: 600, width: '44px', height: '44px', borderRadius: '50%', backgroundColor: cardBg, color: '#0ea5e9', border: `1px solid ${borderColor}`, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'all 0.2s' }}>
+                   <span style={{ fontSize: '1.2rem' }}>📋</span>
+                   <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: 'white', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold', border: `1px solid ${cardBg}` }}>{filteredStations.length}</span>
+                </button>
+              )}
+
               <button onClick={handleFindNearest} disabled={locating} title="ตำแหน่งปัจจุบัน" style={{ position: 'absolute', bottom: '25px', right: '15px', zIndex: 500, width: '44px', height: '44px', borderRadius: '50%', backgroundColor: cardBg, color: locating ? subTextColor : '#0ea5e9', border: `1px solid ${borderColor}`, cursor: locating ? 'wait' : 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'all 0.2s' }}>
                 {locating ? <span style={{ fontSize: '1.2rem' }}>⏳</span> : <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="6"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line></svg>}
               </button>
-
-              {window.innerWidth < 768 && !isMobileListOpen && (
-                <button onClick={() => setIsMobileListOpen(true)} style={{ position: 'absolute', bottom: '85px', left: '50%', transform: 'translateX(-50%)', zIndex: 600, padding: '12px 24px', borderRadius: '30px', backgroundColor: '#1e293b', color: '#fff', border: '2px solid #0ea5e9', fontWeight: 'bold', fontSize: '0.95rem', boxShadow: '0 8px 25px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '8px', animation: 'slideUp 0.3s ease-out' }}>
-                  📋 ดูรายชื่อสถานี ({filteredStations.length})
-                </button>
-              )}
 
               {!showRadar && (
                 <div style={{ position: 'absolute', bottom: '25px', left: window.innerWidth < 768 ? '15px' : '60px', zIndex: 500, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -761,7 +796,6 @@ export default function App() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               
-              {/* 🚨 1. ป้ายแจ้งเตือน Nowcast (โผล่เฉพาะตอนฝนจะตกใน 90 นาที) */}
               {nowcastAlert && (
                 <div style={{ backgroundColor: '#fef2f2', borderRadius: '16px', padding: '20px', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', gap: '15px', animation: 'alertPulse 2s infinite' }}>
                   <style>{`@keyframes alertPulse { 0% { boxShadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { boxShadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { boxShadow: 0 0 0 0 rgba(239, 68, 68, 0); } }`}</style>
@@ -782,7 +816,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* 2. ส่วนผู้ช่วย AI */}
               {(alertsData?.urgent?.length > 0 || alertsData?.daily?.length > 0) && (
                 <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)' }}></div>
@@ -797,9 +830,21 @@ export default function App() {
                     )}
                   </div>
 
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', padding: '10px', backgroundColor: darkMode ? 'rgba(0,0,0,0.2)' : '#f0f9ff', borderRadius: '12px', border: `1px solid ${borderColor}` }}>
+                    <span style={{ fontSize: '0.9rem', color: textColor, fontWeight: 'bold' }}>📅 เลือกวันวิเคราะห์:</span>
+                    <select value={aiTargetDay} onChange={(e) => setAiTargetDay(Number(e.target.value))} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #0ea5e9`, backgroundColor: darkMode ? '#1e293b' : '#fff', color: '#0ea5e9', outline: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                      {dashForecast.slice(0, 7).map((item, idx) => {
+                        const d = new Date(); d.setDate(d.getDate() + idx);
+                        const dateStr = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                        let label = idx === 0 ? `วันนี้ (${dateStr})` : idx === 1 ? `พรุ่งนี้ (${dateStr})` : dateStr;
+                        return <option key={idx} value={idx}>{label}</option>;
+                      })}
+                    </select>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' }}>
                     <button onClick={() => generateAISummary('general')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #3b82f6`, backgroundColor: darkMode ? 'rgba(59,130,246,0.1)' : '#eff6ff', color: '#3b82f6', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌤️ สรุปภาพรวม</button>
-                    <button onClick={() => generateAISummary('tomorrow')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #8b5cf6`, backgroundColor: darkMode ? 'rgba(139,92,246,0.1)' : '#f3e8ff', color: '#8b5cf6', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🔮 แผนพรุ่งนี้</button>
+                    <button onClick={() => generateAISummary('rain')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #0ea5e9`, backgroundColor: darkMode ? 'rgba(14,165,233,0.1)' : '#e0f2fe', color: '#0ea5e9', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>☔ เช็คเวลาฝนตก</button>
                     <button onClick={() => generateAISummary('hourly')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #6366f1`, backgroundColor: darkMode ? 'rgba(99,102,241,0.1)' : '#e0e7ff', color: '#4f46e5', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>⏱️ วางแผนราย ชม.</button>
                     <button onClick={() => generateAISummary('lifestyle')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #10b981`, backgroundColor: darkMode ? 'rgba(16,185,129,0.1)' : '#f0fdf4', color: '#10b981', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>👕 ซักผ้า/ล้างรถ</button>
                     <button onClick={() => generateAISummary('exercise')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #f59e0b`, backgroundColor: darkMode ? 'rgba(245,158,11,0.1)' : '#fffbeb', color: '#f59e0b', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🏃‍♂️ ออกกำลังกาย</button>
@@ -808,14 +853,23 @@ export default function App() {
                     <button onClick={() => generateAISummary('agriculture')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #84cc16`, backgroundColor: darkMode ? 'rgba(132,204,22,0.1)' : '#ecfccb', color: '#65a30d', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌾 เกษตรกร</button>
                   </div>
 
+                  {/* 🌟 ส่วนประมวลผลกล่อง AI เปลี่ยนให้รองรับข้อความที่ AI คิดเองทั้งหมด */}
                   <div style={{ backgroundColor: darkMode ? '#1e293b' : '#f8fafc', padding: isGeneratingAI || aiSummaryJson ? '15px' : '0', borderRadius: '12px', border: aiSummaryJson ? `1px dashed #8b5cf6` : 'none', transition: 'all 0.3s' }}>
                     {isGeneratingAI ? ( <div style={{ textAlign: 'center', color: '#8b5cf6', padding: '15px', fontWeight: 'bold' }}>⏳ AI กำลังคิดวิเคราะห์ข้อมูลอย่างละเอียด...</div> ) : aiSummaryJson ? (
                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                          {aiSummaryJson.map((item, i) => {
                            let statusColor, statusBg, statusIcon, statusText;
-                           if (item.status === 'yes') { statusColor = '#16a34a'; statusBg = darkMode ? 'rgba(22,163,74,0.15)' : '#dcfce7'; statusIcon = '✅'; statusText = 'เหมาะสม'; } 
-                           else if (item.status === 'no') { statusColor = '#dc2626'; statusBg = darkMode ? 'rgba(220,38,38,0.15)' : '#fee2e2'; statusIcon = '❌'; statusText = 'ควรเลี่ยง'; } 
-                           else { statusColor = '#d97706'; statusBg = darkMode ? 'rgba(217,119,6,0.15)' : '#fffbeb'; statusIcon = '⚠️'; statusText = 'เฝ้าระวัง'; }
+                           
+                           // รองรับโค้ดสีที่ AI ส่งมา (green, red, yellow, blue) หรือใช้แบบเก่า (yes, no, warning)
+                           const c = item.status_color || item.status;
+                           
+                           if (c === 'green' || c === 'yes') { statusColor = '#16a34a'; statusBg = darkMode ? 'rgba(22,163,74,0.15)' : '#dcfce7'; statusIcon = '✅'; } 
+                           else if (c === 'red' || c === 'no') { statusColor = '#dc2626'; statusBg = darkMode ? 'rgba(220,38,38,0.15)' : '#fee2e2'; statusIcon = '🚨'; } 
+                           else if (c === 'blue' || c === 'info') { statusColor = '#0ea5e9'; statusBg = darkMode ? 'rgba(14,165,233,0.15)' : '#e0f2fe'; statusIcon = 'ℹ️'; }
+                           else { statusColor = '#d97706'; statusBg = darkMode ? 'rgba(217,119,6,0.15)' : '#fffbeb'; statusIcon = '⚠️'; }
+                           
+                           // ใช้คำที่ AI คิดให้ ถ้าไม่มีให้ใช้คำเดิม
+                           statusText = item.status_text || (c === 'yes' ? 'เหมาะสม' : c === 'no' ? 'ควรเลี่ยง' : 'เฝ้าระวัง');
                            
                            return (
                               <div key={i} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode ? 'rgba(0,0,0,0.2)' : '#fff', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}`, boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
@@ -837,38 +891,46 @@ export default function App() {
                 </div>
               )}
 
-              {/* 3. แจ้งเตือน 3 ชม / 24 ชม */}
-              {(alertsData?.urgent?.length > 0 || alertsData?.daily?.length > 0) && (
-                <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '20px' }}>
-                  <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '20px', border: `1px solid ${borderColor}`, borderTop: alertsData?.urgent?.some(a => a.level >= 2) ? '4px solid #ef4444' : '4px solid #10b981', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-                    <h3 style={{ fontSize: '1.2rem', color: alertsData?.urgent?.some(a => a.level >= 2) ? '#ef4444' : '#10b981', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {alertsData?.urgent?.some(a => a.level >= 2) ? `🚨 พยากรณ์ 3 ชม. (${timeStr3h})` : `✅ พยากรณ์ 3 ชม. (${timeStr3h})`}
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {alertsData?.urgent?.map((al, idx) => (
-                        <div key={idx} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode?'#0f172a':'#fff', padding: '15px', borderRadius: '10px', borderLeft: `4px solid ${al.color}`, border: darkMode ? '1px solid #334155' : '1px solid #f1f5f9' }}>
-                          <div style={{ fontSize: '1.8rem', display:'flex', alignItems:'center' }}>{al.icon}</div>
-                          <div><h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: al.color, fontWeight:'bold' }}>{al.title}</h4><p style={{ margin: 0, color: textColor, lineHeight:1.4, fontSize:'0.85rem' }}>{al.desc}</p></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '20px', border: `1px solid ${borderColor}`, borderTop: '4px solid #0ea5e9', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-                    <h3 style={{ fontSize: '1.2rem', color: '#0ea5e9', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>📅 ภาพรวมสภาพอากาศ (24 ชั่วโมง)</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {alertsData?.daily?.map((al, idx) => (
-                        <div key={idx} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '10px' }}>
-                          <div style={{ fontSize: '1.5rem', display:'flex', alignItems:'center' }}>{al.icon}</div>
-                          <div><h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: al.color, fontWeight:'bold' }}>{al.title}</h4><p style={{ margin: 0, color: subTextColor, lineHeight:1.4, fontSize:'0.85rem' }}>{al.desc}</p></div>
-                        </div>
-                      ))}
-                    </div>
+              <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : (window.innerWidth < 1024 ? '1fr 1fr' : '1fr 1fr 1fr'), gap: '20px' }}>
+                <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '20px', border: `1px solid ${borderColor}`, borderTop: alertsData?.urgent?.some(a => a.level >= 2) ? '4px solid #ef4444' : '4px solid #10b981', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+                  <h3 style={{ fontSize: '1.2rem', color: alertsData?.urgent?.some(a => a.level >= 2) ? '#ef4444' : '#10b981', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {alertsData?.urgent?.some(a => a.level >= 2) ? `🚨 พยากรณ์ 3 ชม. (${timeStr3h})` : `✅ พยากรณ์ 3 ชม. (${timeStr3h})`}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {alertsData?.urgent?.map((al, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode?'#0f172a':'#fff', padding: '15px', borderRadius: '10px', borderLeft: `4px solid ${al.color}`, border: darkMode ? '1px solid #334155' : '1px solid #f1f5f9' }}>
+                        <div style={{ fontSize: '1.8rem', display:'flex', alignItems:'center' }}>{al.icon}</div>
+                        <div><h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: al.color, fontWeight:'bold' }}>{al.title}</h4><p style={{ margin: 0, color: textColor, lineHeight:1.4, fontSize:'0.85rem' }}>{al.desc}</p></div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
 
-              {/* 4. 📊 กราฟสถิติเชิงลึก 14 วัน */}
+                <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '20px', border: `1px solid ${borderColor}`, borderTop: '4px solid #0ea5e9', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+                  <h3 style={{ fontSize: '1.2rem', color: '#0ea5e9', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>📅 ภาพรวมของวันนี้</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {alertsData?.daily?.map((al, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.5rem', display:'flex', alignItems:'center' }}>{al.icon}</div>
+                        <div><h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: al.color, fontWeight:'bold' }}>{al.title}</h4><p style={{ margin: 0, color: subTextColor, lineHeight:1.4, fontSize:'0.85rem' }}>{al.desc}</p></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '20px', border: `1px solid ${borderColor}`, borderTop: '4px solid #8b5cf6', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+                  <h3 style={{ fontSize: '1.2rem', color: '#8b5cf6', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>🔮 พยากรณ์วันพรุ่งนี้</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {alertsData?.tomorrow?.length > 0 ? alertsData.tomorrow.map((al, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode?'#0f172a':'#f3e8ff', padding: '15px', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.5rem', display:'flex', alignItems:'center' }}>{al.icon}</div>
+                        <div><h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: al.color, fontWeight:'bold' }}>{al.title}</h4><p style={{ margin: 0, color: subTextColor, lineHeight:1.4, fontSize:'0.85rem' }}>{al.desc}</p></div>
+                      </div>
+                    )) : <div style={{ textAlign:'center', color:subTextColor, padding:'20px' }}>กำลังดึงข้อมูลวันพรุ่งนี้...</div>}
+                  </div>
+                </div>
+              </div>
+
               <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
@@ -891,11 +953,11 @@ export default function App() {
                       <div style={{ height: '220px' }}>
                         <ResponsiveContainer>
                           {activeChart.type === 'bar' ? (
-                            <BarChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} />{activeChart.hasLY && <Bar dataKey={activeChart.keyLY} fill="#94a3b8" radius={[4,4,0,0]} />}</BarChart>
+                            <BarChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={activeChart.domain} /><RechartsTooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} />{activeChart.hasLY && <Bar dataKey={activeChart.keyLY} fill="#94a3b8" radius={[4,4,0,0]} />}</BarChart>
                           ) : activeChart.type === 'area' ? (
-                            <AreaChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={2} /></AreaChart>
+                            <AreaChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={activeChart.domain} /><RechartsTooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={2} /></AreaChart>
                           ) : (
-                            <LineChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Line type="monotone" dataKey={activeChart.key} stroke={activeChart.color} strokeWidth={3} />{activeChart.hasLY && <Line type="monotone" dataKey={activeChart.keyLY} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={2} />}</LineChart>
+                            <LineChart data={dashHistory} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={activeChart.domain} /><RechartsTooltip /><Line type="monotone" dataKey={activeChart.key} stroke={activeChart.color} strokeWidth={3} />{activeChart.hasLY && <Line type="monotone" dataKey={activeChart.keyLY} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={2} />}</LineChart>
                           )}
                         </ResponsiveContainer>
                       </div>
@@ -905,9 +967,9 @@ export default function App() {
                       <div style={{ height: '220px' }}>
                         <ResponsiveContainer>
                           {activeChart.type === 'bar' ? (
-                            <BarChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} /><RechartsTooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} /></BarChart>
+                            <BarChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={activeChart.domain} /><RechartsTooltip /><Bar dataKey={activeChart.key} fill={activeChart.color} radius={[4,4,0,0]} /></BarChart>
                           ) : (
-                            <AreaChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={['auto', 'auto']} /><RechartsTooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={3} /></AreaChart>
+                            <AreaChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}><CartesianGrid strokeDasharray="3 3" stroke={borderColor} /><XAxis dataKey="date" stroke={subTextColor} fontSize={10} /><YAxis stroke={subTextColor} fontSize={10} domain={activeChart.domain} /><RechartsTooltip /><Area type="monotone" dataKey={activeChart.key} stroke={activeChart.color} fill={activeChart.color} fillOpacity={0.4} strokeWidth={3} /></AreaChart>
                           )}
                         </ResponsiveContainer>
                       </div>
@@ -916,7 +978,6 @@ export default function App() {
                 ) : <div style={{ textAlign:'center', color:subTextColor, padding:'40px' }}>ไม่มีข้อมูลสถิติของพื้นที่นี้</div>}
               </div>
 
-              {/* 5. Top 5 Ranking ทั่วประเทศ */}
               {nationwideSummary && (
                 <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
                   <div style={{ textAlign: 'center', marginBottom: '20px' }}>
