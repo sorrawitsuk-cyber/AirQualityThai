@@ -1,3 +1,5 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 export default async function handler(req, res) {
   // บังคับให้เป็น POST เท่านั้น
   if (req.method !== 'POST') {
@@ -17,40 +19,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("🚀 ส่งข้อมูลยิงตรงไปที่ Google Gemini API (gemini-1.5-flash)...");
+    console.log("🚀 ใช้แพ็กเกจทางการ (SDK) ส่งข้อมูลไปหา Gemini 1.5 Flash...");
     
-    // 🌟 กลับมาใช้ gemini-1.5-flash ลูกรักของคุณที่เคยใช้งานได้ปกติครับ!
-    // (ถ้าคุณหมายถึง 2.0 จริงๆ สามารถแก้เลข 1.5 เป็น 2.0 ได้เลยนะครับ)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 🌟 กลับมาใช้ SDK แท้ของ Google (ตัดปัญหา 404 URL ทิ้งไปเลย)
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); 
     
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2 } // บังคับให้ AI ตอบตรงไปตรงมา ไม่มั่ว
-      })
-    });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-    const data = await response.json();
-
-    // เช็ค Error จาก Google
-    if (!response.ok) {
-      console.error("🔥 Google API Error:", data);
-      return res.status(response.status).json({ 
-          error: "Google API Error", 
-          details: data.error?.message || "Unknown API Error" 
-      });
-    }
-
-    // ดึงข้อความออกมาส่งกลับไปให้หน้าเว็บ
-    const text = data.candidates[0].content.parts[0].text;
-    console.log("✅ Gemini 1.5 Flash ตอบกลับสำเร็จ!");
-    
+    console.log("✅ Gemini ตอบกลับสำเร็จ!");
     return res.status(200).json({ jsonText: text });
 
   } catch (error) {
-    console.error("🔥 เกิดข้อผิดพลาดในระบบเซิร์ฟเวอร์:", error.message || error);
+    console.error("🔥 เกิดข้อผิดพลาดฝั่ง SDK ของ Google:", error.message || error);
     return res.status(500).json({ 
         error: "Internal Server Error", 
         details: error.message || "Unknown error occurred" 
