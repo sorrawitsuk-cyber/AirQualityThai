@@ -34,7 +34,6 @@ const legendData = {
   wind: { title: 'ความเร็วลม', items: [{color:'#00b0f0',label:'0-10 (ลมอ่อน)'},{color:'#2ecc71',label:'11-25 (ลมปานกลาง)'},{color:'#f1c40f',label:'26-40 (ลมแรง)'},{color:'#e67e22',label:'41-60 (ลมแรงมาก)'},{color:'#e74c3c',label:'> 60 (พายุ)'}] }
 };
 
-// 🌟 ตั้งค่าสเกลแกน Y ของกราฟไม่ให้หลอกตา
 const chartConfigs = { 
   pm25: { key: 'pm25', name: 'PM2.5', color: '#f59e0b', type: 'area', domain: [0, max => Math.max(100, Math.ceil(max))] }, 
   temp: { key: 'temp', keyLY: 'tempLY', name: 'อุณหภูมิสูงสุด', color: '#ef4444', hasLY: true, type: 'line', domain: [min => Math.min(20, Math.floor(min)), max => Math.max(45, Math.ceil(max))] }, 
@@ -342,9 +341,11 @@ export default function App() {
            hourlyRawData += `- เวลา ${fmt(dW.hourly.time[idx])}: อุณหภูมิ ${dW.hourly.temperature_2m?.[idx] ?? '-'}°C, โอกาสฝน ${dW.hourly.precipitation_probability?.[idx] ?? 0}%, ปริมาณฝน ${dW.hourly.precipitation?.[idx] ?? 0}mm, PM2.5 ${pmVal} µg/m³\n`; 
         }
         
+        // 🌟 อัปเดต: เพิ่มค่าฝุ่น PM2.5 ในข้อมูลของวันพรุ่งนี้ด้วย
         for (let i = nIdx + 12; i < dW.hourly.time.length; i += 3) {
             if(dW.hourly.time[i]) {
-                tomorrowHourlyRawData += `- พรุ่งนี้เวลา ${fmt(dW.hourly.time[i])}: โอกาสฝน ${dW.hourly.precipitation_probability?.[i] ?? 0}% (${dW.hourly.precipitation?.[i] ?? 0}mm), อุณหภูมิ ${dW.hourly.temperature_2m?.[i] ?? '-'}°C\n`;
+                const pmValTmr = dA.hourly?.pm2_5?.[i] ?? 'ไม่มีข้อมูล';
+                tomorrowHourlyRawData += `- พรุ่งนี้เวลา ${fmt(dW.hourly.time[i])}: โอกาสฝน ${dW.hourly.precipitation_probability?.[i] ?? 0}% (${dW.hourly.precipitation?.[i] ?? 0}mm), อุณหภูมิ ${dW.hourly.temperature_2m?.[i] ?? '-'}°C, PM2.5 ${pmValTmr} µg/m³\n`;
             }
         }
 
@@ -425,20 +426,21 @@ export default function App() {
       } else if (aiTargetDay === 1) {
           if (dashForecast && dashForecast.length > 1) { 
               const tF = dashForecast[1]; 
-              contextData += `[ภาพรวมพรุ่งนี้]: อุณหภูมิสูงสุด ${tF.temp}°C, โอกาสฝน ${tF.rainProb || 0}%, ปริมาณฝน ${tF.rain || 0}mm, ลม ${tF.wind || 0}km/h, UV ${tF.uv || 0}\n`; 
+              // 🌟 อัปเดต: แนบค่าฝุ่น PM2.5 เฉลี่ยไปด้วย
+              contextData += `[ภาพรวมพรุ่งนี้]: อุณหภูมิสูงสุด ${tF.temp}°C, โอกาสฝน ${tF.rainProb || 0}%, ปริมาณฝน ${tF.rain || 0}mm, ลม ${tF.wind || 0}km/h, UV ${tF.uv || 0}, PM2.5 เฉลี่ย ${tF.pm25 || 'ไม่มีข้อมูล'} µg/m³\n`; 
           }
           if (alertsData.tomorrowHourlyText) contextData += `\n${alertsData.tomorrowHourlyText}`;
       } else {
           if (dashForecast && dashForecast.length > aiTargetDay) { 
               const tF = dashForecast[aiTargetDay]; 
-              contextData += `[ภาพรวมวันที่ ${targetDateStr}]: อุณหภูมิสูงสุด ${tF.temp}°C, โอกาสฝน ${tF.rainProb || 0}%, ปริมาณฝน ${tF.rain || 0}mm, ลม ${tF.wind || 0}km/h, UV ${tF.uv || 0}\n`; 
+              // 🌟 อัปเดต: แนบค่าฝุ่น PM2.5 เฉลี่ยไปด้วย
+              contextData += `[ภาพรวมวันที่ ${targetDateStr}]: อุณหภูมิสูงสุด ${tF.temp}°C, โอกาสฝน ${tF.rainProb || 0}%, ปริมาณฝน ${tF.rain || 0}mm, ลม ${tF.wind || 0}km/h, UV ${tF.uv || 0}, PM2.5 เฉลี่ย ${tF.pm25 || 'ไม่มีข้อมูล'} µg/m³\n`; 
               contextData += `(ไม่มีข้อมูลรายชั่วโมง ให้ประเมินจากภาพรวม)`;
           } else { contextData += `(ไม่มีข้อมูล)`; }
       }
 
       const dayWord = aiTargetDay === 0 ? 'วันนี้' : `วันที่ ${targetDateStr}`;
       
-      // 🌟 ปฏิวัติคำสั่ง: บังคับคีย์ข้อมูลชัดเจน ให้ AI เลือกสีและป้ายกำกับมาเอง
       const jsonInstruction = `\n\n**สำคัญมาก: คุณต้องตอบกลับเป็น JSON Array แท้ๆ ตามโครงสร้างนี้เท่านั้น:**\n[\n  { "title": "ชื่อหัวข้อ", "icon": "ใส่อีโมจิ1ตัว", "color": "green หรือ red หรือ yellow หรือ blue", "tag": "คำในป้ายกำกับสั้นๆ เช่น ปลอดภัย, เฝ้าระวัง, ควรเลี่ยง, ไม่มีฝน", "desc": "อธิบายเหตุผลสั้นๆกระชับ" }\n]`;
 
       let promptText = '';
@@ -465,7 +467,6 @@ export default function App() {
       
       if (data.jsonText) {
         try { 
-            // 🌟 Parsing สะอาดหมดจด เพราะ Google ส่ง application/json มาให้แล้ว
             const cleanText = data.jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsedData = JSON.parse(cleanText); 
             setAiSummaryJson(parsedData); 
@@ -905,12 +906,11 @@ export default function App() {
                   {isGeneratingAI ? ( <div style={{ textAlign: 'center', color: '#8b5cf6', padding: '15px', fontWeight: 'bold' }}>⏳ AI กำลังคิดวิเคราะห์ข้อมูลอย่างละเอียด...</div> ) : aiSummaryJson ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {aiSummaryJson.map((item, i) => {
-                          // 🌟 ปฏิวัติสี: ดึงสีตามที่ AI ส่งมาเป๊ะๆ ไม่เดาเอง
                           let statusColor, statusBg;
                           if (item.color === 'green') { statusColor = '#16a34a'; statusBg = darkMode ? 'rgba(22,163,74,0.15)' : '#dcfce7'; } 
                           else if (item.color === 'red') { statusColor = '#dc2626'; statusBg = darkMode ? 'rgba(220,38,38,0.15)' : '#fee2e2'; } 
                           else if (item.color === 'blue') { statusColor = '#0ea5e9'; statusBg = darkMode ? 'rgba(14,165,233,0.15)' : '#e0f2fe'; }
-                          else { statusColor = '#d97706'; statusBg = darkMode ? 'rgba(217,119,6,0.15)' : '#fffbeb'; } // default yellow
+                          else { statusColor = '#d97706'; statusBg = darkMode ? 'rgba(217,119,6,0.15)' : '#fffbeb'; } 
                           
                           return (
                             <div key={i} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode ? 'rgba(0,0,0,0.2)' : '#fff', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}`, boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
