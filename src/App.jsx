@@ -397,10 +397,10 @@ export default function App() {
     } catch(e) { console.error("Error setting alerts:", e); } finally { setAlertsLoading(false); }
   };
 
-  const handleScanLocation = () => { if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); navigator.geolocation.getCurrentPosition((pos) => fetchAlertsData(pos.coords.latitude, pos.coords.longitude, '📍 พิกัดปัจจุบันของคุณ'), () => alert('ไม่อนุญาต GPS')); };
   const handleRadarPixelScan = async () => {
     const targetLat = activeStation ? activeStation.lat : 13.75;
     const targetLon = activeStation ? activeStation.long : 100.5;
+    const locName = activeStation ? activeStation.nameTH : (alertsLocationName || 'พิกัดปัจจุบัน');
     
     setAlertsLoading(true);
     try {
@@ -412,12 +412,13 @@ export default function App() {
       const data = await res.json();
       
       if (data.intensity) {
-        alert(`🎯 ผลสแกนพิกเซลเรดาร์ล่าสุด!\n\n📍 พิกัดรูปภาพ: ${data.targetPixel}\n🎨 สีที่สแกนเจอ: ${data.detectedColor}\n💧 สถานะ: ${data.intensity}\n🕒 ข้อมูลเรดาร์เวลา: ${data.radarTime}\n\n(ลองเอาลิงก์รูปล่างนี้ไปเปิดดูได้ครับ)\n${data.imageUrl}`);
+        // ✨ อัปเดต: เปลี่ยนข้อความให้ดูเป็นทางการแบบศูนย์พยากรณ์อากาศ
+        alert(`🛰️ รายงานวิเคราะห์ข้อมูลเรดาร์ (Nowcast)\n📍 พื้นที่เป้าหมาย: ${locName}\n\nสถานะกลุ่มฝน ณ ปัจจุบัน:\n${data.intensity}\n\n🕒 อ้างอิงข้อมูลภาพถ่ายดาวเทียมเวลา: ${data.radarTime}`);
       } else {
-        alert("สแกนไม่สำเร็จ: " + data.error);
+        alert("⚠️ ระบบขัดข้อง: " + data.error);
       }
     } catch(e) {
-      alert("เชื่อมต่อระบบสแกนภาพล้มเหลว");
+      alert("⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อศูนย์ข้อมูลเรดาร์");
     } finally {
       setAlertsLoading(false);
     }
@@ -926,7 +927,7 @@ export default function App() {
                   <button onClick={() => generateAISummary('agriculture')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #84cc16`, backgroundColor: darkMode ? 'rgba(132,204,22,0.1)' : '#ecfccb', color: '#65a30d', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌾 เกษตรกร</button>
                   
                   {/* 📡 ปุ่มแสกนเรดาร์ที่เราเพิ่งเพิ่มไปครับ */}
-                  <button onClick={handleRadarPixelScan} disabled={alertsLoading} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #14b8a6`, backgroundColor: darkMode ? 'rgba(20,184,166,0.1)' : '#ccfbf1', color: '#0d9488', fontSize: '0.85rem', cursor: alertsLoading?'wait':'pointer', fontWeight:'bold' }}>📡 สแกนสีเรดาร์ (PoC)</button>
+                 <button onClick={handleRadarPixelScan} disabled={alertsLoading} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #14b8a6`, backgroundColor: darkMode ? 'rgba(20,184,166,0.1)' : '#ccfbf1', color: '#0d9488', fontSize: '0.85rem', cursor: alertsLoading?'wait':'pointer', fontWeight:'bold' }}>📡 ตรวจสอบเรดาร์</button>
                 </div>
 
                 <div style={{ backgroundColor: darkMode ? '#1e293b' : '#f8fafc', padding: isGeneratingAI || aiSummaryJson ? '15px' : '0', borderRadius: '12px', border: aiSummaryJson ? `1px dashed #8b5cf6` : 'none', transition: 'all 0.3s' }}>
