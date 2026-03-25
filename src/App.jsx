@@ -398,6 +398,30 @@ export default function App() {
   };
 
   const handleScanLocation = () => { if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); navigator.geolocation.getCurrentPosition((pos) => fetchAlertsData(pos.coords.latitude, pos.coords.longitude, '📍 พิกัดปัจจุบันของคุณ'), () => alert('ไม่อนุญาต GPS')); };
+  const handleRadarPixelScan = async () => {
+    const targetLat = activeStation ? activeStation.lat : 13.75;
+    const targetLon = activeStation ? activeStation.long : 100.5;
+    
+    setAlertsLoading(true);
+    try {
+      const res = await fetch('/api/radar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: parseFloat(targetLat), lon: parseFloat(targetLon) })
+      });
+      const data = await res.json();
+      
+      if (data.intensity) {
+        alert(`🎯 ผลสแกนพิกเซลเรดาร์ล่าสุด!\n\n📍 พิกัดรูปภาพ: ${data.targetPixel}\n🎨 สีที่สแกนเจอ: ${data.detectedColor}\n💧 สถานะ: ${data.intensity}\n🕒 ข้อมูลเรดาร์เวลา: ${data.radarTime}\n\n(ลองเอาลิงก์รูปล่างนี้ไปเปิดดูได้ครับ)\n${data.imageUrl}`);
+      } else {
+        alert("สแกนไม่สำเร็จ: " + data.error);
+      }
+    } catch(e) {
+      alert("เชื่อมต่อระบบสแกนภาพล้มเหลว");
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (currentPage==='forecast' && !alertsLocationName) {
@@ -900,6 +924,9 @@ export default function App() {
                   <button onClick={() => generateAISummary('health')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #ef4444`, backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', color: '#ef4444', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>😷 สุขภาพ/ภูมิแพ้</button>
                   <button onClick={() => generateAISummary('travel')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #db2777`, backgroundColor: darkMode ? 'rgba(219,39,119,0.1)' : '#fce7f3', color: '#db2777', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🎒 ท่องเที่ยว</button>
                   <button onClick={() => generateAISummary('agriculture')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #84cc16`, backgroundColor: darkMode ? 'rgba(132,204,22,0.1)' : '#ecfccb', color: '#65a30d', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌾 เกษตรกร</button>
+                  
+                  {/* 📡 ปุ่มแสกนเรดาร์ที่เราเพิ่งเพิ่มไปครับ */}
+                  <button onClick={handleRadarPixelScan} disabled={alertsLoading} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #14b8a6`, backgroundColor: darkMode ? 'rgba(20,184,166,0.1)' : '#ccfbf1', color: '#0d9488', fontSize: '0.85rem', cursor: alertsLoading?'wait':'pointer', fontWeight:'bold' }}>📡 สแกนสีเรดาร์ (PoC)</button>
                 </div>
 
                 <div style={{ backgroundColor: darkMode ? '#1e293b' : '#f8fafc', padding: isGeneratingAI || aiSummaryJson ? '15px' : '0', borderRadius: '12px', border: aiSummaryJson ? `1px dashed #8b5cf6` : 'none', transition: 'all 0.3s' }}>
