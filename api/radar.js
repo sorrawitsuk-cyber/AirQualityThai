@@ -29,7 +29,6 @@ export default async function handler(req, res) {
     const hexColor = image.getPixelColor(pixelX, pixelY);
     const rgba = intToRGBA(hexColor); 
 
-    // ✨ อัปเดต: ใช้คำศัพท์อุตุนิยมวิทยาแทนการบอกสี
     let intensity = "🌤️ ไม่พบกลุ่มฝนปกคลุมในพื้นที่ (สภาพอากาศปกติ)";
     let alertLevel = 0;
 
@@ -44,7 +43,8 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      radarTime: new Date(latestTime * 1000).toLocaleString('th-TH'),
+      // ✨ อัปเดต: บังคับแปลงเวลาให้เป็นโซน Asia/Bangkok เสมอ
+      radarTime: new Date(latestTime * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
       intensity: intensity,
       alertLevel: alertLevel
     });
