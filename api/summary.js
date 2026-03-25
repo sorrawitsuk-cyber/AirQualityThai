@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export default async function handler(req, res) {
   // บังคับให้เป็น POST เท่านั้น
   if (req.method !== 'POST') {
@@ -9,37 +7,49 @@ export default async function handler(req, res) {
   // ดึง API Key มาเช็ค
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("🚨 ไม่พบ GEMINI_API_KEY ใน Environment Variables!");
+    console.error("🚨 ไม่พบ GEMINI_API_KEY!");
     return res.status(500).json({ error: "ไม่พบการตั้งค่า API Key ของ AI" });
   }
 
   const { prompt } = req.body;
-
   if (!prompt) {
     return res.status(400).json({ error: "No prompt provided" });
   }
 
   try {
-    console.log("🚀 กำลังส่งข้อมูลไปหา Gemini...");
+    console.log("🚀 ส่งข้อมูลยิงตรงไปที่ Google Gemini API...");
     
-    // เรียกใช้งาน Gemini
-    const genAI = new GoogleGenerativeAI(apiKey);
+    // 🌟 ท่าไม้ตาย: ยิงตรงเข้า API ของ Google (ใช้รุ่น 1.5-flash ล่าสุด)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
-    // 🌟 อัปเดต: ใช้ gemini-pro รุ่นคลาสสิกที่เสถียรและรองรับทุก API Key 100%
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" }); 
-    
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2 } // บังคับให้ AI ตอบตรงไปตรงมา
+      })
+    });
 
+    const data = await response.json();
+
+    // เช็คว่า Google ด่าอะไรกลับมาไหม
+    if (!response.ok) {
+      console.error("🔥 Google API Error:", data);
+      return res.status(response.status).json({ 
+          error: "Google API Error", 
+          details: data.error?.message || "Unknown API Error" 
+      });
+    }
+
+    // ดึงข้อความจาก JSON ที่ Google ตอบกลับมา
+    const text = data.candidates[0].content.parts[0].text;
     console.log("✅ Gemini ตอบกลับสำเร็จ!");
     
     return res.status(200).json({ jsonText: text });
 
   } catch (error) {
-    // 🕵️‍♂️ จับ Error แบบละเอียดมาแสดง
-    console.error("🔥 เกิดข้อผิดพลาดตอนคุยกับ Gemini:", error.message || error);
-    
+    console.error("🔥 เกิดข้อผิดพลาดในระบบเซิร์ฟเวอร์:", error.message || error);
     return res.status(500).json({ 
         error: "Internal Server Error", 
         details: error.message || "Unknown error occurred" 
