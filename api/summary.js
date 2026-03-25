@@ -1,16 +1,11 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export default async function handler(req, res) {
-  // บังคับให้เป็น POST เท่านั้น
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // ดึง API Key มาเช็ค
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("🚨 ไม่พบ GEMINI_API_KEY!");
-    return res.status(500).json({ error: "ไม่พบการตั้งค่า API Key ของ AI" });
+    return res.status(500).json({ error: "ไม่พบการตั้งค่า API Key" });
   }
 
   const { prompt } = req.body;
@@ -19,24 +14,38 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("🚀 ใช้แพ็กเกจทางการ (SDK) ส่งข้อมูลไปหา Gemini 1.5 Flash...");
+    console.log("🚀 [Overhaul] ยิงตรงเข้า Gemini 1.5 Flash พร้อมบังคับ JSON...");
     
-    // 🌟 กลับมาใช้ SDK แท้ของ Google (ตัดปัญหา 404 URL ทิ้งไปเลย)
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); 
+    // ใช้ 1.5-flash และใช้ endpoint มาตรฐาน
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { 
+            temperature: 0.2,
+            // 🌟 ท่าไม้ตาย: บังคับให้ Google ส่งกลับมาเป็น JSON แท้ๆ 100%
+            responseMimeType: "application/json" 
+        }
+      })
+    });
 
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("🔥 Google API Error:", data);
+      return res.status(response.status).json({ error: "Google API Error", details: data });
+    }
+
+    const text = data.candidates[0].content.parts[0].text;
     console.log("✅ Gemini ตอบกลับสำเร็จ!");
+    
     return res.status(200).json({ jsonText: text });
 
   } catch (error) {
-    console.error("🔥 เกิดข้อผิดพลาดฝั่ง SDK ของ Google:", error.message || error);
-    return res.status(500).json({ 
-        error: "Internal Server Error", 
-        details: error.message || "Unknown error occurred" 
-    });
+    console.error("🔥 Backend Error:", error);
+    return res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 }

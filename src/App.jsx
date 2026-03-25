@@ -437,68 +437,54 @@ export default function App() {
       }
 
       const dayWord = aiTargetDay === 0 ? 'วันนี้' : `วันที่ ${targetDateStr}`;
-      const jsonInstruction = `\n\n**ข้อบังคับสำคัญ: คุณต้องตอบเป็น JSON Array แท้ๆ เท่านั้น ห้ามมีข้อความอื่นปนเด็ดขาด** ตัวอย่าง:\n[\n  { "label": "หัวข้อ", "icon": "☀️", "status_color": "green/red/yellow/blue", "status_text": "คำสั้นๆในป้าย (เช่น ปกติ, ไม่มีฝน, อันตราย, เลี่ยงได้เลี่ยง)", "reason": "อธิบายสั้นๆ" }\n]`;
+      
+      // 🌟 ปฏิวัติคำสั่ง: บังคับคีย์ข้อมูลชัดเจน ให้ AI เลือกสีและป้ายกำกับมาเอง
+      const jsonInstruction = `\n\n**สำคัญมาก: คุณต้องตอบกลับเป็น JSON Array แท้ๆ ตามโครงสร้างนี้เท่านั้น:**\n[\n  { "title": "ชื่อหัวข้อ", "icon": "ใส่อีโมจิ1ตัว", "color": "green หรือ red หรือ yellow หรือ blue", "tag": "คำในป้ายกำกับสั้นๆ เช่น ปลอดภัย, เฝ้าระวัง, ควรเลี่ยง, ไม่มีฝน", "desc": "อธิบายเหตุผลสั้นๆกระชับ" }\n]`;
 
       let promptText = '';
-      if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศสำหรับ **${dayWord}** วิเคราะห์ 3 ข้อ: 1.สภาพอากาศภาพรวม 2.การเดินทาง 3.ข้อควรระวัง:\n\n${contextData}`; } 
-      else if (topic === 'rain') { promptText = `คุณคือนักอุตุนิยมวิทยา วิเคราะห์แนวโน้ม "ฝนตก" สำหรับ **${dayWord}** วิเคราะห์: 1. ภาพรวมฝน (โอกาสกี่เปอร์เซ็นต์ หนักแค่ไหน) 2. ช่วงเวลาที่คาดว่าฝนจะตก (ให้ระบุเวลาชัดเจนจากข้อมูล) 3. คำแนะนำการเดินทาง:\n\n${contextData}`; }
-      else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลสำหรับ **${dayWord}** **เลือกมาแค่ 3 ช่วงเวลาของวันที่น่าสนใจที่สุด** ห้ามอธิบายยาว (ถ้าไม่มีรายชั่วโมงให้วิเคราะห์จากภาพรวม):\n\n${contextData}`; } 
-      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำการท่องเที่ยว: 1.การทำกิจกรรมกลางแจ้ง 2.ประเภทสถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
-      else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ช่วงไหนเหมาะตากผ้าที่สุด? 2.เหมาะจะล้างรถไหม? 3.ต้องพกร่มไหม:\n\n${contextData}`; } 
-      else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ออกกำลังกายกลางแจ้งได้ไหม? 2.ช่วงเวลาที่ดีที่สุด 3.ข้อควรระวัง:\n\n${contextData}`; } 
-      else if (topic === 'health') { promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ความปลอดภัยระบบหายใจ 2.ช่วงเวลาที่ฝุ่น/แดดอันตรายที่สุด 3.คำแนะนำพิเศษ:\n\n${contextData}`; }
-      else if (topic === 'agriculture') { promptText = `คุณคือผู้เชี่ยวชาญการเกษตร วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำ: 1.ความปลอดภัยพ่นปุ๋ย/ยา 2.การรดน้ำ 3.การตากผลผลิต:\n\n${contextData}`; }
+      if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศสำหรับ **${dayWord}** วิเคราะห์: 1.สภาพอากาศภาพรวม 2.การเดินทาง 3.ข้อควรระวัง:\n\n${contextData}`; } 
+      else if (topic === 'rain') { promptText = `คุณคือนักอุตุนิยมวิทยา วิเคราะห์แนวโน้ม "ฝนตก" สำหรับ **${dayWord}** วิเคราะห์: 1. ภาพรวมฝน (โอกาสเปอร์เซ็นต์/หนักแค่ไหน) 2. ช่วงเวลาฝนตก (ระบุเวลาชัดเจน) 3. คำแนะนำการเดินทาง:\n\n${contextData}`; }
+      else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลสำหรับ **${dayWord}** **เลือกมา 3 ช่วงเวลาของวันที่สำคัญที่สุด** ห้ามอธิบายยาว:\n\n${contextData}`; } 
+      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
+      else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศ **${dayWord}**: 1.เวลาตากผ้า 2.เวลาล้างรถ 3.ต้องพกร่มไหม:\n\n${contextData}`; } 
+      else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ออกกำลังกายกลางแจ้งได้ไหม 2.ช่วงเวลาที่ดีที่สุด 3.ข้อควรระวัง:\n\n${contextData}`; } 
+      else if (topic === 'health') { promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.คุณภาพอากาศ/PM2.5 2.ความปลอดภัยแดด/UV 3.คำแนะนำพิเศษ:\n\n${contextData}`; }
+      else if (topic === 'agriculture') { promptText = `คุณคือผู้เชี่ยวชาญการเกษตร วิเคราะห์สภาพอากาศ **${dayWord}**: 1.พ่นปุ๋ย/ยา 2.การรดน้ำ 3.ตากผลผลิต:\n\n${contextData}`; }
 
       promptText += jsonInstruction;
 
       const response = await fetch('/api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, topic: topic }) });
       
-      // 🕵️‍♂️ [ระบบสายลับ 1]: เช็คสถานะ API ฝั่งเซิร์ฟเวอร์
       if (!response.ok) {
-        console.error("🚨 API Backend Error! Status:", response.status);
-        setAiSummaryJson([{ label: "Backend Error", icon: "🔌", status_color: "red", status_text: "API มีปัญหา", reason: `เซิร์ฟเวอร์ตอบกลับรหัส: ${response.status} (เช็ค API Key หรือ Vercel Logs)` }]);
-        setIsGeneratingAI(false);
-        return;
+        console.error("Backend Error:", response.status);
+        setAiSummaryJson([{ title: "Backend Error", icon: "🔌", color: "red", tag: "API มีปัญหา", desc: `เซิร์ฟเวอร์ตอบกลับ: ${response.status} ลองกดใหม่อีกครั้ง` }]);
+        setIsGeneratingAI(false); return;
       }
 
       const data = await response.json();
       
-      // 🕵️‍♂️ [ระบบสายลับ 2]: แอบดูข้อมูลที่รับมาจากหลังบ้านทั้งหมด
-      console.log("🔥 Raw Data จาก Backend API:", data);
-
-      // ดักกรณี Backend ตอบกลับมาเป็น error message ตรงๆ (ถ้าคุณเขียนดักไว้ใน api/summary.js)
-      if (data.error) {
-        console.error("🚨 ข้อมูล Error จาก AI:", data.error);
-        setAiSummaryJson([{ label: "AI Error", icon: "⚠️", status_color: "red", status_text: "โควต้าเต็ม/ล้มเหลว", reason: data.error }]);
-        setIsGeneratingAI(false);
-        return;
-      }
-      
       if (data.jsonText) {
         try { 
+            // 🌟 Parsing สะอาดหมดจด เพราะ Google ส่ง application/json มาให้แล้ว
             const cleanText = data.jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsedData = JSON.parse(cleanText); 
             setAiSummaryJson(parsedData); 
             setAiTimestamp(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'); 
-        } 
-        catch (e) { 
-            // 🕵️‍♂️ [ระบบสายลับ 3]: ถ้า AI ตอบมาผิดรูปแบบ เราจะปริ้นข้อความจริงออกมาดูว่ามันแอบตอบอะไรมา!
-            console.error("🚨 AI ตอบกลับมาผิดรูปแบบ JSON! นี่คือสิ่งที่ AI ตอบมา:", data.jsonText);
-            setAiSummaryJson([{ label: "Format Error", icon: "❌", status_color: "red", status_text: "AI คุยไม่รู้เรื่อง", reason: "รูปแบบข้อมูลจาก AI ผิดพลาด (กด F12 ดู Console เพื่อเช็คข้อความ)" }]); 
+        } catch (e) { 
+            console.error("Parse Error:", e);
+            setAiSummaryJson([{ title: "Format Error", icon: "❌", color: "red", tag: "ประมวลผลพลาด", desc: "รูปแบบข้อมูลผิดพลาด กรุณากดใหม่อีกครั้ง" }]); 
         }
       } else { 
-          // กรณีติดต่อสำเร็จ แต่หาคำว่า jsonText ไม่เจอ
-          setAiSummaryJson([{ label: "No Output", icon: "😶", status_color: "yellow", status_text: "ว่างเปล่า", reason: "AI ประมวลผลสำเร็จแต่ไม่ส่งข้อความกลับมา (ตรวจสอบไฟล์ /api/summary.js)" }]); 
+          setAiSummaryJson([{ title: "No Output", icon: "😶", color: "yellow", tag: "ว่างเปล่า", desc: "AI ไม่สามารถสรุปได้ในขณะนี้" }]); 
       }
     } catch (error) { 
-        console.error("🚨 ระบบเชื่อมต่อขัดข้องรุนแรง:", error); 
-        setAiSummaryJson([{ label: "Connection Error", icon: "🚑", status_color: "red", status_text: "เน็ตหลุด/เชื่อมต่อไม่ได้", reason: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); 
-    } 
-    finally { setIsGeneratingAI(false); }
+        console.error("Connection Error:", error); 
+        setAiSummaryJson([{ title: "Connection Error", icon: "🚑", color: "red", tag: "เน็ตหลุด/เชื่อมต่อไม่ได้", desc: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); 
+    } finally { setIsGeneratingAI(false); }
   };
 
   const handleShareAI = () => {
-    if(!aiSummaryJson) return; const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.label}: ${i.reason}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Weather Dashboard`;
+    if(!aiSummaryJson) return; const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.title}: ${i.desc}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Weather Dashboard`;
     if (navigator.share) { navigator.share({ title: 'สรุปสภาพอากาศจาก AI', text: shareText }).catch(console.error); } else { navigator.clipboard.writeText(shareText); alert('คัดลอกข้อความสรุปแล้ว! สามารถนำไปวางส่งให้เพื่อนได้เลยครับ'); }
   };
 
@@ -919,23 +905,22 @@ export default function App() {
                   {isGeneratingAI ? ( <div style={{ textAlign: 'center', color: '#8b5cf6', padding: '15px', fontWeight: 'bold' }}>⏳ AI กำลังคิดวิเคราะห์ข้อมูลอย่างละเอียด...</div> ) : aiSummaryJson ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {aiSummaryJson.map((item, i) => {
-                          let statusColor, statusBg, statusIcon, statusText;
-                          const c = item.status_color || item.status;
-                          if (c === 'green' || c === 'yes') { statusColor = '#16a34a'; statusBg = darkMode ? 'rgba(22,163,74,0.15)' : '#dcfce7'; statusIcon = '✅'; } 
-                          else if (c === 'red' || c === 'no') { statusColor = '#dc2626'; statusBg = darkMode ? 'rgba(220,38,38,0.15)' : '#fee2e2'; statusIcon = '🚨'; } 
-                          else if (c === 'blue' || c === 'info') { statusColor = '#0ea5e9'; statusBg = darkMode ? 'rgba(14,165,233,0.15)' : '#e0f2fe'; statusIcon = 'ℹ️'; }
-                          else { statusColor = '#d97706'; statusBg = darkMode ? 'rgba(217,119,6,0.15)' : '#fffbeb'; statusIcon = '⚠️'; }
-                          statusText = item.status_text || (c === 'yes' ? 'เหมาะสม' : c === 'no' ? 'ควรเลี่ยง' : 'เฝ้าระวัง');
+                          // 🌟 ปฏิวัติสี: ดึงสีตามที่ AI ส่งมาเป๊ะๆ ไม่เดาเอง
+                          let statusColor, statusBg;
+                          if (item.color === 'green') { statusColor = '#16a34a'; statusBg = darkMode ? 'rgba(22,163,74,0.15)' : '#dcfce7'; } 
+                          else if (item.color === 'red') { statusColor = '#dc2626'; statusBg = darkMode ? 'rgba(220,38,38,0.15)' : '#fee2e2'; } 
+                          else if (item.color === 'blue') { statusColor = '#0ea5e9'; statusBg = darkMode ? 'rgba(14,165,233,0.15)' : '#e0f2fe'; }
+                          else { statusColor = '#d97706'; statusBg = darkMode ? 'rgba(217,119,6,0.15)' : '#fffbeb'; } // default yellow
                           
                           return (
                             <div key={i} style={{ display: 'flex', gap: '15px', backgroundColor: darkMode ? 'rgba(0,0,0,0.2)' : '#fff', padding: '15px', borderRadius: '10px', border: `1px solid ${borderColor}`, boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
                               <div style={{ fontSize: '1.8rem', width: '45px', height: '45px', background: statusBg, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{item.icon}</div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '5px' }}>
-                                  <h4 style={{ margin: '0', fontSize: '1.05rem', color: textColor, fontWeight: 'bold' }}>{item.label}</h4>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: statusColor, display: 'flex', alignItems: 'center', gap: '4px', background: statusBg, padding: '4px 10px', borderRadius: '12px' }}>{statusIcon} {statusText}</span>
+                                  <h4 style={{ margin: '0', fontSize: '1.05rem', color: textColor, fontWeight: 'bold' }}>{item.title}</h4>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: statusColor, display: 'flex', alignItems: 'center', gap: '4px', background: statusBg, padding: '4px 10px', borderRadius: '12px' }}>{item.tag}</span>
                                 </div>
-                                <p style={{ margin: 0, color: subTextColor, lineHeight: 1.5, fontSize: '0.9rem' }}>{item.reason}</p>
+                                <p style={{ margin: 0, color: subTextColor, lineHeight: 1.5, fontSize: '0.9rem' }}>{item.desc}</p>
                               </div>
                             </div>
                           );
