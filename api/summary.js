@@ -1,42 +1,46 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 export default async function handler(req, res) {
+  // บังคับให้เป็น POST เท่านั้น
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { prompt, topic } = req.body;
+  // ดึง API Key มาเช็ค
   const apiKey = process.env.GEMINI_API_KEY;
-
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key is missing' });
+    console.error("🚨 ไม่พบ GEMINI_API_KEY ใน Environment Variables!");
+    return res.status(500).json({ error: "ไม่พบการตั้งค่า API Key ของ AI" });
   }
 
-  const cleanApiKey = apiKey.replace(/["']/g, "").trim();
+  const { prompt } = req.body;
 
-  // 🧠 บังคับให้ Gemini ตอบกลับเป็น JSON เท่านั้น
-  let finalPrompt = `${prompt}\n\n**IMPORTANT INSTRUCTION:** Return the answer **ONLY** in a raw JSON format (no Markdown, no code blocks like \`\`\`json). The JSON must be a single array of objects, where each object has exactly four keys: "label" (string), "icon" (string emoji), "status" (string, choose only from: "yes", "no", or "warning"), and "reason" (string, max 100 characters). 
-
-Example of required output structure:
-[
-  {"label": "ตากผ้า", "icon": "👕", "status": "yes", "reason": "ท้องฟ้าแจ่มใส ลมพัดดี"},
-  {"label": "ล้างรถ", "icon": "🚗", "status": "warning", "reason": "โอกาสฝนตกปานกลางตอนค่ำ"}
-]`;
+  if (!prompt) {
+    return res.status(400).json({ error: "No prompt provided" });
+  }
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] })
-    });
-
-    const data = await response.json();
+    console.log("🚀 กำลังส่งข้อมูลไปหา Gemini...");
     
-    if (data.candidates && data.candidates.length > 0) {
-      return res.status(200).json({ jsonText: data.candidates[0].content.parts[0].text });
-    } else {
-      return res.status(500).json({ error: 'No summary generated' });
-    }
+    // เรียกใช้งาน Gemini
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // ใช้รุ่น Flash เพื่อความรวดเร็ว
+    
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    console.log("✅ Gemini ตอบกลับสำเร็จ!");
+    
+    return res.status(200).json({ jsonText: text });
+
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Server Error' });
+    // 🕵️‍♂️ จับ Error แบบละเอียดมาแสดง
+    console.error("🔥 เกิดข้อผิดพลาดตอนคุยกับ Gemini:", error.message || error);
+    
+    return res.status(500).json({ 
+        error: "Internal Server Error", 
+        details: error.message || "Unknown error occurred" 
+    });
   }
 }
