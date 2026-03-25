@@ -1,3 +1,5 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -5,7 +7,8 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: "ไม่พบการตั้งค่า API Key" });
+    console.error("🚨 ไม่พบ GEMINI_API_KEY!");
+    return res.status(500).json({ error: "ไม่พบการตั้งค่า API Key ของ AI" });
   }
 
   const { prompt } = req.body;
@@ -14,38 +17,50 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("🚀 [Overhaul] ยิงตรงเข้า Gemini 1.5 Flash พร้อมบังคับ JSON...");
+    const genAI = new GoogleGenerativeAI(apiKey);
     
-    // ใช้ 1.5-flash และใช้ endpoint มาตรฐาน
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { 
-            temperature: 0.2,
-            // 🌟 ท่าไม้ตาย: บังคับให้ Google ส่งกลับมาเป็น JSON แท้ๆ 100%
-            responseMimeType: "application/json" 
+    // 🌟 ท่าไม้ตายสุดท้าย: ระบบ Auto-Fallback! 
+    // มันจะไล่ทดสอบโมเดลจากใหม่สุดไปเก่าสุด อันไหนคีย์ของคุณรองรับ มันจะใช้อันนั้นอัตโนมัติ!
+    const modelsToTry = [
+        "gemini-2.5-flash", // เผื่อไว้ตามที่คุณระบุ
+        "gemini-2.0-flash", // รุ่นใหม่ล่าสุดที่ Google เพิ่งปล่อย
+        "gemini-1.5-flash", 
+        "gemini-1.5-flash-latest",
+        "gemini-pro"        // รุ่นคลาสสิก (ไม้ตายก้นหีบ)
+    ];
+
+    let text = "";
+    let success = false;
+    let lastError = "";
+
+    // ลูปทดสอบโมเดล
+    for (const modelName of modelsToTry) {
+        try {
+            console.log(`🚀 กำลังลองเชื่อมต่อกับโมเดล: ${modelName}...`);
+            const model = genAI.getGenerativeModel({ model: modelName }); 
+            const result = await model.generateContent(prompt);
+            text = result.response.text(); // ดึงข้อความออกมา
+            success = true;
+            console.log(`✅ สำเร็จ! โมเดลที่เวิร์กคือ: ${modelName}`);
+            break; // เจออันที่ใช้ได้ปุ๊บ หยุดหาทันที
+        } catch (err) {
+            console.error(`❌ โมเดล ${modelName} ถูกปฏิเสธ:`, err.message);
+            lastError = err.message;
         }
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("🔥 Google API Error:", data);
-      return res.status(response.status).json({ error: "Google API Error", details: data });
     }
 
-    const text = data.candidates[0].content.parts[0].text;
-    console.log("✅ Gemini ตอบกลับสำเร็จ!");
-    
+    // ถ้าลองหมดแล้วยังใช้ไม่ได้สักอัน
+    if (!success) {
+         throw new Error("API Key ของคุณไม่รองรับโมเดลใดๆ เลย: " + lastError);
+    }
+
     return res.status(200).json({ jsonText: text });
 
   } catch (error) {
-    console.error("🔥 Backend Error:", error);
-    return res.status(500).json({ error: "Internal Server Error", details: error.message });
+    console.error("🔥 สรุป Error รวม:", error.message || error);
+    return res.status(500).json({ 
+        error: "Internal Server Error", 
+        details: error.message || "Unknown error occurred" 
+    });
   }
 }
