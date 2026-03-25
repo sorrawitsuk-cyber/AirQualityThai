@@ -452,7 +452,27 @@ export default function App() {
       promptText += jsonInstruction;
 
       const response = await fetch('/api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, topic: topic }) });
+      
+      // 🕵️‍♂️ [ระบบสายลับ 1]: เช็คสถานะ API ฝั่งเซิร์ฟเวอร์
+      if (!response.ok) {
+        console.error("🚨 API Backend Error! Status:", response.status);
+        setAiSummaryJson([{ label: "Backend Error", icon: "🔌", status_color: "red", status_text: "API มีปัญหา", reason: `เซิร์ฟเวอร์ตอบกลับรหัส: ${response.status} (เช็ค API Key หรือ Vercel Logs)` }]);
+        setIsGeneratingAI(false);
+        return;
+      }
+
       const data = await response.json();
+      
+      // 🕵️‍♂️ [ระบบสายลับ 2]: แอบดูข้อมูลที่รับมาจากหลังบ้านทั้งหมด
+      console.log("🔥 Raw Data จาก Backend API:", data);
+
+      // ดักกรณี Backend ตอบกลับมาเป็น error message ตรงๆ (ถ้าคุณเขียนดักไว้ใน api/summary.js)
+      if (data.error) {
+        console.error("🚨 ข้อมูล Error จาก AI:", data.error);
+        setAiSummaryJson([{ label: "AI Error", icon: "⚠️", status_color: "red", status_text: "โควต้าเต็ม/ล้มเหลว", reason: data.error }]);
+        setIsGeneratingAI(false);
+        return;
+      }
       
       if (data.jsonText) {
         try { 
@@ -461,9 +481,19 @@ export default function App() {
             setAiSummaryJson(parsedData); 
             setAiTimestamp(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'); 
         } 
-        catch (e) { setAiSummaryJson([{ label: "Error", icon: "❌", status_color: "red", status_text: "ข้อผิดพลาด", reason: "รูปแบบข้อมูลจาก AI ผิดพลาด ลองกดปุ่มใหม่อีกครั้ง" }]); }
-      } else { setAiSummaryJson([{ label: "No Summary", icon: "😶", status_color: "yellow", status_text: "รอข้อมูล", reason: "AI ไม่สามารถสรุปได้ในขณะนี้" }]); }
-    } catch (error) { console.error(error); setAiSummaryJson([{ label: "Server Error", icon: "🚑", status_color: "red", status_text: "ข้อผิดพลาด", reason: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); } 
+        catch (e) { 
+            // 🕵️‍♂️ [ระบบสายลับ 3]: ถ้า AI ตอบมาผิดรูปแบบ เราจะปริ้นข้อความจริงออกมาดูว่ามันแอบตอบอะไรมา!
+            console.error("🚨 AI ตอบกลับมาผิดรูปแบบ JSON! นี่คือสิ่งที่ AI ตอบมา:", data.jsonText);
+            setAiSummaryJson([{ label: "Format Error", icon: "❌", status_color: "red", status_text: "AI คุยไม่รู้เรื่อง", reason: "รูปแบบข้อมูลจาก AI ผิดพลาด (กด F12 ดู Console เพื่อเช็คข้อความ)" }]); 
+        }
+      } else { 
+          // กรณีติดต่อสำเร็จ แต่หาคำว่า jsonText ไม่เจอ
+          setAiSummaryJson([{ label: "No Output", icon: "😶", status_color: "yellow", status_text: "ว่างเปล่า", reason: "AI ประมวลผลสำเร็จแต่ไม่ส่งข้อความกลับมา (ตรวจสอบไฟล์ /api/summary.js)" }]); 
+      }
+    } catch (error) { 
+        console.error("🚨 ระบบเชื่อมต่อขัดข้องรุนแรง:", error); 
+        setAiSummaryJson([{ label: "Connection Error", icon: "🚑", status_color: "red", status_text: "เน็ตหลุด/เชื่อมต่อไม่ได้", reason: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); 
+    } 
     finally { setIsGeneratingAI(false); }
   };
 
