@@ -434,39 +434,61 @@ export default function App() {
   const handleRadarPixelScan = async () => {
     let targetLat = 13.75;
     let targetLon = 100.5;
+    let windDir = 0;
+    let windSpeed = 0;
+
+    // หาพิกัดและข้อมูลลมของพื้นที่เป้าหมาย
     if (activeStation) {
       targetLat = activeStation.lat; targetLon = activeStation.long;
+      const tObj = stationTemps[activeStation.stationID];
+      if (tObj) { windDir = tObj.windDir; windSpeed = tObj.windSpeed; }
     } else if (alertsLocationName.includes('จ.')) {
       const provName = alertsLocationName.replace('จ.', '');
       const provStations = stations.filter(s => extractProvince(s.areaTH) === provName);
       if (provStations.length > 0) {
         targetLat = provStations[0].lat; targetLon = provStations[0].long;
+        const tObj = stationTemps[provStations[0].stationID];
+        if (tObj) { windDir = tObj.windDir; windSpeed = tObj.windSpeed; }
       }
     }
     
-    const locName = alertsLocationName || 'พิกัดปัจจุบัน';
+    const locName = alertsLocationName || 'พื้นที่ปัจจุบัน';
     
-    setAlertsLoading(true);
+    // เรียกแอนิเมชันลูกแก้ว AI ของเราทำงาน
+    setIsGeneratingAI(true);
+    setAiSummaryJson(null);
+    
     try {
       const res = await fetch('/api/radar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: parseFloat(targetLat), lon: parseFloat(targetLon) })
+        body: JSON.stringify({ lat: parseFloat(targetLat), lon: parseFloat(targetLon), windDir, windSpeed })
       });
       const data = await res.json();
       
-      if (data.intensity) {
-        alert(`🛰️ รายงานวิเคราะห์ข้อมูลเรดาร์ (Nowcast)\n📍 พื้นที่เป้าหมาย: ${locName}\n\nสถานะกลุ่มฝน ณ ปัจจุบัน:\n${data.intensity}\n\n🕒 อ้างอิงข้อมูลภาพถ่ายดาวเทียมเวลา: ${data.radarTime}`);
+      // จัดรูปแบบข้อมูลให้ออกมาเป็นการ์ด AI สีสวยๆ
+      let resultCard = {};
+
+      if (data.alertLevel === 3) {
+          resultCard = { title: "ระวังพายุฝนรุนแรง!", icon: "🚨", color: "red", tag: "ฝนตกหนัก", desc: `เรดาร์ตรวจพบกลุ่มฝนกำลังแรงหนาแน่นบริเวณ ${locName} เสี่ยงน้ำท่วมขังและลมกระโชกแรง ${data.windText}` };
+      } else if (data.alertLevel === 2) {
+          resultCard = { title: "มีฝนตกปานกลาง", icon: "🌧️", color: "yellow", tag: "มีฝนตก", desc: `ตรวจพบกลุ่มฝนระดับปานกลางปกคลุมพื้นที่ ${locName} การเดินทางควรพกร่มและระวังถนนลื่น ${data.windText}` };
+      } else if (data.alertLevel === 1) {
+          resultCard = { title: "มีฝนตกปรอยๆ", icon: "🌦️", color: "green", tag: "ฝนเล็กน้อย", desc: `พบกลุ่มฝนกำลังอ่อนบริเวณ ${locName} อาจมีฝนตกปรอยๆ ไม่กระทบการทำกิจกรรมมากนัก ${data.windText}` };
       } else {
-        alert("⚠️ ระบบขัดข้อง: " + data.error);
+          resultCard = { title: "ท้องฟ้าโปร่ง ไม่มีฝน", icon: "☀️", color: "blue", tag: "ปลอดภัย", desc: `เรดาร์ตรวจไม่พบกลุ่มฝนบริเวณ ${locName} ในขณะนี้ สามารถทำกิจกรรมกลางแจ้งหรือซักผ้าได้ตามปกติครับ` };
       }
+
+      setAiSummaryJson([resultCard]);
+      setAiTimestamp(`${data.radarTime} น. (สแกนจากดาวเทียมภาพล่าสุด)`);
+
     } catch(e) {
-      alert("⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อศูนย์ข้อมูลเรดาร์");
+      setAiSummaryJson([{ title: "ระบบขัดข้อง", icon: "⚠️", color: "red", tag: "Error", desc: "ไม่สามารถประมวลผลภาพเรดาร์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง" }]);
     } finally {
-      setAlertsLoading(false);
+      setIsGeneratingAI(false);
     }
   };
-
+  
   useEffect(() => {
     if (currentPage === 'forecast' && alertsLocationName === '') {
       if (stations.length > 0) {

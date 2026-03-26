@@ -1,14 +1,29 @@
 import { Jimp, intToRGBA } from 'jimp';
 
+// ฟังก์ชันแปลงองศาลม เป็นทิศทางที่คนเข้าใจง่าย
+const getWindDirectionText = (degree) => {
+    if (degree === undefined || degree === null) return '';
+    if (degree >= 337.5 || degree < 22.5) return 'เหนือ';
+    if (degree >= 22.5 && degree < 67.5) return 'ตะวันออกเฉียงเหนือ';
+    if (degree >= 67.5 && degree < 112.5) return 'ตะวันออก';
+    if (degree >= 112.5 && degree < 157.5) return 'ตะวันออกเฉียงใต้';
+    if (degree >= 157.5 && degree < 202.5) return 'ใต้';
+    if (degree >= 202.5 && degree < 247.5) return 'ตะวันตกเฉียงใต้';
+    if (degree >= 247.5 && degree < 292.5) return 'ตะวันตก';
+    if (degree >= 292.5 && degree < 337.5) return 'ตะวันตกเฉียงเหนือ';
+    return '';
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  const { lat, lon } = req.body;
+  const { lat, lon, windDir, windSpeed } = req.body;
   if (!lat || !lon) return res.status(400).json({ error: 'Missing lat/lon' });
 
   try {
-    const rvRes = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-    const rvData = await rvRes.json();
+    const rvRes = await fetch('https://api.api-ninjas.com/v1/weather'); // เลี่ยงปัญหาด้วย public
+    const rvDataRes = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    const rvData = await rvDataRes.json();
     const latestTime = rvData.radar.past[rvData.radar.past.length - 1].time;
 
     const zoom = 10;
@@ -29,23 +44,29 @@ export default async function handler(req, res) {
     const hexColor = image.getPixelColor(pixelX, pixelY);
     const rgba = intToRGBA(hexColor); 
 
-    let intensity = "🌤️ ไม่พบกลุ่มฝนปกคลุมในพื้นที่ (สภาพอากาศปกติ)";
     let alertLevel = 0;
 
     if (rgba.a > 0) {
         if (rgba.r > 200 && rgba.g < 100) { 
-            intensity = "🚨 ตรวจพบกลุ่มฝนกำลังแรง (มีแนวโน้มฝนตกหนักถึงหนักมาก)"; alertLevel = 3;
+            alertLevel = 3; // หนักมาก
         } else if (rgba.r > 200 && rgba.g > 150) { 
-            intensity = "🌧️ ตรวจพบกลุ่มฝนกำลังปานกลาง"; alertLevel = 2;
+            alertLevel = 2; // ปานกลาง
         } else { 
-            intensity = "🌦️ ตรวจพบกลุ่มฝนกำลังอ่อน (ฝนตกเล็กน้อยถึงปรอยๆ)"; alertLevel = 1;
+            alertLevel = 1; // อ่อน
         }
     }
 
+    // คำนวณคำบรรยายทิศทางฝน
+    let windText = '';
+    if (alertLevel > 0 && windSpeed !== undefined) {
+        const dirText = getWindDirectionText(windDir);
+        windText = windSpeed > 5 ? `กลุ่มฝนมีแนวโน้มเคลื่อนตัวไปทางทิศ${dirText} (ตามทิศทางลม ${windSpeed} กม./ชม.)` : 'สภาพลมค่อนข้างสงบ กลุ่มฝนอาจแช่ตัวอยู่ในพื้นที่สักระยะ';
+    }
+
     return res.status(200).json({
-      radarTime: new Date(latestTime * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
-      intensity: intensity,
-      alertLevel: alertLevel
+      radarTime: new Date(latestTime * 1000).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }),
+      alertLevel: alertLevel,
+      windText: windText
     });
 
   } catch (error) {
