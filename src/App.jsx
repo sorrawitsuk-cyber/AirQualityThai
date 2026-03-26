@@ -68,8 +68,23 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) { var R = 6371; var d
 function deg2rad(deg) { return deg * (Math.PI/180) }
 
 const SkeletonLoading = ({ darkMode }) => {
-  const bg = darkMode ? '#0f172a' : '#f1f5f9'; const pulseColor = darkMode ? '#1e293b' : '#e2e8f0';
-  return ( <div style={{ height: '100vh', backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}> <style>{`@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } } .skeleton { animation: pulse 1.5s infinite ease-in-out; border-radius: 12px; }`}</style> <div className="skeleton" style={{ height: '65px', backgroundColor: pulseColor, borderRadius: '0' }}></div> <div style={{ display: 'flex', gap: '15px', padding: '15px', flex: 1, flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}> <div className="skeleton" style={{ flex: 7, backgroundColor: pulseColor, minHeight: window.innerWidth < 768 ? '50vh' : 'auto' }}></div> <div className="skeleton" style={{ flex: 3, backgroundColor: pulseColor, display: window.innerWidth < 768 ? 'none' : 'block' }}></div> </div> </div> );
+  const bg = darkMode ? '#0f172a' : '#f0f9ff'; 
+  const textColor = darkMode ? '#38bdf8' : '#0284c7';
+  return (
+    <div style={{ height: '100vh', backgroundColor: bg, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: "'Kanit', sans-serif" }}>
+      <style>{`
+        @keyframes spinFast { 100% { transform: rotate(360deg); } }
+        @keyframes pulseGlow { 0%, 100% { opacity: 0.6; transform: scale(0.98); } 50% { opacity: 1; transform: scale(1.02); } }
+        .satellite-spinner { width: 70px; height: 70px; border: 4px solid rgba(14, 165, 233, 0.1); border-left-color: #0ea5e9; border-right-color: #ec4899; border-radius: 50%; animation: spinFast 1.2s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite; margin-bottom: 25px; box-shadow: 0 0 20px rgba(14,165,233,0.2); }
+        .loading-text-pro { color: ${textColor}; font-size: 1.4rem; font-weight: bold; animation: pulseGlow 2s infinite; letter-spacing: 0.5px; }
+      `}</style>
+      <div className="satellite-spinner"></div>
+      <div className="loading-text-pro">กำลังเชื่อมต่อศูนย์ดาวเทียม...</div>
+      <div style={{fontSize: '0.9rem', color: darkMode ? '#64748b' : '#94a3b8', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px'}}>
+        <span>📡</span> ดึงข้อมูลสภาพอากาศ Real-time
+      </div>
+    </div>
+  );
 };
 
 // ==============================================================
@@ -839,8 +854,12 @@ export default function App() {
             )}
           </div>
 
-          {alertsLoading ? (
-             <div style={{ textAlign:'center', padding:'50px', color:subTextColor, fontSize:'1.2rem' }}>กำลังประมวลผลข้อมูลดาวเทียม...</div>
+         {alertsLoading ? (
+             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 15px' }}>
+                <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+                <div style={{ width: '50px', height: '50px', border: '4px solid rgba(16, 185, 129, 0.2)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '15px' }}></div>
+                <div style={{ color: '#10b981', fontSize: '1.2rem', fontWeight: 'bold', animation: 'pulseGlow 1.5s infinite' }}>กำลังสแกนพื้นที่...</div>
+             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               
@@ -895,7 +914,17 @@ export default function App() {
                 </div>
 
                 <div style={{ backgroundColor: darkMode ? '#1e293b' : '#f8fafc', padding: isGeneratingAI || aiSummaryJson ? '15px' : '0', borderRadius: '12px', border: aiSummaryJson ? `1px dashed #8b5cf6` : 'none', transition: 'all 0.3s' }}>
-                  {isGeneratingAI ? ( <div style={{ textAlign: 'center', color: '#8b5cf6', padding: '15px', fontWeight: 'bold' }}>⏳ AI กำลังคิดวิเคราะห์ข้อมูลอย่างละเอียด...</div> ) : aiSummaryJson ? (
+                 {isGeneratingAI ? ( 
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px 15px' }}>
+                        <style>{`
+                          @keyframes ai-pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(139, 92, 246, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); } }
+                          .ai-brain { width: 60px; height: 60px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: white; margin-bottom: 15px; animation: ai-pulse 1.5s infinite; }
+                        `}</style>
+                        <div className="ai-brain">✨</div>
+                        <div style={{ color: '#8b5cf6', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '8px', animation: 'pulseGlow 1.5s infinite' }}>AI กำลังประมวลผล...</div>
+                        <div style={{ color: subTextColor, fontSize: '0.9rem' }}>กรุณารอสักครู่ ระบบกำลังวิเคราะห์สภาพอากาศเชิงลึก 🛰️</div>
+                      </div>
+                  ) : aiSummaryJson ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {aiSummaryJson.map((item, i) => {
                           let statusColor, statusBg;
@@ -1023,7 +1052,11 @@ export default function App() {
                 </div>
 
                 {dashLoading ? (
-                  <div style={{ textAlign:'center', color:subTextColor, padding:'40px', fontSize: '1.1rem' }}>⏳ กำลังดึงข้อมูลสถิติดาวเทียม...</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '50px 15px' }}>
+                    <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+                    <div style={{ width: '45px', height: '45px', border: '4px solid rgba(14, 165, 233, 0.2)', borderTopColor: '#0ea5e9', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '15px' }}></div>
+                    <div style={{ color: '#0ea5e9', fontSize: '1.1rem', fontWeight: 'bold', animation: 'pulseGlow 1.5s infinite' }}>กำลังซิงค์ข้อมูลดาวเทียมย้อนหลัง...</div>
+                  </div>
                 ) : dashHistory.length > 0 ? (
                   <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 1fr', gap: '20px' }}>
                     
