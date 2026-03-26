@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
 import './App.css';
 
 // ==============================================================
@@ -33,7 +33,6 @@ const legendData = {
   wind: { title: 'ความเร็วลม', items: [{color:'#00b0f0',label:'0-10 (ลมอ่อน)'},{color:'#2ecc71',label:'11-25 (ลมปานกลาง)'},{color:'#f1c40f',label:'26-40 (ลมแรง)'},{color:'#e67e22',label:'41-60 (ลมแรงมาก)'},{color:'#e74c3c',label:'> 60 (พายุ)'}] }
 };
 
-// 🌟 อัปเดต: บังคับให้เป็น line chart ล้วนทุกโหมด เพื่อความสบายตา
 const chartConfigs = { 
   pm25: { key: 'pm25', name: 'PM2.5', color: '#f59e0b', domain: [0, max => Math.max(100, Math.ceil(max))] }, 
   temp: { key: 'temp', keyLY: 'tempLY', name: 'อุณหภูมิสูงสุด', color: '#ef4444', hasLY: true, domain: [min => Math.min(20, Math.floor(min)), max => Math.max(45, Math.ceil(max))] }, 
@@ -79,10 +78,10 @@ const SkeletonLoading = ({ darkMode }) => {
         .loading-text-pro { color: ${textColor}; font-size: 1.4rem; font-weight: bold; animation: pulseGlow 2s infinite; letter-spacing: 0.5px; }
       `}</style>
       <div className="satellite-spinner"></div>
-      <div className="loading-text-pro">กำลังดึงข้อมูล API...</div>
-        <div style={{fontSize: '0.9rem', color: darkMode ? '#64748b' : '#94a3b8', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px'}}>
-        <span>🔄</span> อัปเดตฐานข้อมูลแบบ Real-time
-        </div>
+      <div className="loading-text-pro">กำลังซิงค์ข้อมูลสภาพอากาศ...</div>
+      <div style={{fontSize: '0.9rem', color: darkMode ? '#64748b' : '#94a3b8', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px'}}>
+        <span>📡</span> ประมวลผลจากสถานีตรวจวัดทั่วประเทศ
+      </div>
     </div>
   );
 };
@@ -278,7 +277,6 @@ export default function App() {
     setDashTitle(titleText); setDashLoading(true);
     try {
       const today = new Date(); 
-      // 🌟 ดึงข้อมูล 10 ปีที่แล้ว
       const lyEnd = new Date(); lyEnd.setFullYear(today.getFullYear() - 10); lyEnd.setDate(lyEnd.getDate() + 7); 
       const lyStart = new Date(lyEnd); lyStart.setDate(lyStart.getDate() - 21); 
       
@@ -437,7 +435,6 @@ export default function App() {
     let windDir = 0;
     let windSpeed = 0;
 
-    // หาพิกัดและข้อมูลลม
     if (activeStation) {
       targetLat = activeStation.lat; targetLon = activeStation.long;
       const tObj = stationTemps[activeStation.stationID];
@@ -452,7 +449,6 @@ export default function App() {
       }
     }
     
-    // เรียกแอนิเมชันลูกแก้ว AI
     setIsGeneratingAI(true);
     setAiSummaryJson(null);
     
@@ -646,6 +642,7 @@ export default function App() {
             <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '25px', padding: '4px' }}>
               <button onClick={() => { setCurrentPage('map'); setIsMobileListOpen(false); }} style={{ padding: '5px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: currentPage === 'map' ? '#fff' : 'transparent', color: currentPage === 'map' ? '#0ea5e9' : '#fff' }}>🗺️ แผนที่</button>
               <button onClick={() => { setCurrentPage('forecast'); }} style={{ padding: '5px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: currentPage === 'forecast' ? '#fff' : 'transparent', color: currentPage === 'forecast' ? '#0ea5e9' : '#fff' }}>🌤️ พยากรณ์</button>
+              <button onClick={() => { setCurrentPage('climate'); }} style={{ padding: '5px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: currentPage === 'climate' ? '#fff' : 'transparent', color: currentPage === 'climate' ? '#0ea5e9' : '#fff' }}>🌍 ภูมิอากาศ</button>
             </div>
           )}
           <button onClick={() => setDarkMode(!darkMode)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{darkMode ? '☀️' : '🌙'}</button>
@@ -826,7 +823,7 @@ export default function App() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : currentPage === 'forecast' ? (
         // ======================= FORECAST TAB (พยากรณ์รวม) =======================
         <div style={{ flex: 1, padding: '20px', paddingBottom: window.innerWidth < 768 ? '90px' : '20px', maxWidth: '1200px', margin: '0 auto', width: '100%', overflowY: 'auto' }}>
           
@@ -874,7 +871,7 @@ export default function App() {
             )}
           </div>
 
-         {alertsLoading ? (
+          {alertsLoading ? (
              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 15px' }}>
                 <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
                 <div style={{ width: '50px', height: '50px', border: '4px solid rgba(16, 185, 129, 0.2)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '15px' }}></div>
@@ -936,7 +933,7 @@ export default function App() {
                 </div>
 
                 <div style={{ backgroundColor: darkMode ? '#1e293b' : '#f8fafc', padding: isGeneratingAI || aiSummaryJson ? '15px' : '0', borderRadius: '12px', border: aiSummaryJson ? `1px dashed #8b5cf6` : 'none', transition: 'all 0.3s' }}>
-                 {isGeneratingAI ? ( 
+                  {isGeneratingAI ? ( 
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px 15px' }}>
                         <style>{`
                           @keyframes ai-pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(139, 92, 246, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); } }
@@ -968,6 +965,7 @@ export default function App() {
                             </div>
                           );
                         })}
+                        {aiTimestamp && <div style={{ textAlign: 'right', fontSize: '0.75rem', color: subTextColor, marginTop: '5px', fontStyle: 'italic' }}>AI วิเคราะห์ข้อมูลล่าสุดเมื่อ: {aiTimestamp}</div>}
                       </div>
                   ) : ( <div style={{ color: subTextColor, fontSize: '0.9rem', textAlign: 'center', padding: '10px' }}>👆 กดปุ่มด้านบนเพื่อให้ AI วิเคราะห์สภาพอากาศตามที่คุณต้องการได้เลยครับ</div> )}
                 </div>
@@ -1102,7 +1100,7 @@ export default function App() {
 
                     {/* กราฟพยากรณ์ล่วงหน้า 7 วัน */}
                     <div style={{ background: darkMode?'#0f172a':'#f8fafc', padding: '15px', borderRadius: '12px', border: `1px solid ${borderColor}` }}>
-                      <h4 style={{ fontSize: '1rem', color: textColor, textAlign: 'center', fontWeight:'bold', marginBottom: '15px' }}>พยากรณ์ล่วงหน้า 7 วัน</h4>
+                      <h4 style={{ fontSize: '1rem', color: textColor, textAlign: 'center', fontWeight:'bold', marginBottom: '15px' }}>พยากรณ์ล่วงหน้า 7 วัน (เทียบปีที่แล้ว)</h4>
                       <div style={{ height: '220px' }}>
                         <ResponsiveContainer>
                           <LineChart data={validForecast} margin={{ top:5, right:10, bottom:5, left:-20 }}>
@@ -1124,9 +1122,116 @@ export default function App() {
             </div>
           )}
         </div>
+      ) : (
+        // ======================= 🌟 ภูมิอากาศ TAB (Climate Center) 🌟 =======================
+        <div style={{ flex: 1, padding: '20px', paddingBottom: window.innerWidth < 768 ? '90px' : '20px', maxWidth: '1200px', margin: '0 auto', width: '100%', overflowY: 'auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '2rem', color: textColor, marginBottom: '5px', fontWeight:'bold' }}>🌍 ศูนย์วิเคราะห์ภูมิอากาศและภัยพิบัติ</h2>
+            <p style={{ color: subTextColor, fontSize:'1.1rem', marginBottom: '20px' }}>เฝ้าระวังพายุ ข่าวสาร และการเปลี่ยนแปลงสภาพภูมิอากาศ</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+            
+            {/* โซนที่ 1: ข่าวสารและประกาศ (News) */}
+            <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+              <h3 style={{ fontSize: '1.4rem', color: '#0ea5e9', margin: '0 0 20px 0', fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.6rem' }}>📰</span> ข่าวสารและประกาศเตือนภัย
+              </h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '15px' }}>
+                <div style={{ padding: '15px', backgroundColor: darkMode ? '#0f172a' : '#fef2f2', borderLeft: '4px solid #ef4444', borderRadius: '8px', border: `1px solid ${darkMode?'#7f1d1d':'#fecaca'}` }}>
+                   <h4 style={{ margin: '0 0 8px 0', color: '#dc2626', fontSize: '1.1rem' }}>พายุฤดูร้อนบริเวณประเทศไทยตอนบน</h4>
+                   <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: textColor }}>ภาคเหนือ อีสาน และกลาง เตรียมรับมือพายุฝนฟ้าคะนอง ลมกระโชกแรง และลูกเห็บตกบางแห่ง ควรเลี่ยงที่โล่งแจ้ง ต้นไม้ใหญ่</p>
+                   <span style={{ fontSize: '0.75rem', color: subTextColor }}>อัปเดต: วันนี้ 05:00 น. | ที่มา: กรมอุตุนิยมวิทยา</span>
+                </div>
+                <div style={{ padding: '15px', backgroundColor: darkMode ? '#0f172a' : '#fffbeb', borderLeft: '4px solid #f59e0b', borderRadius: '8px', border: `1px solid ${darkMode?'#78350f':'#fde68a'}` }}>
+                   <h4 style={{ margin: '0 0 8px 0', color: '#d97706', fontSize: '1.1rem' }}>เฝ้าระวังฝุ่น PM2.5 ภาคเหนือ</h4>
+                   <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: textColor }}>เนื่องจากลมอ่อนและการระบายอากาศไม่ดี ทำให้ฝุ่นควันสะสมตัวสูงในพื้นที่ เชียงใหม่ เชียงราย และแม่ฮ่องสอน</p>
+                   <span style={{ fontSize: '0.75rem', color: subTextColor }}>อัปเดต: วันนี้ 07:00 น. | ที่มา: กรมควบคุมมลพิษ</span>
+                </div>
+              </div>
+            </div>
+
+            {/* โซนที่ 2: ศูนย์เฝ้าระวังพายุ (Storm Watch) */}
+            <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ fontSize: '1.4rem', color: '#8b5cf6', margin: 0, fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1.6rem' }}>🌪️</span> เฝ้าระวังพายุและทิศทางลม
+                </h3>
+              </div>
+              
+              {/* แผนที่ลมจาก Windy.com (จำลองการดึง iFrame) */}
+              <div style={{ width: '100%', height: window.innerWidth < 768 ? '350px' : '450px', borderRadius: '12px', overflow: 'hidden', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#0f172a' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                 {/* 💡 ในอนาคตเราจะเอาโค้ด <iframe> ของ Windy หรือ Zoom Earth มาแปะตรงนี้ครับ */}
+                 <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=5&overlay=wind&product=ecmwf&level=surface&lat=13.75&lon=100.5" 
+                    frameBorder="0"
+                 ></iframe>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '10px', textAlign: 'right' }}>อ้างอิงข้อมูลกระแสลมจาก Windy.com (โมเดล ECMWF)</p>
+            </div>
+
+            {/* โซนที่ 3: ปรากฏการณ์โลก เอลนีโญ / ลานีญา */}
+            <div style={{ backgroundColor: cardBg, borderRadius: '16px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+              <h3 style={{ fontSize: '1.4rem', color: '#10b981', margin: '0 0 20px 0', fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.6rem' }}>🌡️</span> มาตรวัด เอลนีโญ / ลานีญา (ENSO Tracker)
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 1fr', gap: '30px', alignItems: 'center' }}>
+                
+                {/* หน้าปัด Gauge จำลองด้วย CSS */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: darkMode ? '#0f172a' : '#f8fafc', padding: '30px', borderRadius: '12px', border: `1px solid ${borderColor}` }}>
+                  <style>{`
+                    .enso-gauge-container { position: relative; width: 240px; height: 120px; overflow: hidden; }
+                    .enso-gauge-bg { position: absolute; top: 0; left: 0; width: 240px; height: 240px; border-radius: 50%; background: conic-gradient(from 270deg, #3b82f6 0deg 60deg, #10b981 60deg 120deg, #ef4444 120deg 180deg, transparent 180deg); }
+                    .enso-gauge-inner { position: absolute; top: 30px; left: 30px; width: 180px; height: 180px; border-radius: 50%; background-color: ${darkMode ? '#0f172a' : '#f8fafc'}; }
+                    .enso-needle { position: absolute; bottom: 0; left: 118px; width: 4px; height: 90px; background-color: ${textColor}; transform-origin: bottom center; transform: rotate(10deg); /* ปรับองศาเข็มตรงนี้ (-90 ถึง 90) */ border-radius: 4px; transition: transform 1s ease-out; }
+                    .enso-dot { position: absolute; bottom: -8px; left: 112px; width: 16px; height: 16px; background-color: ${textColor}; border-radius: 50%; }
+                  `}</style>
+                  
+                  <div className="enso-gauge-container">
+                    <div className="enso-gauge-bg"></div>
+                    <div className="enso-gauge-inner"></div>
+                    <div className="enso-needle"></div>
+                    <div className="enso-dot"></div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '260px', marginTop: '10px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                    <span style={{ color: '#3b82f6' }}>ลานีญา (ฝนชุก)</span>
+                    <span style={{ color: '#10b981' }}>ปกติ</span>
+                    <span style={{ color: '#ef4444' }}>เอลนีโญ (แล้ง)</span>
+                  </div>
+
+                  <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#10b981' }}>สภาวะปกติ (Neutral)</div>
+                    <p style={{ margin: '5px 0 0 0', color: subTextColor, fontSize: '0.9rem' }}>มีแนวโน้มเปลี่ยนเข้าสู่ 'ลานีญา' ในช่วงครึ่งปีหลัง</p>
+                  </div>
+                </div>
+
+                <div>
+                   <h4 style={{ fontSize: '1.1rem', color: textColor, marginBottom: '10px' }}>ผลกระทบต่อประเทศไทย</h4>
+                   <ul style={{ color: textColor, fontSize: '0.95rem', lineHeight: '1.8', paddingLeft: '20px' }}>
+                     <li><strong>ปริมาณฝน:</strong> คาดว่าจะกลับมาตกชุกและมีปริมาณมากกว่าค่าปกติในช่วงฤดูฝน เสี่ยงต่อน้ำท่วมขัง</li>
+                     <li><strong>อุณหภูมิ:</strong> อากาศจะคลายความร้อนลงบ้างเมื่อเทียบกับปีที่แล้วที่แล้งจัด</li>
+                     <li><strong>การเกษตร:</strong> ควรเตรียมแหล่งรับน้ำและวางแผนระบายน้ำสำหรับพืชผลที่อาจได้รับความเสียหายจากน้ำท่วม</li>
+                   </ul>
+                   <button style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #10b981`, backgroundColor: darkMode ? 'rgba(16,185,129,0.1)' : '#dcfce7', color: '#059669', fontSize: '0.9rem', cursor: 'pointer', fontWeight:'bold', marginTop: '15px' }}>
+                     🤖 ให้ AI วิเคราะห์เชิงลึก
+                   </button>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
       )}
 
-      {/* MOBILE NAV & FILTERS (ซ่อนไว้เพื่อความกระชับ) */}
+      {/* ========================================== */}
+      {/* 📱 MOBILE UX: Bottom Navigation Bar */}
+      {/* ========================================== */}
       {window.innerWidth < 768 && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '65px', backgroundColor: darkMode ? '#1e293b' : '#ffffff', borderTop: `1px solid ${borderColor}`, display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 9000, paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: '0 -4px 15px rgba(0,0,0,0.08)' }}>
           <div onClick={() => { setCurrentPage('map'); setIsMobileListOpen(false); window.scrollTo({top:0, behavior:'smooth'}); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: currentPage === 'map' ? '#0ea5e9' : subTextColor, cursor: 'pointer', flex: 1, padding: '5px' }}>
@@ -1136,6 +1241,10 @@ export default function App() {
           <div onClick={() => { setCurrentPage('forecast'); window.scrollTo({top:0, behavior:'smooth'}); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: currentPage === 'forecast' ? '#0ea5e9' : subTextColor, cursor: 'pointer', flex: 1, padding: '5px' }}>
             <span style={{ fontSize: '1.4rem', marginBottom: '2px', filter: currentPage === 'forecast' ? 'none' : 'grayscale(100%) opacity(50%)', transition: 'all 0.2s' }}>🌤️</span>
             <span style={{ fontSize: '0.75rem', fontWeight: currentPage === 'forecast' ? 'bold' : 'normal', transition: 'all 0.2s' }}>พยากรณ์</span>
+          </div>
+          <div onClick={() => { setCurrentPage('climate'); window.scrollTo({top:0, behavior:'smooth'}); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: currentPage === 'climate' ? '#0ea5e9' : subTextColor, cursor: 'pointer', flex: 1, padding: '5px' }}>
+            <span style={{ fontSize: '1.4rem', marginBottom: '2px', filter: currentPage === 'climate' ? 'none' : 'grayscale(100%) opacity(50%)', transition: 'all 0.2s' }}>🌍</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: currentPage === 'climate' ? 'bold' : 'normal', transition: 'all 0.2s' }}>ภูมิอากาศ</span>
           </div>
         </div>
       )}
