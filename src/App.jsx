@@ -79,10 +79,10 @@ const SkeletonLoading = ({ darkMode }) => {
         .loading-text-pro { color: ${textColor}; font-size: 1.4rem; font-weight: bold; animation: pulseGlow 2s infinite; letter-spacing: 0.5px; }
       `}</style>
       <div className="satellite-spinner"></div>
-      <div className="loading-text-pro">กำลังเชื่อมต่อศูนย์ดาวเทียม...</div>
-      <div style={{fontSize: '0.9rem', color: darkMode ? '#64748b' : '#94a3b8', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px'}}>
-        <span>📡</span> ดึงข้อมูลสภาพอากาศ Real-time
-      </div>
+      <div className="loading-text-pro">กำลังดึงข้อมูล API...</div>
+        <div style={{fontSize: '0.9rem', color: darkMode ? '#64748b' : '#94a3b8', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px'}}>
+        <span>🔄</span> อัปเดตฐานข้อมูลแบบ Real-time
+        </div>
     </div>
   );
 };
@@ -910,6 +910,8 @@ export default function App() {
                   <button onClick={() => generateAISummary('lifestyle')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #10b981`, backgroundColor: darkMode ? 'rgba(16,185,129,0.1)' : '#f0fdf4', color: '#10b981', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>👕 ซักผ้า/ล้างรถ</button>
                   <button onClick={() => generateAISummary('exercise')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #f59e0b`, backgroundColor: darkMode ? 'rgba(245,158,11,0.1)' : '#fffbeb', color: '#f59e0b', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🏃‍♂️ ออกกำลังกาย</button>
                   <button onClick={() => generateAISummary('health')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #ef4444`, backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', color: '#ef4444', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>😷 สุขภาพ/ภูมิแพ้</button>
+                  <button onClick={() => generateAISummary('travel')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #db2777`, backgroundColor: darkMode ? 'rgba(219,39,119,0.1)' : '#fce7f3', color: '#db2777', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🎒 ท่องเที่ยว</button>
+                  <button onClick={() => generateAISummary('agriculture')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #84cc16`, backgroundColor: darkMode ? 'rgba(132,204,22,0.1)' : '#ecfccb', color: '#65a30d', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌾 เกษตรกร</button>
                   <button onClick={handleRadarPixelScan} disabled={alertsLoading} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #14b8a6`, backgroundColor: darkMode ? 'rgba(20,184,166,0.1)' : '#ccfbf1', color: '#0d9488', fontSize: '0.85rem', cursor: alertsLoading?'wait':'pointer', fontWeight:'bold' }}>📡 ตรวจสอบเรดาร์</button>
                 </div>
 
