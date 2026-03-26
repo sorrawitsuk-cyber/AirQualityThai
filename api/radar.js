@@ -14,20 +14,28 @@ const getWindDirectionText = (degree) => {
     return '';
 };
 
-// 🌟 ใหม่: ฟังก์ชันแปลงพิกัด GPS เป็นชื่อ เขต/อำเภอ ภาษาไทย
+// 🌟 อัปเดต 1: กรองคำว่า "แขวง" ทิ้ง เอาให้เหลือแค่ "เขต" หรือ "อำเภอ" สวยๆ
 const getLocationName = async (lat, lon) => {
     try {
         const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`;
         const res = await fetch(url);
         const data = await res.json();
-        if (data && (data.locality || data.city)) {
-            let locality = data.locality || '';
-            let city = data.city || '';
-            // กรองคำซ้ำให้ดูสวยงาม
-            if (locality && !locality.includes('เขต') && !locality.includes('อำเภอ')) {
-                locality = city.includes('กรุงเทพ') ? `เขต${locality}` : `อ.${locality}`;
+        if (data) {
+            let area = data.city || data.locality || '';
+            let province = data.principalSubdivision || '';
+            
+            // กรองเอา "แขวง" ออก ป้องกันการซ้อนคำว่า เขตแขวง
+            if (area.includes('แขวง')) {
+                area = data.city ? data.city : area.replace(/แขวง/g, '');
             }
-            return `${locality} ${city}`.trim();
+            area = area.replace(/แขวง/g, '').trim();
+
+            if (area && !area.includes('เขต') && !area.includes('อำเภอ')) {
+                area = (province.includes('กรุงเทพ') || province === 'Bangkok') ? `เขต${area}` : `อ.${area}`;
+            }
+            
+            area = area.replace('เขตเขต', 'เขต').replace('อ.อ.', 'อ.'); // กันคำเบิ้ล
+            return `${area} ${province}`.trim();
         }
         return null;
     } catch (e) {
@@ -35,11 +43,10 @@ const getLocationName = async (lat, lon) => {
     }
 };
 
-// 🌟 ใหม่: สมการคณิตศาสตร์ (Haversine) คำนวณหาพิกัดในอีก 30 นาทีข้างหน้า
 const calculateFutureLocation = (lat, lon, windDir, windSpeedKmH) => {
-    const R = 6371; // รัศมีโลก (กิโลเมตร)
-    const distance = windSpeedKmH * 0.5; // ระยะทางที่เคลื่อนที่ใน 30 นาที (0.5 ชั่วโมง)
-    const bearing = (windDir + 180) % 360; // ทิศที่พายุจะไป (ตรงข้ามกับทิศที่ลมพัดมา)
+    const R = 6371; 
+    const distance = windSpeedKmH * 0.5; 
+    const bearing = (windDir + 180) % 360; 
     
     const brng = bearing * Math.PI / 180;
     const lat1 = lat * Math.PI / 180;
@@ -82,19 +89,20 @@ export default async function handler(req, res) {
 
     let alertLevel = 0;
 
-    // 🌟 แก้บั๊ก "ฝนทิพย์": บังคับความเข้มสี (Alpha > 50) กรองเมฆจางๆ ทิ้ง
-    if (rgba.a > 50) {
+    // 🌟 อัปเดต 2: ตั้งค่าความไวเรดาร์ให้ "แข็งขึ้น" (เพิ่มค่า Alpha จาก 50 เป็น 150)
+    // กรองพวกเมฆจางๆ เมฆทิพย์ออกไป เอาเฉพาะกลุ่มก้อนฝนที่มีความหนาแน่นสูงจริงๆ
+    if (rgba.a > 150) {
         if (rgba.r > 200 && rgba.g < 100) { 
-            alertLevel = 3; // แดง/ม่วง = หนักมาก
+            alertLevel = 3; 
         } else if (rgba.r > 150 && rgba.g > 150) { 
-            alertLevel = 2; // เหลือง/ส้ม = ปานกลาง
-        } else if (rgba.a > 80) { 
-            alertLevel = 1; // ฟ้า/เขียวเข้ม = ปรอยๆ
+            alertLevel = 2; 
+        } else { 
+            alertLevel = 1; 
         }
     }
 
     let windText = '';
-    let targetDistrict = await getLocationName(lat, lon); // ดึงชื่อเขตปัจจุบัน
+    let targetDistrict = await getLocationName(lat, lon);
 
     if (alertLevel > 0) {
         if (windSpeed > 3 && windDir !== undefined) {
@@ -103,7 +111,7 @@ export default async function handler(req, res) {
             const moveDirText = getWindDirectionText(futureLoc.moveDir);
             
             const destText = futureDistrict ? `มุ่งหน้าเข้าสู่พื้นที่ [${futureDistrict}]` : 'เคลื่อนตัวออกนอกพื้นที่';
-            windText = `กลุ่มฝนมีแนวโน้มเคลื่อนตัวไปทางทิศ${moveDirText} (ความเร็ว ${windSpeed} กม./ชม.) คาดว่าจะ${destText} ในอีก 30 นาทีข้างหน้า`;
+            windText = `กลุ่มฝนมีแนวโน้มเคลื่อนตัวไปทางทิศ${moveDirText} (ความเร็วลม ${windSpeed} กม./ชม.) คาดว่าจะ${destText} ในอีก 30 นาทีข้างหน้า`;
         } else {
             windText = 'สภาพลมค่อนข้างสงบ กลุ่มฝนมีแนวโน้มแช่ตัวและตกสะสมอยู่ในพื้นที่เดิมครับ';
         }
