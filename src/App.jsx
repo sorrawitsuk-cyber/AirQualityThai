@@ -142,10 +142,7 @@ export default function App() {
   
   const [radarTarget, setRadarTarget] = useState({ lat: 13.75, lon: 100.5, name: 'พิกัดที่กำหนด' });
 
-  // 🌟 ฟีเจอร์ใหม่: สถานที่โปรด (Favorite Locations)
   const [favLocations, setFavLocations] = useState(() => JSON.parse(localStorage.getItem('weatherFavs')) || ['กรุงเทพมหานคร']);
-
-  // 🌟 ฟีเจอร์ใหม่: PWA Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const cardRefs = useRef({});
@@ -157,7 +154,6 @@ export default function App() {
   
   useEffect(() => { setAiSummaryJson(null); setAiTimestamp(''); setNowcastAlert(null); }, [alertsLocationName, activeStation, aiTargetDay]);
 
-  // ดักจับ Event สำหรับการติดตั้ง PWA
   useEffect(() => {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -747,8 +743,8 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)' }}>{darkMode ? '🌙' : '🌤️'}</div>
           <div style={{ display: window.innerWidth < 1024 ? 'none' : 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', whiteSpace: 'nowrap', lineHeight: '1.1', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Thai Weather</h1>
-            <span style={{ fontSize: '0.8rem', color: darkMode ? '#cbd5e1' : '#e0f2fe', whiteSpace: 'nowrap', fontWeight: 'normal' }}>Dashboard v2.0</span>
+            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', whiteSpace: 'nowrap', lineHeight: '1.1', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Thai Weather Dashboard</h1>
+            <span style={{ fontSize: '0.8rem', color: darkMode ? '#cbd5e1' : '#e0f2fe', whiteSpace: 'nowrap', fontWeight: 'normal' }}>ระบบพยากรณ์และเตือนภัย</span>
           </div>
         </div>
 
@@ -792,7 +788,7 @@ export default function App() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: 'auto' }}>
           
-          {/* 🌟 ปุ่ม Install PWA (แสดงเฉพาะถ้าติดตั้งได้) */}
+          {/* 🌟 ปุ่ม Install PWA */}
           {deferredPrompt && (
              <button onClick={handleInstallClick} style={{ padding: '6px 12px', borderRadius: '20px', backgroundColor: '#fbbf24', color: '#78350f', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
                 📲 ติดตั้งแอป
@@ -816,17 +812,18 @@ export default function App() {
           
           {/* 🌟 แถบ Favorite Locations (Bento Style) */}
           {favLocations.length > 0 && !showRadar && (
-            <div style={{ padding: '10px 15px 0 15px', display: 'flex', gap: '10px', overflowX: 'auto' }} className="hide-scrollbar">
-              <span style={{ fontSize: '0.85rem', color: darkMode ? '#cbd5e1' : '#475569', display: 'flex', alignItems: 'center' }}>⭐️ พื้นที่โปรด:</span>
+            <div style={{ padding: '12px 15px 0 15px', display: 'flex', gap: '10px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }} className="hide-scrollbar">
+              <span style={{ fontSize: '0.85rem', color: darkMode ? '#cbd5e1' : '#475569', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}>⭐️ พื้นที่โปรด:</span>
               {favLocations.map(prov => (
-                <button key={prov} onClick={() => { setSelectedRegion(''); setSelectedProvince(prov); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '4px 12px', borderRadius: '20px', backgroundColor: cardBg, backdropFilter: backdropBlur, border: `1px solid ${borderColor}`, color: textColor, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <button key={prov} onClick={() => { setSelectedRegion(''); setSelectedProvince(prov); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '6px 14px', borderRadius: '20px', backgroundColor: cardBg, backdropFilter: backdropBlur, border: `1px solid ${borderColor}`, color: textColor, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
                   {prov}
                 </button>
               ))}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', height: '100%' }}>
+          {/* 🌟 แก้ไข Flex ยุบตัวตกขอบ (minHeight: 0) */}
+          <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', flex: 1, minHeight: 0 }}>
             
             {/* MAP AREA (Bento Style) */}
             <div style={{ flex: 7, width: '100%', borderRadius: '20px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '100%' : '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
