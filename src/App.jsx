@@ -137,7 +137,6 @@ export default function App() {
   const [windyLayer, setWindyLayer] = useState('wind');
   const [showIsobars, setShowIsobars] = useState(false);
 
-  // 🌟 ใหม่: State สำหรับหน้าต่างลอยผลวิเคราะห์เรดาร์บนแผนที่
   const [isMapRadarScanning, setIsMapRadarScanning] = useState(false);
   const [mapRadarResult, setMapRadarResult] = useState(null);
 
@@ -243,7 +242,7 @@ export default function App() {
     if (activeStation && currentPage === 'map') {
       if (cardRefs.current[activeStation.stationID] && (window.innerWidth >= 768 || isMobileListOpen)) { cardRefs.current[activeStation.stationID].scrollIntoView({ behavior: 'smooth', block: 'center' }); }
       const marker = markerRefs.current[activeStation.stationID]; if (marker && !showRadar) marker.openPopup(); 
-      setActiveWeather(null); setActiveForecast(null); setMapRadarResult(null); // Clear map radar on station change
+      setActiveWeather(null); setActiveForecast(null); setMapRadarResult(null);
       
       const fetchCardDetails = async () => {
         try {
@@ -429,12 +428,7 @@ export default function App() {
     } catch(e) { console.error("Error setting alerts:", e); } finally { setAlertsLoading(false); }
   };
 
-  const handleScanLocation = () => { 
-    if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); 
-    navigator.geolocation.getCurrentPosition((pos) => fetchAlertsData(pos.coords.latitude, pos.coords.longitude, '📍 พิกัดปัจจุบันของคุณ'), () => alert('ไม่อนุญาต GPS')); 
-  };
-
-  // 🌟 อัปเดต: ให้ไปโชว์ที่หน้าต่างลอยบนแผนที่แทน
+  // 🌟 อัปเดต 2: ฟังก์ชันคำนวณเป้าสแกน AI ให้แม่นยำ (แก้บั๊กโคราช)
   const handleMapRadarScan = async () => {
     let targetLat = 13.75;
     let targetLon = 100.5;
@@ -442,14 +436,19 @@ export default function App() {
     let windSpeed = 0;
     let locName = 'พิกัดที่เลือก';
 
-    if (activeStation) {
-      targetLat = activeStation.lat; targetLon = activeStation.long; locName = activeStation.nameTH;
+    if (activeStation && !isNaN(parseFloat(activeStation.lat))) {
+      targetLat = parseFloat(activeStation.lat); 
+      targetLon = parseFloat(activeStation.long); 
+      locName = activeStation.nameTH;
       const tObj = stationTemps[activeStation.stationID];
       if (tObj) { windDir = tObj.windDir; windSpeed = tObj.windSpeed; }
     } else if (selectedProvince) {
-      const provStations = stations.filter(s => extractProvince(s.areaTH) === selectedProvince);
+      const provStations = stations.filter(s => extractProvince(s.areaTH) === selectedProvince && !isNaN(parseFloat(s.lat)));
       if (provStations.length > 0) {
-        targetLat = provStations[0].lat; targetLon = provStations[0].long; locName = `จ.${selectedProvince}`;
+        // หาค่าเฉลี่ยกึ่งกลางจังหวัดจริงๆ
+        targetLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length;
+        targetLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length;
+        locName = `จ.${selectedProvince}`;
         const tObj = stationTemps[provStations[0].stationID];
         if (tObj) { windDir = tObj.windDir; windSpeed = tObj.windSpeed; }
       }
@@ -597,6 +596,24 @@ export default function App() {
   const todayDateText = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
   const currentHr = new Date().getHours(); const next3Hr = (currentHr + 3) % 24; const timeStr3h = `${String(currentHr).padStart(2, '0')}:00 - ${String(next3Hr).padStart(2, '0')}:00 น.`;
 
+  // 🌟 อัปเดต 1: เตรียมพิกัดสำหรับแสดงแผนที่ Windy เรดาร์
+  let radarLat = 13.75;
+  let radarLon = 100.5;
+  let radarZoom = 6;
+
+  if (activeStation && !isNaN(parseFloat(activeStation.lat))) {
+    radarLat = parseFloat(activeStation.lat);
+    radarLon = parseFloat(activeStation.long);
+    radarZoom = 10;
+  } else if (selectedProvince) {
+    const provStations = stations.filter(s => extractProvince(s.areaTH) === selectedProvince && !isNaN(parseFloat(s.lat)));
+    if (provStations.length > 0) {
+      radarLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length;
+      radarLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length;
+      radarZoom = 8;
+    }
+  }
+
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', backgroundColor:themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'hidden', overflowX:'hidden' }}>
       
@@ -717,27 +734,26 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 ส่วนควบคุมและแสดงผลเรดาร์ AI บนแผนที่ */}
+              {/* ส่วนแสดงแผนที่เรดาร์ Windy (แสดงเต็มจอในพื้นที่แผนที่หลัก) */}
               {showRadar && (
                 <>
                   <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 450, backgroundColor: darkMode ? '#0f172a' : '#fff' }}>
                     <iframe 
                       width="100%" 
                       height="100%" 
-                      src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=7&overlay=radar&product=radar&level=surface&lat=${activeStation ? activeStation.lat : (selectedProvince === 'กรุงเทพมหานคร' ? 13.75 : 14.5)}&lon=${activeStation ? activeStation.long : (selectedProvince === 'กรุงเทพมหานคร' ? 100.5 : 101.5)}`} 
+                      src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=${radarZoom}&overlay=radar&product=radar&level=surface&lat=${radarLat}&lon=${radarLon}`} 
                       frameBorder="0"
                       style={{ pointerEvents: isMapRadarScanning ? 'none' : 'auto' }}
                     ></iframe>
                   </div>
 
-                  {/* ปุ่มกดวิเคราะห์เรดาร์ (ลอยอยู่มุมขวาล่าง) */}
+                  {/* 🌟 อัปเดต 3: เปลี่ยนคำในปุ่มเป็น "AI วิเคราะห์ฝน" */}
                   {!isMapRadarScanning && !mapRadarResult && (
                     <button onClick={handleMapRadarScan} style={{ position: 'absolute', bottom: '30px', right: '30px', zIndex: 600, padding: '12px 24px', borderRadius: '30px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)', display: 'flex', alignItems: 'center', gap: '8px', animation: 'pulseGlow 2s infinite' }}>
-                      <span style={{ fontSize: '1.2rem' }}>🔍</span> วิเคราะห์ด้วย AI
+                      <span style={{ fontSize: '1.2rem' }}>🔍</span> AI วิเคราะห์ฝน
                     </button>
                   )}
 
-                  {/* แอนิเมชันสแกนเรดาร์ (เป้าเล็งตรงกลางจอ) */}
                   {isMapRadarScanning && (
                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 600, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <style>{`
@@ -753,7 +769,6 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* การ์ดผลลัพธ์ลอยตัว (HUD) */}
                   {mapRadarResult && (
                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 600, width: '90%', maxWidth: '350px', backgroundColor: darkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)', padding: '20px', borderRadius: '16px', border: `1px solid ${mapRadarResult.color === 'red' ? '#ef4444' : mapRadarResult.color === 'yellow' ? '#f59e0b' : mapRadarResult.color === 'green' ? '#10b981' : '#0ea5e9'}`, boxShadow: '0 10px 30px rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)', animation: 'slideUp 0.3s ease-out' }}>
                       <button onClick={() => setMapRadarResult(null)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', fontSize: '1.2rem', color: subTextColor, cursor: 'pointer' }}>✕</button>
@@ -982,7 +997,6 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* 🌟 ถอดปุ่ม ตรวจสอบเรดาร์ ออกจากหน้านี้แล้ว */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' }}>
                   <button onClick={() => generateAISummary('general')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #3b82f6`, backgroundColor: darkMode ? 'rgba(59,130,246,0.1)' : '#eff6ff', color: '#3b82f6', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>🌤️ สรุปภาพรวม</button>
                   <button onClick={() => generateAISummary('rain')} disabled={isGeneratingAI} style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid #0ea5e9`, backgroundColor: darkMode ? 'rgba(14,165,233,0.1)' : '#e0f2fe', color: '#0ea5e9', fontSize: '0.85rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold' }}>☔ เช็คเวลาฝนตก</button>
