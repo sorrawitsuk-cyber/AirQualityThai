@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 // 🌟 เปลี่ยนวิธี Import ให้ตรงกับโครงสร้างใหม่ของแพ็กเกจ
+=======
+>>>>>>> 3ccbef092ae59b5dae5e57d34753c334e5cad979
 import { Jimp, intToRGBA } from 'jimp';
 
 export default async function handler(req, res) {
@@ -8,12 +11,18 @@ export default async function handler(req, res) {
   if (!lat || !lon) return res.status(400).json({ error: 'Missing lat/lon' });
 
   try {
+<<<<<<< HEAD
     // 1. ดึงเวลาล่าสุดของเรดาร์
+=======
+>>>>>>> 3ccbef092ae59b5dae5e57d34753c334e5cad979
     const rvRes = await fetch('https://api.rainviewer.com/public/weather-maps.json');
     const rvData = await rvRes.json();
     const latestTime = rvData.radar.past[rvData.radar.past.length - 1].time;
 
+<<<<<<< HEAD
     // 2. 🧮 คณิตศาสตร์ขั้นสูง: แปลง GPS ให้เป็น X, Y บนกระดาษแผนที่ (Zoom ระดับ 10)
+=======
+>>>>>>> 3ccbef092ae59b5dae5e57d34753c334e5cad979
     const zoom = 10;
     const n = Math.pow(2, zoom);
     const x = (lon + 180) / 360 * n;
@@ -23,6 +32,7 @@ export default async function handler(req, res) {
     const tileX = Math.floor(x);
     const tileY = Math.floor(y);
     
+<<<<<<< HEAD
     // หาจุด Pixel X,Y แบบเจาะจงในรูปขนาด 256x256 px
     const pixelX = Math.floor((x - tileX) * 256);
     const pixelY = Math.floor((y - tileY) * 256);
@@ -58,6 +68,35 @@ export default async function handler(req, res) {
       intensity: intensity,
       alertLevel: alertLevel,
       imageUrl: tileUrl
+=======
+    const pixelX = Math.floor((x - tileX) * 256);
+    const pixelY = Math.floor((y - tileY) * 256);
+
+    const tileUrl = `https://tilecache.rainviewer.com/v2/radar/${latestTime}/256/${zoom}/${tileX}/${tileY}/2/1_1.png`;
+
+    const image = await Jimp.read(tileUrl);
+    const hexColor = image.getPixelColor(pixelX, pixelY);
+    const rgba = intToRGBA(hexColor); 
+
+    let intensity = "🌤️ ไม่พบกลุ่มฝนปกคลุมในพื้นที่ (สภาพอากาศปกติ)";
+    let alertLevel = 0;
+
+    if (rgba.a > 0) {
+        if (rgba.r > 200 && rgba.g < 100) { 
+            intensity = "🚨 ตรวจพบกลุ่มฝนกำลังแรง (มีแนวโน้มฝนตกหนักถึงหนักมาก)"; alertLevel = 3;
+        } else if (rgba.r > 200 && rgba.g > 150) { 
+            intensity = "🌧️ ตรวจพบกลุ่มฝนกำลังปานกลาง"; alertLevel = 2;
+        } else { 
+            intensity = "🌦️ ตรวจพบกลุ่มฝนกำลังอ่อน (ฝนตกเล็กน้อยถึงปรอยๆ)"; alertLevel = 1;
+        }
+    }
+
+    return res.status(200).json({
+      // ✨ อัปเดต: บังคับแปลงเวลาให้เป็นโซน Asia/Bangkok เสมอ
+      radarTime: new Date(latestTime * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
+      intensity: intensity,
+      alertLevel: alertLevel
+>>>>>>> 3ccbef092ae59b5dae5e57d34753c334e5cad979
     });
 
   } catch (error) {
