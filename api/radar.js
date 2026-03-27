@@ -46,8 +46,7 @@ export default async function handler(req, res) {
     const timeStr = new Date(latestTime * 1000).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
     let targetDistrict = await getLocationName(lat, lon);
 
-    // 🌟 ปรับ Zoom กลับมาที่ระดับ 7 (1 พิกเซล = พื้นที่กว้าง 1.2 กิโลเมตร) 
-    // เสถียรกว่า และภาพดาวเทียมไม่ค่อยแหว่ง
+    // Zoom 7: 1 พิกเซล = พื้นที่กว้างประมาณ 1.2 กิโลเมตร
     const zoom = 7;
     const n = Math.pow(2, zoom);
     const x = (lon + 180) / 360 * n;
@@ -63,7 +62,6 @@ export default async function handler(req, res) {
     
     let image;
     try {
-        // 🌟 ใส่กันชน! ถ้าดาวเทียมบอกว่า 410 Gone (ไม่มีภาพ = ไม่มีฝน) ให้ข้ามไปเลย
         image = await Jimp.read(tileUrl);
     } catch (imgError) {
         console.log("No radar tile found (Clear sky). URL:", tileUrl);
@@ -79,7 +77,6 @@ export default async function handler(req, res) {
         });
     }
 
-    // 🌟 กำหนดรัศมีสแกน (60 กิโลเมตร)
     const kmPerPixel = 1.2;
     const maxRadiusKm = 60; 
     const maxRadiusPx = Math.floor(maxRadiusKm / kmPerPixel); 
@@ -90,30 +87,35 @@ export default async function handler(req, res) {
     let nearestStormDx = 0;
     let nearestStormDy = 0;
 
-    // กวาดตารางพิกเซล (ปรับให้กวาดเป็นวงกลม เพื่อให้รันเร็วขึ้น ไม่เกิน 10 วิ)
     for (let dy = -maxRadiusPx; dy <= maxRadiusPx; dy++) {
         for (let dx = -maxRadiusPx; dx <= maxRadiusPx; dx++) {
             
             const distPx = Math.sqrt(dx*dx + dy*dy);
-            if (distPx > maxRadiusPx) continue; // ตัดมุมกรอบสี่เหลี่ยมออกให้เป็นวงกลม
+            if (distPx > maxRadiusPx) continue; 
 
             const checkX = pixelX + dx;
             const checkY = pixelY + dy;
 
+            // ตรวจสอบพิกเซลภายในเขตของ Tile
             if (checkX >= 0 && checkX < 256 && checkY >= 0 && checkY < 256) {
                 const hexColor = image.getPixelColor(checkX, checkY);
                 const rgba = intToRGBA(hexColor);
 
-                if (rgba.a > 150) { 
-                    let level = 1;
-                    if (rgba.r > 200 && rgba.g < 100) level = 3; 
-                    else if (rgba.r > 150 && rgba.g > 150) level = 2; 
+                // 🌟 อัปเดตแก้บั๊ก: ลดการกรองลงเหลือ Alpha > 10 (จับได้แม้กระทั่งเมฆสีฟ้า/เขียวจางๆ)
+                if (rgba.a > 10) { 
+                    let level = 1; // เริ่มต้นที่เบาที่สุด (สีฟ้า/เขียว)
+                    
+                    // วิเคราะห์จากค่าสีแดง (Red) และเขียว (Green)
+                    if (rgba.r > 200 && rgba.g < 150) level = 3; // สีแดง/ม่วง (ตกหนักมาก)
+                    else if (rgba.r > 150 && rgba.g >= 150) level = 2; // สีเหลือง/ส้ม (ตกปานกลาง)
 
-                    if (distPx <= 2) { // ถือว่าตกอยู่บนหัว (รัศมี 2.4 กม.)
+                    // ถ้าระยะห่างไม่เกิน 3 กม. ถือว่าตกอยู่ "บนหัวเรา" เลย
+                    if (distPx <= 2.5) { 
                         if (level > centerAlertLevel) centerAlertLevel = level;
                     }
 
-                    if (distPx <= maxRadiusPx && distPx > 2 && distPx < nearestStormDistPx) {
+                    // หาพายุลูกที่อยู่ใกล้เราที่สุด (แต่อยู่นอกรัศมี 3 กม.)
+                    if (distPx <= maxRadiusPx && distPx > 2.5 && distPx < nearestStormDistPx) {
                         nearestStormDistPx = distPx;
                         nearestStormLevel = level;
                         nearestStormDx = dx;
