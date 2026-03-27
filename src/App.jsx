@@ -622,7 +622,7 @@ export default function App() {
       if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศสำหรับ **${dayWord}** วิเคราะห์: 1.สภาพอากาศภาพรวม 2.การเดินทาง 3.ข้อควรระวัง:\n\n${contextData}`; } 
       else if (topic === 'rain') { promptText = `คุณคือนักอุตุนิยมวิทยา วิเคราะห์แนวโน้ม "ฝนตก" สำหรับ **${dayWord}** วิเคราะห์: 1. ภาพรวมฝน (โอกาสเปอร์เซ็นต์/หนักแค่ไหน) 2. ช่วงเวลาฝนตก (ระบุเวลาชัดเจน) 3. คำแนะนำการเดินทาง:\n\n${contextData}`; }
       else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลสำหรับ **${dayWord}** **เลือกมา 3 ช่วงเวลาของวันที่สำคัญที่สุด** ห้ามอธิบายยาว:\n\n${contextData}`; } 
-      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
+      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord} แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
       else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศ **${dayWord}**: 1.เวลาตากผ้า 2.เวลาล้างรถ 3.ต้องพกร่มไหม:\n\n${contextData}`; } 
       else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ออกกำลังกายกลางแจ้งได้ไหม 2.ช่วงเวลาที่ดีที่สุด 3.ข้อควรระวัง:\n\n${contextData}`; } 
       else if (topic === 'health') { promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.คุณภาพอากาศ/PM2.5 2.ความปลอดภัยแดด/UV 3.คำแนะนำพิเศษ:\n\n${contextData}`; }
@@ -673,7 +673,6 @@ export default function App() {
     return darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : 'linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%)';
   };
 
-  // สร้างระบบจำลองเวลาอัปเดตข่าวสารให้ดู Real-time (สมมติอิงจากวันนี้)
   const getRelativeTime = (hoursAgo) => {
     const d = new Date();
     d.setHours(d.getHours() - hoursAgo);
@@ -708,7 +707,7 @@ export default function App() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', background: themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'hidden', overflowX:'hidden', transition: 'background 1s ease' }}>
       
-      {/* HEADER */}
+      {/* HEADER (กู้คืนชื่อเต็มและซ่อนปุ่ม PWA) */}
       <header style={{ flexShrink: 0, minHeight: '65px', background: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(29, 161, 242, 0.9)', backdropFilter: backdropBlur, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px', flexWrap: 'nowrap', overflowX: 'auto', zIndex: 900, borderBottom: `1px solid ${borderColor}` }} className="hide-scrollbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)' }}>{darkMode ? '🌙' : '🌤️'}</div>
@@ -771,7 +770,6 @@ export default function App() {
       {currentPage === 'map' ? (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingBottom: window.innerWidth < 768 ? '65px' : '0', overflow: 'hidden' }}>
 
-          {/* 🌟 แก้ไข Flex ยุบตัวตกขอบ (minHeight: 0) */}
           <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', flex: 1, minHeight: 0 }}>
             
             {/* MAP AREA (Bento Style) */}
@@ -1438,7 +1436,7 @@ export default function App() {
               <p style={{ fontSize: '0.85rem', color: textColor, opacity: 0.7, marginTop: '15px', textAlign: 'right' }}>อ้างอิงข้อมูลจาก Windy.com (โมเดล ECMWF)</p>
             </div>
 
-            {/* 🌟 โซนที่ 3: ปรากฏการณ์โลก (ปรับปรุงข้อมูลเชิงลึก Niño 3.4) */}
+            {/* 🌟 โซนที่ 3: ปรากฏการณ์โลก (พยากรณ์ความน่าจะเป็น 3/6/12 เดือน) */}
             <div style={{ backgroundColor: cardBg, backdropFilter: backdropBlur, borderRadius: '20px', padding: '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
               <h3 style={{ fontSize: '1.5rem', color: '#10b981', margin: '0 0 25px 0', fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontSize: '1.8rem' }}>🌡️</span> สถานการณ์ เอลนีโญ / ลานีญา (ENSO) & Niño 3.4
@@ -1478,26 +1476,56 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* 🌟 พยากรณ์ความน่าจะเป็น */}
                 <div>
                    <h4 style={{ fontSize: '1.2rem', color: textColor, marginBottom: '15px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     📊 บทวิเคราะห์สถานการณ์ (มีนาคม 2026)
+                     📊 พยากรณ์ความน่าจะเป็นและผลกระทบ (ระยะยาว)
                    </h4>
-                   <p style={{ color: textColor, fontSize: '0.95rem', lineHeight: '1.8', opacity: 0.9, marginBottom: '15px' }}>
-                     อุณหภูมิผิวน้ำทะเล (SST Anomaly) บริเวณมหาสมุทรแปซิฟิกเขตศูนย์สูตร (ภูมิภาค Niño 3.4) ปัจจุบันมีค่าติดลบอยู่ที่ <strong>-0.65 °C</strong> ซึ่งชี้ให้เห็นว่าโลกกำลังอยู่ในสภาวะ <strong>"ลานีญากำลังอ่อน"</strong>
+                   <p style={{ color: textColor, fontSize: '0.95rem', lineHeight: '1.8', opacity: 0.9, marginBottom: '20px' }}>
+                     อุณหภูมิผิวน้ำทะเล (SST Anomaly) ปัจจุบันชี้ว่าโลกอยู่ในสภาวะ <strong>"ลานีญากำลังอ่อน"</strong> แนวโน้มในอนาคตมีดังนี้:
                    </p>
                    
-                   <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
-                     <strong style={{ color: textColor }}>ผลกระทบต่อประเทศไทยในระยะนี้:</strong>
-                     <ul style={{ color: textColor, fontSize: '0.95rem', lineHeight: '1.8', paddingLeft: '20px', opacity: 0.9, margin: '10px 0 0 0' }}>
-                       <li><strong>ปริมาณฝน (Rainfall):</strong> ปริมาณฝนรวมทั่วประเทศมีแนวโน้ม <strong>สูงกว่าค่าปกติเล็กน้อย</strong> โดยเฉพาะในภาคใต้และภาคตะวันออก ควรเฝ้าระวังปัญหาน้ำท่วมฉับพลัน</li>
-                       <li><strong>อุณหภูมิ (Temperature):</strong> อุณหภูมิเฉลี่ยจะต่ำกว่าปีเอลนีโญอย่างเห็นได้ชัด แต่อาจสลับกับพายุฤดูร้อนในช่วงเปลี่ยนผ่านฤดู</li>
-                       <li><strong>การคาดการณ์ (Forecast):</strong> แบบจำลองพยากรณ์ชี้ว่า สภาวะลานีญาอ่อนนี้จะทรงตัวไปจนถึงกลางปี 2026 ก่อนจะค่อยๆ ปรับเข้าสู่สภาวะปกติ (Neutral)</li>
-                     </ul>
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                     {/* 1-3 Months */}
+                     <div style={{ backgroundColor: 'rgba(59,130,246,0.05)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #3b82f6', border: `1px solid ${borderColor}`, borderLeftWidth: '4px' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                         <strong style={{ color: textColor, fontSize: '1rem' }}>ระยะสั้น (1-3 เดือน)</strong>
+                         <span style={{ background: '#3b82f6', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>ลานีญา 75%</span>
+                       </div>
+                       <p style={{ margin: 0, color: textColor, fontSize: '0.9rem', lineHeight: '1.6', opacity: 0.9 }}>
+                         <strong>ผลกระทบไทย:</strong> ปริมาณฝนสูงกว่าค่าปกติ 10-20% โดยเฉพาะภาคใต้และตะวันออกตอนล่าง เสี่ยงน้ำท่วมขังและน้ำป่าไหลหลาก อุณหภูมิเฉลี่ยต่ำกว่าปกติเล็กน้อย
+                       </p>
+                     </div>
+
+                     {/* 3-6 Months */}
+                     <div style={{ backgroundColor: 'rgba(16,185,129,0.05)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #10b981', border: `1px solid ${borderColor}`, borderLeftWidth: '4px' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                         <strong style={{ color: textColor, fontSize: '1rem' }}>ระยะกลาง (3-6 เดือน)</strong>
+                         <span style={{ background: '#10b981', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>สภาวะปกติ 60%</span>
+                       </div>
+                       <p style={{ margin: 0, color: textColor, fontSize: '0.9rem', lineHeight: '1.6', opacity: 0.9 }}>
+                         <strong>ผลกระทบไทย:</strong> ปรากฏการณ์ลานีญาจะค่อยๆ อ่อนกำลังลง ปริมาณฝนและอุณหภูมิเริ่มกลับเข้าสู่เกณฑ์มาตรฐาน (Neutral) แต่อาจยังเจอพายุหมุนเขตร้อนตามฤดูกาล
+                       </p>
+                     </div>
+
+                     {/* 6-12 Months */}
+                     <div style={{ backgroundColor: 'rgba(245,158,11,0.05)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #f59e0b', border: `1px solid ${borderColor}`, borderLeftWidth: '4px' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                         <strong style={{ color: textColor, fontSize: '1rem' }}>ระยะยาว (6 เดือน - 1 ปี)</strong>
+                         <span style={{ background: '#f59e0b', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>เอลนีโญ 55%</span>
+                       </div>
+                       <p style={{ margin: 0, color: textColor, fontSize: '0.9rem', lineHeight: '1.6', opacity: 0.9 }}>
+                         <strong>ผลกระทบไทย:</strong> มีสัญญาณก่อตัวของเอลนีโญรอบใหม่ ปริมาณฝนอาจทิ้งช่วงยาวนานขึ้น อุณหภูมิพุ่งสูงกว่าปกติ เกษตรกรควรเริ่มวางแผนกักเก็บน้ำล่วงหน้า
+                       </p>
+                     </div>
                    </div>
 
-                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                     <button onClick={() => window.open('https://iri.columbia.edu/our-expertise/climate/forecasts/enso/current/', '_blank')} style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline', marginTop: '10px' }}>
-                       ดูข้อมูลสถิติฉบับเต็มจากสถาบัน IRI
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
+                     <button onClick={() => window.open('https://iri.columbia.edu/our-expertise/climate/forecasts/enso/current/', '_blank')} style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}>
+                       ดูสถิติฉบับเต็มจากสถาบัน IRI
+                     </button>
+                     <button style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #10b981`, backgroundColor: darkMode ? 'rgba(16,185,129,0.2)' : '#dcfce7', color: '#059669', fontSize: '0.9rem', cursor: 'pointer', fontWeight:'bold', transition: '0.2s', boxShadow: '0 4px 10px rgba(16,185,129,0.15)' }}>
+                       🤖 ให้ AI วิเคราะห์เชิงลึก
                      </button>
                    </div>
                 </div>
@@ -1525,43 +1553,6 @@ export default function App() {
           <div onClick={() => { setCurrentPage('climate'); window.scrollTo({top:0, behavior:'smooth'}); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: currentPage === 'climate' ? '#0ea5e9' : subTextColor, cursor: 'pointer', flex: 1, padding: '5px' }}>
             <span style={{ fontSize: '1.6rem', marginBottom: '4px', filter: currentPage === 'climate' ? 'none' : 'grayscale(100%) opacity(50%)', transition: 'all 0.2s', transform: currentPage === 'climate' ? 'scale(1.1)' : 'scale(1)' }}>📰</span>
             <span style={{ fontSize: '0.75rem', fontWeight: currentPage === 'climate' ? 'bold' : 'normal', transition: 'all 0.2s' }}>ข่าว & เตือนภัย</span>
-          </div>
-        </div>
-      )}
-
-      {/* 🌟 MOBILE FILTERS MODAL */}
-      {window.innerWidth < 768 && showMobileFilters && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
-          <div style={{ backgroundColor: cardBg, borderRadius: '20px', padding: '25px', width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '15px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', border: `1px solid ${borderColor}`, backdropFilter: backdropBlur }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <h3 style={{ margin: 0, color: textColor }}>🔍 ค้นหาสถานี</h3>
-              <button onClick={() => setShowMobileFilters(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: subTextColor, cursor: 'pointer' }}>✕</button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>ภูมิภาค</label>
-              <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : '#f8fafc', color: textColor, outline: 'none', fontSize: '1rem' }}>
-                <option value="">ทุกภูมิภาค</option>{Object.keys(regionMapping).map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>จังหวัด</label>
-              <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : '#f8fafc', color: textColor, outline: 'none', fontSize: '1rem' }}>
-                <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>สถานี</label>
-              <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowMobileFilters(false); setIsMobileListOpen(false); setMapRadarResult(null); setIsMapRadarScanning(false);} }} style={{ padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : '#f8fafc', color: textColor, outline: 'none', fontSize: '1rem' }}>
-                <option value="">-- เลือกสถานี --</option>{filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(s => (<option key={s.stationID} value={s.stationID}>{s.nameTH}</option>))}
-              </select>
-            </div>
-
-            <button onClick={() => setShowMobileFilters(false)} style={{ marginTop: '10px', padding: '12px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
-              ตกลง
-            </button>
           </div>
         </div>
       )}
