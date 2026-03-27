@@ -98,7 +98,6 @@ export default function App() {
   
   const [selectedStationId, setSelectedStationId] = useState('');
   
-  // 🌟 อัปเดต 1: เริ่มต้นที่โหมดฝุ่น PM2.5 ทันทีที่เปิดแอป
   const [viewMode, setViewMode] = useState('pm25'); 
   const [sortOrder, setSortOrder] = useState('desc'); 
   const [stationTemps, setStationTemps] = useState({});
@@ -107,9 +106,7 @@ export default function App() {
   const [lastUpdateText, setLastUpdateText] = useState('');
   const [locating, setLocating] = useState(false);
   
-  // 🌟 อัปเดต 2: บังคับให้เป็นโหมดสว่าง (Light Mode) ทุกครั้งที่เปิดแอป (โดยตั้งค่าเริ่มต้นเป็น false)
   const [darkMode, setDarkMode] = useState(() => {
-    // อ่านค่าเก่ามา แต่ถ้าไม่เคยตั้งค่าให้เป็น false (สว่าง)
     const saved = localStorage.getItem('darkMode');
     return saved ? saved === 'true' : false;
   });
@@ -151,7 +148,6 @@ export default function App() {
   const [radarTarget, setRadarTarget] = useState({ lat: 13.75, lon: 100.5, name: 'พิกัดที่กำหนด' });
 
   const [favLocations, setFavLocations] = useState(() => JSON.parse(localStorage.getItem('weatherFavs')) || ['กรุงเทพมหานคร']);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const cardRefs = useRef({});
   const markerRefs = useRef({});
@@ -161,23 +157,6 @@ export default function App() {
   useEffect(() => { localStorage.setItem('darkMode', darkMode); if(darkMode) document.body.classList.add('dark-theme'); else document.body.classList.remove('dark-theme'); }, [darkMode]);
   
   useEffect(() => { setAiSummaryJson(null); setAiTimestamp(''); setNowcastAlert(null); }, [alertsLocationName, activeStation, aiTargetDay]);
-
-  useEffect(() => {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    });
-  }, []);
-
-  const handleInstallClick = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') console.log('User accepted the install prompt');
-        setDeferredPrompt(null);
-      });
-    }
-  };
 
   const toggleFavorite = (prov) => {
     let newFavs = [...favLocations];
@@ -680,25 +659,13 @@ export default function App() {
     } finally { setIsGeneratingAI(false); }
   };
 
-  const handleShareAI = () => {
-    if(!aiSummaryJson) return; const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.title}: ${i.desc}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Weather Dashboard`;
-    if (navigator.share) { navigator.share({ title: 'สรุปสภาพอากาศจาก AI', text: shareText }).catch(console.error); } else { navigator.clipboard.writeText(shareText); alert('คัดลอกข้อความสรุปแล้ว! สามารถนำไปวางส่งให้เพื่อนได้เลยครับ'); }
-  };
-
   // 🌟 ฟังก์ชัน Dynamic Background
   const getDynamicBackground = () => {
     if (alertsLoading || loading) return darkMode ? '#0f172a' : '#f1f5f9';
-    
-    // ดูจากค่าพยากรณ์ปัจจุบัน (nowcastAlert หรือ daily alert)
     let hasRain = nowcastAlert || alertsData.urgent?.some(a => a.level >= 2 && a.title.includes('ฝน'));
     let isHot = alertsData.urgent?.some(a => a.level >= 3 && a.title.includes('ร้อน'));
-    
-    if (hasRain) {
-      return darkMode ? 'linear-gradient(135deg, #1e3a8a 0%, #020617 100%)' : 'linear-gradient(135deg, #93c5fd 0%, #cbd5e1 100%)';
-    } else if (isHot) {
-      return darkMode ? 'linear-gradient(135deg, #7f1d1d 0%, #0f172a 100%)' : 'linear-gradient(135deg, #fef08a 0%, #fed7aa 100%)';
-    }
-    
+    if (hasRain) return darkMode ? 'linear-gradient(135deg, #1e3a8a 0%, #020617 100%)' : 'linear-gradient(135deg, #93c5fd 0%, #cbd5e1 100%)';
+    else if (isHot) return darkMode ? 'linear-gradient(135deg, #7f1d1d 0%, #0f172a 100%)' : 'linear-gradient(135deg, #fef08a 0%, #fed7aa 100%)';
     return darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : 'linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%)';
   };
 
@@ -707,7 +674,7 @@ export default function App() {
   const isPm25Mode = viewMode === 'pm25'; const isTempMode = viewMode === 'temp'; const isHeatMode = viewMode === 'heat';
   const isUvMode = viewMode === 'uv'; const isRainMode = viewMode === 'rain'; const isWindMode = viewMode === 'wind';
   
-  // 🌟 Bento UI Variables (Glassmorphism)
+  // Bento UI Variables
   const themeBg = getDynamicBackground();
   const cardBg = darkMode ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.85)';
   const textColor = darkMode ? '#f8fafc' : '#1e293b'; const subTextColor = darkMode ? '#e2e8f0' : '#475569';
@@ -720,33 +687,18 @@ export default function App() {
   const todayDateText = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
   const currentHr = new Date().getHours(); const next3Hr = (currentHr + 3) % 24; const timeStr3h = `${String(currentHr).padStart(2, '0')}:00 - ${String(next3Hr).padStart(2, '0')}:00 น.`;
 
-  let radarLat = 13.75;
-  let radarLon = 100.5;
-  let radarZoom = 6;
-
-  if (activeStation && !isNaN(parseFloat(activeStation.lat))) {
-    radarLat = parseFloat(activeStation.lat);
-    radarLon = parseFloat(activeStation.long);
-    radarZoom = 10;
-  } else if (selectedProvince) {
+  let radarLat = 13.75; let radarLon = 100.5; let radarZoom = 6;
+  if (activeStation && !isNaN(parseFloat(activeStation.lat))) { radarLat = parseFloat(activeStation.lat); radarLon = parseFloat(activeStation.long); radarZoom = 10; } 
+  else if (selectedProvince) {
     const provStations = stations.filter(s => extractProvince(s.areaTH) === selectedProvince && !isNaN(parseFloat(s.lat)));
-    if (provStations.length > 0) {
-      radarLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length;
-      radarLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length;
-      radarZoom = 8;
-    }
+    if (provStations.length > 0) { radarLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length; radarLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length; radarZoom = 8; }
   }
-
-  if (isMapRadarScanning || mapRadarResult) {
-     radarLat = radarTarget.lat;
-     radarLon = radarTarget.lon;
-     radarZoom = 11;
-  }
+  if (isMapRadarScanning || mapRadarResult) { radarLat = radarTarget.lat; radarLon = radarTarget.lon; radarZoom = 11; }
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', background: themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'hidden', overflowX:'hidden', transition: 'background 1s ease' }}>
       
-      {/* HEADER (Glassmorphism) */}
+      {/* HEADER */}
       <header style={{ flexShrink: 0, minHeight: '65px', background: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(29, 161, 242, 0.9)', backdropFilter: backdropBlur, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px', flexWrap: 'nowrap', overflowX: 'auto', zIndex: 900, borderBottom: `1px solid ${borderColor}` }} className="hide-scrollbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)' }}>{darkMode ? '🌙' : '🌤️'}</div>
@@ -772,7 +724,6 @@ export default function App() {
                   <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setMapRadarResult(null); setIsMapRadarScanning(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
                   </select>
-                  {/* 🌟 ปุ่ม Favorite Location */}
                   {selectedProvince && (
                      <button onClick={() => toggleFavorite(selectedProvince)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '0 5px' }} title="บันทึกสถานที่โปรด">
                         {favLocations.includes(selectedProvince) ? '⭐' : '☆'}
@@ -795,14 +746,6 @@ export default function App() {
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: 'auto' }}>
-          
-          {/* 🌟 ปุ่ม Install PWA (แสดงเฉพาะถ้าติดตั้งได้) */}
-          {deferredPrompt && (
-             <button onClick={handleInstallClick} style={{ padding: '6px 12px', borderRadius: '20px', backgroundColor: '#fbbf24', color: '#78350f', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
-                📲 ติดตั้งแอป
-             </button>
-          )}
-
           {window.innerWidth >= 768 && (
             <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '25px', padding: '4px' }}>
               <button onClick={() => { setCurrentPage('map'); setIsMobileListOpen(false); }} style={{ padding: '5px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: currentPage === 'map' ? '#fff' : 'transparent', color: currentPage === 'map' ? '#0ea5e9' : '#fff' }}>🗺️ แผนที่</button>
@@ -817,23 +760,10 @@ export default function App() {
       {/* BODY CONTENT */}
       {currentPage === 'map' ? (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingBottom: window.innerWidth < 768 ? '65px' : '0', overflow: 'hidden' }}>
-          
-          {/* 🌟 แถบ Favorite Locations (Bento Style) */}
-          {favLocations.length > 0 && !showRadar && (
-            <div style={{ padding: '12px 15px 0 15px', display: 'flex', gap: '10px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }} className="hide-scrollbar">
-              <span style={{ fontSize: '0.85rem', color: darkMode ? '#cbd5e1' : '#475569', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}>⭐️ พื้นที่โปรด:</span>
-              {favLocations.map(prov => (
-                <button key={prov} onClick={() => { setSelectedRegion(''); setSelectedProvince(prov); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '6px 14px', borderRadius: '20px', backgroundColor: cardBg, backdropFilter: backdropBlur, border: `1px solid ${borderColor}`, color: textColor, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                  {prov}
-                </button>
-              ))}
-            </div>
-          )}
 
-          {/* 🌟 แก้ไข Flex ยุบตัวตกขอบ (minHeight: 0) */}
           <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', flex: 1, minHeight: 0 }}>
             
-            {/* MAP AREA (Bento Style) */}
+            {/* MAP AREA */}
             <div style={{ flex: 7, width: '100%', borderRadius: '20px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '100%' : '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               
               <div 
@@ -914,14 +844,9 @@ export default function App() {
                   {!isMapRadarScanning && !mapRadarResult && (
                     <div style={{ position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)', zIndex: 600, display: 'flex', flexDirection: 'column', gap: '10px', background: cardBg, padding: '15px', borderRadius: '20px', backdropFilter: backdropBlur, border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.15)', width: '90%', maxWidth: '400px' }}>
                       <div style={{ textAlign: 'center', color: textColor, fontWeight: 'bold', fontSize: '0.9rem' }}>🎯 เล็งเป้าหมายให้ AI วิเคราะห์ฝน</div>
-                      
                       <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => handleMapRadarScan(true)} style={{ flex: 1, padding: '10px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          📍 ตำแหน่งฉัน
-                        </button>
-                        <button onClick={() => handleMapRadarScan(false)} style={{ flex: 2, padding: '10px', borderRadius: '12px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', animation: 'pulseGlow 2s infinite' }}>
-                          🔍 สแกน {selectedProvince ? `จ.${selectedProvince}` : 'พิกัดที่เลือก'}
-                        </button>
+                        <button onClick={() => handleMapRadarScan(true)} style={{ flex: 1, padding: '10px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>📍 ตำแหน่งฉัน</button>
+                        <button onClick={() => handleMapRadarScan(false)} style={{ flex: 2, padding: '10px', borderRadius: '12px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', animation: 'pulseGlow 2s infinite' }}>🔍 สแกน {selectedProvince ? `จ.${selectedProvince}` : 'พิกัดที่เลือก'}</button>
                       </div>
                     </div>
                   )}
@@ -935,9 +860,7 @@ export default function App() {
                         .radar-wave { position: absolute; width: 100%; height: 100%; border: 2px solid #0ea5e9; border-radius: 50%; animation: radarScan 1.5s linear infinite; }
                       `}</style>
                       <div className="radar-target"><div className="radar-wave"></div></div>
-                      <div style={{ marginTop: '20px', padding: '8px 16px', background: 'rgba(15, 23, 42, 0.8)', color: '#fff', borderRadius: '20px', fontWeight: 'bold', backdropFilter: 'blur(4px)', border: '1px solid #334155' }}>
-                        กำลังให้ AI วิเคราะห์ทิศทางพายุ...
-                      </div>
+                      <div style={{ marginTop: '20px', padding: '8px 16px', background: 'rgba(15, 23, 42, 0.8)', color: '#fff', borderRadius: '20px', fontWeight: 'bold', backdropFilter: 'blur(4px)', border: '1px solid #334155' }}>กำลังให้ AI วิเคราะห์ทิศทางพายุ...</div>
                     </div>
                   )}
 
@@ -952,11 +875,7 @@ export default function App() {
                         </div>
                       </div>
                       <p style={{ margin: 0, color: textColor, fontSize: '0.9rem', lineHeight: '1.6' }}>{mapRadarResult.desc}</p>
-                      
-                      <div style={{ marginTop: '10px', fontSize: '0.8rem', color: subTextColor, borderTop: `1px solid ${borderColor}`, paddingTop: '10px' }}>
-                        📍 สแกนที่: <strong>{radarTarget.name}</strong>
-                      </div>
-
+                      <div style={{ marginTop: '10px', fontSize: '0.8rem', color: subTextColor, borderTop: `1px solid ${borderColor}`, paddingTop: '10px' }}>📍 สแกนที่: <strong>{radarTarget.name}</strong></div>
                       <button onClick={() => setMapRadarResult(null)} style={{ width: '100%', padding: '10px', marginTop: '15px', borderRadius: '8px', border: 'none', backgroundColor: darkMode ? '#334155' : '#e2e8f0', color: textColor, fontWeight: 'bold', cursor: 'pointer' }}>รับทราบ</button>
                     </div>
                   )}
@@ -1031,12 +950,25 @@ export default function App() {
                     ⬇️ ย่อกลับไปดูแผนที่
                   </button>
                 )}
+                
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h2 style={{ fontSize: '1rem', color: textColor, margin: 0, fontWeight: 'bold' }}>{activeChart.name} <span style={{fontSize:'0.85rem', color:subTextColor}}>({filteredStations.length} จุด)</span></h2>
                   <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: darkMode?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.5)', color: textColor, outline:'none', border: `1px solid ${borderColor}` }}>
                     <option value="desc">⬇️ มากไปน้อย</option><option value="asc">⬆️ น้อยไปมาก</option>
                   </select>
                 </div>
+
+                {/* 🌟 ย้ายพื้นที่โปรดมาไว้ตรงนี้แบบเนียนๆ */}
+                {favLocations.length > 0 && (
+                   <div style={{ marginTop: '15px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="hide-scrollbar">
+                      <span style={{ fontSize: '0.8rem', color: subTextColor, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>⭐️ โปรด:</span>
+                      {favLocations.map(prov => (
+                        <button key={prov} onClick={() => { setSelectedRegion(''); setSelectedProvince(prov); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '4px 10px', borderRadius: '15px', backgroundColor: darkMode?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.5)', border: `1px solid ${borderColor}`, color: textColor, fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          {prov}
+                        </button>
+                      ))}
+                   </div>
+                )}
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }} className="hide-scrollbar">
@@ -1070,6 +1002,44 @@ export default function App() {
                       
                       {hAdv && (isActive || ['🚨','🚑','⛔'].includes(hAdv.icon)) && (
                         <div style={{ marginTop:'12px', padding:'10px', background:'rgba(0,0,0,0.05)', borderRadius:'8px', display:'flex', gap:'8px', border: `1px dashed ${boxBg}` }}><span>{hAdv.icon}</span><span style={{fontSize:'0.8rem',color:textColor}}>{hAdv.text}</span></div>
+                      )}
+
+                      {/* 🌟 กู้คืนมินิกราฟพยากรณ์ ให้แสดงตอนถูกคลิก (Active) เท่านั้น */}
+                      {isActive && (
+                        <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` }}>
+                          <h5 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: textColor, display: 'flex', alignItems: 'center', gap: '5px' }}>📊 แนวโน้ม {activeChart.name}</h5>
+                          {activeWeather && activeForecast ? (
+                            <div style={{ height: '120px', width: '100%' }}>
+                              <ResponsiveContainer>
+                                {isPm25Mode ? (
+                                  <BarChart data={activeForecast} margin={{ top: 5, right: 5, bottom: 5, left: -25 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={borderColor} vertical={false} />
+                                    <XAxis dataKey="time" stroke={subTextColor} fontSize={10} tickMargin={5} />
+                                    <YAxis stroke={subTextColor} fontSize={10} domain={activeChart.domain} />
+                                    <RechartsTooltip contentStyle={{ borderRadius: '8px', backgroundColor: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '5px 10px' }} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
+                                    <Bar dataKey="val" name="PM2.5" fill={activeChart.color} radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                                ) : (
+                                  <AreaChart data={ isTempMode ? activeWeather.tempForecast : isHeatMode ? activeWeather.heatForecast : isUvMode ? activeWeather.uvForecast : isRainMode ? activeWeather.rainForecast : activeWeather.windForecast } margin={{ top: 5, right: 5, bottom: 5, left: -25 }}>
+                                    <defs>
+                                      <linearGradient id={`colorGradient-${activeChart.key}`} x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor={activeChart.color} stopOpacity={0.4}/>
+                                        <stop offset="95%" stopColor={activeChart.color} stopOpacity={0}/>
+                                      </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={borderColor} vertical={false} />
+                                    <XAxis dataKey="time" stroke={subTextColor} fontSize={10} tickMargin={5} />
+                                    <YAxis stroke={subTextColor} fontSize={10} domain={activeChart.domain} />
+                                    <RechartsTooltip contentStyle={{ borderRadius: '8px', backgroundColor: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '5px 10px' }} />
+                                    <Area type="monotone" dataKey="val" name={activeChart.name} stroke={activeChart.color} strokeWidth={3} fillOpacity={1} fill={`url(#colorGradient-${activeChart.key})`} />
+                                  </AreaChart>
+                                )}
+                              </ResponsiveContainer>
+                            </div>
+                          ) : (
+                            <div style={{ textAlign: 'center', color: subTextColor, fontSize: '0.8rem', padding: '20px' }}>กำลังโหลดกราฟ...</div>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
