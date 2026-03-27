@@ -622,7 +622,7 @@ export default function App() {
       if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศสำหรับ **${dayWord}** วิเคราะห์: 1.สภาพอากาศภาพรวม 2.การเดินทาง 3.ข้อควรระวัง:\n\n${contextData}`; } 
       else if (topic === 'rain') { promptText = `คุณคือนักอุตุนิยมวิทยา วิเคราะห์แนวโน้ม "ฝนตก" สำหรับ **${dayWord}** วิเคราะห์: 1. ภาพรวมฝน (โอกาสเปอร์เซ็นต์/หนักแค่ไหน) 2. ช่วงเวลาฝนตก (ระบุเวลาชัดเจน) 3. คำแนะนำการเดินทาง:\n\n${contextData}`; }
       else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลสำหรับ **${dayWord}** **เลือกมา 3 ช่วงเวลาของวันที่สำคัญที่สุด** ห้ามอธิบายยาว:\n\n${contextData}`; } 
-      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord} แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
+      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
       else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศ **${dayWord}**: 1.เวลาตากผ้า 2.เวลาล้างรถ 3.ต้องพกร่มไหม:\n\n${contextData}`; } 
       else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ออกกำลังกายกลางแจ้งได้ไหม 2.ช่วงเวลาที่ดีที่สุด 3.ข้อควรระวัง:\n\n${contextData}`; } 
       else if (topic === 'health') { promptText = `คุณคือแพทย์ภูมิแพ้ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.คุณภาพอากาศ/PM2.5 2.ความปลอดภัยแดด/UV 3.คำแนะนำพิเศษ:\n\n${contextData}`; }
@@ -707,7 +707,7 @@ export default function App() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', background: themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'hidden', overflowX:'hidden', transition: 'background 1s ease' }}>
       
-      {/* HEADER (กู้คืนชื่อเต็มและซ่อนปุ่ม PWA) */}
+      {/* HEADER */}
       <header style={{ flexShrink: 0, minHeight: '65px', background: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(29, 161, 242, 0.9)', backdropFilter: backdropBlur, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px', flexWrap: 'nowrap', overflowX: 'auto', zIndex: 900, borderBottom: `1px solid ${borderColor}` }} className="hide-scrollbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.3)' }}>{darkMode ? '🌙' : '🌤️'}</div>
@@ -733,11 +733,6 @@ export default function App() {
                   <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setMapRadarResult(null); setIsMapRadarScanning(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
                   </select>
-                  {selectedProvince && (
-                     <button onClick={() => toggleFavorite(selectedProvince)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '0 5px' }} title="บันทึกสถานที่โปรด">
-                        {favLocations.includes(selectedProvince) ? '⭐' : '☆'}
-                     </button>
-                  )}
                 </div>
                 <div style={{ width: '1px', height: '15px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
@@ -772,7 +767,7 @@ export default function App() {
 
           <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', flex: 1, minHeight: 0 }}>
             
-            {/* MAP AREA (Bento Style) */}
+            {/* MAP AREA */}
             <div style={{ flex: 7, width: '100%', borderRadius: '20px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '100%' : '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               
               <div 
@@ -850,15 +845,16 @@ export default function App() {
                     ></iframe>
                   </div>
 
+                  {/* 🌟 ปรับปรุงปุ่ม UI เรดาร์ใหม่ ไม่ให้ล้นกรอบ */}
                   {!isMapRadarScanning && !mapRadarResult && (
                     <div style={{ position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)', zIndex: 600, display: 'flex', flexDirection: 'column', gap: '10px', background: cardBg, padding: '15px', borderRadius: '20px', backdropFilter: backdropBlur, border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.15)', width: '90%', maxWidth: '400px' }}>
-                      <div style={{ textAlign: 'center', color: textColor, fontWeight: 'bold', fontSize: '0.9rem' }}>🎯 เล็งเป้าหมายให้ AI วิเคราะห์ฝน</div>
+                      <div style={{ textAlign: 'center', color: textColor, fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '5px' }}>🎯 เล็งเป้าหมายให้ AI วิเคราะห์ฝน</div>
                       
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => handleMapRadarScan(true)} style={{ flex: 1, padding: '10px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button onClick={() => handleMapRadarScan(true)} style={{ flex: '1 1 auto', padding: '8px 15px', borderRadius: '25px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.9rem', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(14,165,233,0.3)' }}>
                           📍 ตำแหน่งฉัน
                         </button>
-                        <button onClick={() => handleMapRadarScan(false)} style={{ flex: 2, padding: '10px', borderRadius: '12px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', animation: 'pulseGlow 2s infinite' }}>
+                        <button onClick={() => handleMapRadarScan(false)} style={{ flex: '2 1 auto', padding: '8px 15px', borderRadius: '25px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', animation: 'pulseGlow 2s infinite', fontSize: '0.9rem', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(139,92,246,0.3)' }}>
                           🔍 สแกน {selectedProvince ? `จ.${selectedProvince}` : 'พิกัดที่เลือก'}
                         </button>
                       </div>
@@ -947,7 +943,7 @@ export default function App() {
               </MapContainer>
             </div>
 
-            {/* SIDEBAR RIGHT LIST (Bento Style) */}
+            {/* SIDEBAR RIGHT LIST */}
             <div style={{ 
               flex: window.innerWidth < 768 ? 'none' : 3, 
               display: (window.innerWidth < 768 && isMobileListOpen && !showRadar) || (window.innerWidth >= 768 && !showRadar) ? 'flex' : 'none',
@@ -964,7 +960,7 @@ export default function App() {
               boxShadow: window.innerWidth < 768 ? '0 -10px 20px rgba(0,0,0,0.2)' : '0 10px 25px rgba(0,0,0,0.1)',
               animation: window.innerWidth < 768 ? 'slideUp 0.3s ease-out' : 'none'
             }}>
-              <div style={{ padding: '15px', borderBottom: `1px solid ${borderColor}`, position: 'sticky', top: 0, zIndex: 10, borderRadius: window.innerWidth < 768 ? '20px 20px 0 0' : '20px 20px 0 0' }}>
+              <div style={{ padding: '15px', borderBottom: `1px solid ${borderColor}`, position: 'sticky', top: 0, zIndex: 10, borderRadius: window.innerWidth < 768 ? '20px 20px 0 0' : '20px 20px 0 0', backgroundColor: cardBg, backdropFilter: backdropBlur }}>
                 {window.innerWidth < 768 && (
                   <button onClick={() => setIsMobileListOpen(false)} style={{ width: '100%', padding: '10px', backgroundColor: 'rgba(0,0,0,0.05)', color: textColor, border: 'none', borderRadius: '10px', fontWeight: 'bold', marginBottom: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                     ⬇️ ย่อกลับไปดูแผนที่
@@ -978,12 +974,12 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* 🌟 พื้นที่โปรด ย้ายมาอยู่ใน Header ของ Sidebar อย่างสวยงาม */}
+                {/* 🌟 พื้นที่โปรด ย้ายมาซ่อนไว้อย่างสวยงามตรงนี้ครับ */}
                 {favLocations.length > 0 && (
                    <div style={{ marginTop: '15px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="hide-scrollbar">
                       <span style={{ fontSize: '0.8rem', color: subTextColor, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>⭐️ โปรด:</span>
                       {favLocations.map(prov => (
-                        <button key={prov} onClick={() => { setSelectedRegion(''); setSelectedProvince(prov); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '4px 10px', borderRadius: '15px', backgroundColor: darkMode?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.5)', border: `1px solid ${borderColor}`, color: textColor, fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <button key={prov} onClick={() => { setSelectedRegion(''); setSelectedProvince(prov); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '4px 10px', borderRadius: '15px', backgroundColor: darkMode?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.5)', border: `1px solid ${borderColor}`, color: textColor, fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap', transition: '0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                           {prov}
                         </button>
                       ))}
@@ -1024,7 +1020,7 @@ export default function App() {
                         <div style={{ marginTop:'12px', padding:'10px', background:'rgba(0,0,0,0.05)', borderRadius:'8px', display:'flex', gap:'8px', border: `1px dashed ${boxBg}` }}><span>{hAdv.icon}</span><span style={{fontSize:'0.8rem',color:textColor}}>{hAdv.text}</span></div>
                       )}
 
-                      {/* 🌟 กู้คืนมินิกราฟพยากรณ์ ให้แสดงตอนถูกคลิก (Active) เท่านั้น */}
+                      {/* 🌟 กู้คืนมินิกราฟพยากรณ์ */}
                       {isActive && (
                         <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` }}>
                           <h5 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: textColor, display: 'flex', alignItems: 'center', gap: '5px' }}>📊 แนวโน้ม {activeChart.name}</h5>
@@ -1553,6 +1549,43 @@ export default function App() {
           <div onClick={() => { setCurrentPage('climate'); window.scrollTo({top:0, behavior:'smooth'}); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: currentPage === 'climate' ? '#0ea5e9' : subTextColor, cursor: 'pointer', flex: 1, padding: '5px' }}>
             <span style={{ fontSize: '1.6rem', marginBottom: '4px', filter: currentPage === 'climate' ? 'none' : 'grayscale(100%) opacity(50%)', transition: 'all 0.2s', transform: currentPage === 'climate' ? 'scale(1.1)' : 'scale(1)' }}>📰</span>
             <span style={{ fontSize: '0.75rem', fontWeight: currentPage === 'climate' ? 'bold' : 'normal', transition: 'all 0.2s' }}>ข่าว & เตือนภัย</span>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 MOBILE FILTERS MODAL */}
+      {window.innerWidth < 768 && showMobileFilters && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
+          <div style={{ backgroundColor: cardBg, borderRadius: '20px', padding: '25px', width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '15px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', border: `1px solid ${borderColor}`, backdropFilter: backdropBlur }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <h3 style={{ margin: 0, color: textColor }}>🔍 ค้นหาสถานี</h3>
+              <button onClick={() => setShowMobileFilters(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: subTextColor, cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>ภูมิภาค</label>
+              <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : '#f8fafc', color: textColor, outline: 'none', fontSize: '1rem' }}>
+                <option value="">ทุกภูมิภาค</option>{Object.keys(regionMapping).map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>จังหวัด</label>
+              <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); }} style={{ padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : '#f8fafc', color: textColor, outline: 'none', fontSize: '1rem' }}>
+                <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>สถานี</label>
+              <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setShowMobileFilters(false); setIsMobileListOpen(false); setMapRadarResult(null); setIsMapRadarScanning(false);} }} style={{ padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : '#f8fafc', color: textColor, outline: 'none', fontSize: '1rem' }}>
+                <option value="">-- เลือกสถานี --</option>{filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(s => (<option key={s.stationID} value={s.stationID}>{s.nameTH}</option>))}
+              </select>
+            </div>
+
+            <button onClick={() => setShowMobileFilters(false)} style={{ marginTop: '10px', padding: '12px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
+              ตกลง
+            </button>
           </div>
         </div>
       )}
