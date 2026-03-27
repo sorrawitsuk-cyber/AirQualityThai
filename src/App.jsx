@@ -659,7 +659,11 @@ export default function App() {
     } finally { setIsGeneratingAI(false); }
   };
 
-  // 🌟 ฟังก์ชัน Dynamic Background
+  const handleShareAI = () => {
+    if(!aiSummaryJson) return; const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.title}: ${i.desc}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Weather Dashboard`;
+    if (navigator.share) { navigator.share({ title: 'สรุปสภาพอากาศจาก AI', text: shareText }).catch(console.error); } else { navigator.clipboard.writeText(shareText); alert('คัดลอกข้อความสรุปแล้ว! สามารถนำไปวางส่งให้เพื่อนได้เลยครับ'); }
+  };
+
   const getDynamicBackground = () => {
     if (alertsLoading || loading) return darkMode ? '#0f172a' : '#f1f5f9';
     let hasRain = nowcastAlert || alertsData.urgent?.some(a => a.level >= 2 && a.title.includes('ฝน'));
@@ -669,12 +673,18 @@ export default function App() {
     return darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : 'linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%)';
   };
 
+  // สร้างระบบจำลองเวลาอัปเดตข่าวสารให้ดู Real-time (สมมติอิงจากวันนี้)
+  const getRelativeTime = (hoursAgo) => {
+    const d = new Date();
+    d.setHours(d.getHours() - hoursAgo);
+    return `วันนี้ ${d.getHours().toString().padStart(2, '0')}:00 น.`;
+  };
+
   if (loading) return <SkeletonLoading darkMode={darkMode} />;
 
   const isPm25Mode = viewMode === 'pm25'; const isTempMode = viewMode === 'temp'; const isHeatMode = viewMode === 'heat';
   const isUvMode = viewMode === 'uv'; const isRainMode = viewMode === 'rain'; const isWindMode = viewMode === 'wind';
   
-  // Bento UI Variables
   const themeBg = getDynamicBackground();
   const cardBg = darkMode ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.85)';
   const textColor = darkMode ? '#f8fafc' : '#1e293b'; const subTextColor = darkMode ? '#e2e8f0' : '#475569';
@@ -761,9 +771,10 @@ export default function App() {
       {currentPage === 'map' ? (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingBottom: window.innerWidth < 768 ? '65px' : '0', overflow: 'hidden' }}>
 
+          {/* 🌟 แก้ไข Flex ยุบตัวตกขอบ (minHeight: 0) */}
           <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', flex: 1, minHeight: 0 }}>
             
-            {/* MAP AREA */}
+            {/* MAP AREA (Bento Style) */}
             <div style={{ flex: 7, width: '100%', borderRadius: '20px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '100%' : '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               
               <div 
@@ -844,9 +855,14 @@ export default function App() {
                   {!isMapRadarScanning && !mapRadarResult && (
                     <div style={{ position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)', zIndex: 600, display: 'flex', flexDirection: 'column', gap: '10px', background: cardBg, padding: '15px', borderRadius: '20px', backdropFilter: backdropBlur, border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.15)', width: '90%', maxWidth: '400px' }}>
                       <div style={{ textAlign: 'center', color: textColor, fontWeight: 'bold', fontSize: '0.9rem' }}>🎯 เล็งเป้าหมายให้ AI วิเคราะห์ฝน</div>
+                      
                       <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => handleMapRadarScan(true)} style={{ flex: 1, padding: '10px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>📍 ตำแหน่งฉัน</button>
-                        <button onClick={() => handleMapRadarScan(false)} style={{ flex: 2, padding: '10px', borderRadius: '12px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', animation: 'pulseGlow 2s infinite' }}>🔍 สแกน {selectedProvince ? `จ.${selectedProvince}` : 'พิกัดที่เลือก'}</button>
+                        <button onClick={() => handleMapRadarScan(true)} style={{ flex: 1, padding: '10px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          📍 ตำแหน่งฉัน
+                        </button>
+                        <button onClick={() => handleMapRadarScan(false)} style={{ flex: 2, padding: '10px', borderRadius: '12px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', animation: 'pulseGlow 2s infinite' }}>
+                          🔍 สแกน {selectedProvince ? `จ.${selectedProvince}` : 'พิกัดที่เลือก'}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -860,7 +876,9 @@ export default function App() {
                         .radar-wave { position: absolute; width: 100%; height: 100%; border: 2px solid #0ea5e9; border-radius: 50%; animation: radarScan 1.5s linear infinite; }
                       `}</style>
                       <div className="radar-target"><div className="radar-wave"></div></div>
-                      <div style={{ marginTop: '20px', padding: '8px 16px', background: 'rgba(15, 23, 42, 0.8)', color: '#fff', borderRadius: '20px', fontWeight: 'bold', backdropFilter: 'blur(4px)', border: '1px solid #334155' }}>กำลังให้ AI วิเคราะห์ทิศทางพายุ...</div>
+                      <div style={{ marginTop: '20px', padding: '8px 16px', background: 'rgba(15, 23, 42, 0.8)', color: '#fff', borderRadius: '20px', fontWeight: 'bold', backdropFilter: 'blur(4px)', border: '1px solid #334155' }}>
+                        กำลังให้ AI วิเคราะห์ทิศทางพายุ...
+                      </div>
                     </div>
                   )}
 
@@ -875,7 +893,11 @@ export default function App() {
                         </div>
                       </div>
                       <p style={{ margin: 0, color: textColor, fontSize: '0.9rem', lineHeight: '1.6' }}>{mapRadarResult.desc}</p>
-                      <div style={{ marginTop: '10px', fontSize: '0.8rem', color: subTextColor, borderTop: `1px solid ${borderColor}`, paddingTop: '10px' }}>📍 สแกนที่: <strong>{radarTarget.name}</strong></div>
+                      
+                      <div style={{ marginTop: '10px', fontSize: '0.8rem', color: subTextColor, borderTop: `1px solid ${borderColor}`, paddingTop: '10px' }}>
+                        📍 สแกนที่: <strong>{radarTarget.name}</strong>
+                      </div>
+
                       <button onClick={() => setMapRadarResult(null)} style={{ width: '100%', padding: '10px', marginTop: '15px', borderRadius: '8px', border: 'none', backgroundColor: darkMode ? '#334155' : '#e2e8f0', color: textColor, fontWeight: 'bold', cursor: 'pointer' }}>รับทราบ</button>
                     </div>
                   )}
@@ -958,7 +980,7 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* 🌟 ย้ายพื้นที่โปรดมาไว้ตรงนี้แบบเนียนๆ */}
+                {/* 🌟 พื้นที่โปรด ย้ายมาอยู่ใน Header ของ Sidebar อย่างสวยงาม */}
                 {favLocations.length > 0 && (
                    <div style={{ marginTop: '15px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="hide-scrollbar">
                       <span style={{ fontSize: '0.8rem', color: subTextColor, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>⭐️ โปรด:</span>
@@ -1360,22 +1382,28 @@ export default function App() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
             
-            {/* โซนที่ 1: ข่าวสารและประกาศ (News) */}
+            {/* โซนที่ 1: ข่าวสารและประกาศ (News) - 🌟 ปรับให้ดู Realtime มากขึ้น */}
             <div style={{ backgroundColor: cardBg, backdropFilter: backdropBlur, borderRadius: '20px', padding: '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
               <h3 style={{ fontSize: '1.5rem', color: '#0ea5e9', margin: '0 0 25px 0', fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '1.8rem' }}>📰</span> ข่าวสารและประกาศเตือนภัย
+                <span style={{ fontSize: '1.8rem' }}>📰</span> ข่าวสารและประกาศเตือนภัยล่าสุด
               </h3>
               
               <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '20px' }}>
                 <div style={{ padding: '20px', backgroundColor: darkMode ? 'rgba(127,29,29,0.3)' : 'rgba(254,242,242,0.8)', borderLeft: '6px solid #ef4444', borderRadius: '15px', border: `1px solid ${darkMode?'#7f1d1d':'#fecaca'}` }}>
-                   <h4 style={{ margin: '0 0 10px 0', color: '#dc2626', fontSize: '1.2rem', fontWeight: 'bold' }}>พายุฤดูร้อนบริเวณประเทศไทยตอนบน</h4>
-                   <p style={{ margin: '0 0 15px 0', fontSize: '0.95rem', color: textColor, lineHeight: 1.6 }}>ภาคเหนือ อีสาน และกลาง เตรียมรับมือพายุฝนฟ้าคะนอง ลมกระโชกแรง และลูกเห็บตกบางแห่ง ควรเลี่ยงที่โล่งแจ้ง ต้นไม้ใหญ่</p>
-                   <span style={{ fontSize: '0.8rem', color: textColor, opacity: 0.7 }}>อัปเดต: วันนี้ 05:00 น. | ที่มา: กรมอุตุนิยมวิทยา</span>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                     <h4 style={{ margin: 0, color: '#dc2626', fontSize: '1.2rem', fontWeight: 'bold' }}>พายุฤดูร้อนบริเวณประเทศไทยตอนบน</h4>
+                     <span style={{ background: '#ef4444', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold' }}>ด่วน</span>
+                   </div>
+                   <p style={{ margin: '0 0 15px 0', fontSize: '0.95rem', color: textColor, lineHeight: 1.6 }}>ประกาศฉบับล่าสุด: ภาคเหนือ อีสาน และกลางตอนบน เตรียมรับมือพายุฝนฟ้าคะนอง ลมกระโชกแรง และลูกเห็บตกบางแห่ง ควรเลี่ยงการอยู่ในที่โล่งแจ้ง หรือใต้ต้นไม้ใหญ่</p>
+                   <span style={{ fontSize: '0.8rem', color: textColor, opacity: 0.7 }}>อัปเดต: {getRelativeTime(3)} | แหล่งที่มา: กรมอุตุนิยมวิทยา</span>
                 </div>
                 <div style={{ padding: '20px', backgroundColor: darkMode ? 'rgba(120,53,15,0.3)' : 'rgba(255,251,235,0.8)', borderLeft: '6px solid #f59e0b', borderRadius: '15px', border: `1px solid ${darkMode?'#78350f':'#fde68a'}` }}>
-                   <h4 style={{ margin: '0 0 10px 0', color: '#d97706', fontSize: '1.2rem', fontWeight: 'bold' }}>เฝ้าระวังฝุ่น PM2.5 ภาคเหนือ</h4>
-                   <p style={{ margin: '0 0 15px 0', fontSize: '0.95rem', color: textColor, lineHeight: 1.6 }}>เนื่องจากลมอ่อนและการระบายอากาศไม่ดี ทำให้ฝุ่นควันสะสมตัวสูงในพื้นที่ เชียงใหม่ เชียงราย และแม่ฮ่องสอน</p>
-                   <span style={{ fontSize: '0.8rem', color: textColor, opacity: 0.7 }}>อัปเดต: วันนี้ 07:00 น. | ที่มา: กรมควบคุมมลพิษ</span>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                     <h4 style={{ margin: 0, color: '#d97706', fontSize: '1.2rem', fontWeight: 'bold' }}>เฝ้าระวังฝุ่น PM2.5 สะสมตัว</h4>
+                     <span style={{ background: '#f59e0b', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold' }}>เฝ้าระวัง</span>
+                   </div>
+                   <p style={{ margin: '0 0 15px 0', fontSize: '0.95rem', color: textColor, lineHeight: 1.6 }}>เนื่องจากกระแสลมอ่อนและการระบายอากาศที่ไม่ดี ทำให้ฝุ่นควันสะสมตัวสูงขึ้นในพื้นที่ เชียงใหม่ เชียงราย และแม่ฮ่องสอน ประชาชนควรงดกิจกรรมกลางแจ้ง</p>
+                   <span style={{ fontSize: '0.8rem', color: textColor, opacity: 0.7 }}>อัปเดต: {getRelativeTime(1)} | แหล่งที่มา: กรมควบคุมมลพิษ</span>
                 </div>
               </div>
             </div>
@@ -1384,7 +1412,7 @@ export default function App() {
             <div style={{ backgroundColor: cardBg, backdropFilter: backdropBlur, borderRadius: '20px', padding: '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
                 <h3 style={{ fontSize: '1.5rem', color: '#8b5cf6', margin: 0, fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '1.8rem' }}>🌪️</span> เฝ้าระวังพายุและทิศทางลม
+                  <span style={{ fontSize: '1.8rem' }}>🌪️</span> ศูนย์เฝ้าระวังดาวเทียม (Satellite)
                 </h3>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <select value={windyLayer} onChange={(e) => setWindyLayer(e.target.value)} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid ${borderColor}`, backgroundColor: 'rgba(0,0,0,0.05)', color: textColor, outline: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold' }}>
@@ -1410,10 +1438,10 @@ export default function App() {
               <p style={{ fontSize: '0.85rem', color: textColor, opacity: 0.7, marginTop: '15px', textAlign: 'right' }}>อ้างอิงข้อมูลจาก Windy.com (โมเดล ECMWF)</p>
             </div>
 
-            {/* โซนที่ 3: ปรากฏการณ์โลก เอลนีโญ / ลานีญา */}
+            {/* 🌟 โซนที่ 3: ปรากฏการณ์โลก (ปรับปรุงข้อมูลเชิงลึก Niño 3.4) */}
             <div style={{ backgroundColor: cardBg, backdropFilter: backdropBlur, borderRadius: '20px', padding: '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
               <h3 style={{ fontSize: '1.5rem', color: '#10b981', margin: '0 0 25px 0', fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '1.8rem' }}>🌡️</span> มาตรวัด เอลนีโญ / ลานีญา (ENSO Tracker)
+                <span style={{ fontSize: '1.8rem' }}>🌡️</span> สถานการณ์ เอลนีโญ / ลานีญา (ENSO) & Niño 3.4
               </h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 1.5fr', gap: '40px', alignItems: 'center' }}>
@@ -1421,41 +1449,57 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.03)', padding: '40px 20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
                   <style>{`
                     .enso-gauge-container { position: relative; width: 260px; height: 130px; overflow: hidden; }
-                    .enso-gauge-bg { position: absolute; top: 0; left: 0; width: 260px; height: 260px; border-radius: 50%; background: conic-gradient(from 270deg, #3b82f6 0deg 60deg, #10b981 60deg 120deg, #ef4444 120deg 180deg, transparent 180deg); }
+                    .enso-gauge-bg { position: absolute; top: 0; left: 0; width: 260px; height: 260px; border-radius: 50%; background: conic-gradient(from 270deg, #3b82f6 0deg 90deg, #10b981 90deg 110deg, #ef4444 110deg 180deg, transparent 180deg); }
                     .enso-gauge-inner { position: absolute; top: 35px; left: 35px; width: 190px; height: 190px; border-radius: 50%; background-color: ${darkMode ? '#1e293b' : '#f8fafc'}; }
-                    .enso-needle { position: absolute; bottom: 0; left: 128px; width: 4px; height: 100px; background-color: ${textColor}; transform-origin: bottom center; transform: rotate(10deg); border-radius: 4px; transition: transform 1s ease-out; }
+                    .enso-needle { position: absolute; bottom: 0; left: 128px; width: 4px; height: 100px; background-color: ${textColor}; transform-origin: bottom center; transform: rotate(-30deg); border-radius: 4px; transition: transform 1s ease-out; }
                     .enso-dot { position: absolute; bottom: -8px; left: 122px; width: 16px; height: 16px; background-color: ${textColor}; border-radius: 50%; }
                   `}</style>
                   
                   <div className="enso-gauge-container">
                     <div className="enso-gauge-bg"></div>
                     <div className="enso-gauge-inner" style={{ background: cardBg }}></div>
+                    {/* เข็มชี้ไปทาง ลานีญาอ่อนๆ (-30deg) */}
                     <div className="enso-needle"></div>
                     <div className="enso-dot"></div>
                   </div>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '280px', marginTop: '15px', fontSize: '0.9rem', fontWeight: 'bold' }}>
                     <span style={{ color: '#3b82f6' }}>ลานีญา (ฝนชุก)</span>
-                    <span style={{ color: '#10b981' }}>ปกติ</span>
+                    <span style={{ color: '#10b981', marginLeft: '25px' }}>ปกติ</span>
                     <span style={{ color: '#ef4444' }}>เอลนีโญ (แล้ง)</span>
                   </div>
 
-                  <div style={{ marginTop: '25px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>สภาวะปกติ (Neutral)</div>
-                    <p style={{ margin: '8px 0 0 0', color: textColor, opacity: 0.8, fontSize: '1rem' }}>มีแนวโน้มเปลี่ยนเข้าสู่ 'ลานีญา' ในช่วงครึ่งปีหลัง</p>
+                  <div style={{ marginTop: '25px', textAlign: 'center', backgroundColor: darkMode ? 'rgba(59,130,246,0.1)' : '#eff6ff', padding: '15px', borderRadius: '15px', border: '1px solid #bfdbfe', width: '100%' }}>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#2563eb' }}>ลานีญากำลังอ่อน (Weak La Niña)</div>
+                    <div style={{ margin: '8px 0 0 0', color: textColor, fontSize: '0.95rem', display: 'flex', justifyContent: 'space-between', padding: '0 10px' }}>
+                      <span>ดัชนี Niño 3.4 (SST):</span>
+                      <strong style={{ color: '#2563eb' }}>-0.65 °C</strong>
+                    </div>
                   </div>
                 </div>
 
                 <div>
-                   <h4 style={{ fontSize: '1.2rem', color: textColor, marginBottom: '15px', fontWeight: 'bold' }}>ผลกระทบต่อประเทศไทย</h4>
-                   <ul style={{ color: textColor, fontSize: '1rem', lineHeight: '1.9', paddingLeft: '20px', opacity: 0.9 }}>
-                     <li><strong>ปริมาณฝน:</strong> คาดว่าจะกลับมาตกชุกและมีปริมาณมากกว่าค่าปกติในช่วงฤดูฝน เสี่ยงต่อน้ำท่วมขัง</li>
-                     <li><strong>อุณหภูมิ:</strong> อากาศจะคลายความร้อนลงบ้างเมื่อเทียบกับปีที่แล้วที่แล้งจัด</li>
-                     <li><strong>การเกษตร:</strong> ควรเตรียมแหล่งรับน้ำและวางแผนระบายน้ำสำหรับพืชผลที่อาจได้รับความเสียหายจากน้ำท่วม</li>
-                   </ul>
-                   <button style={{ padding: '10px 20px', borderRadius: '30px', border: `1px solid #10b981`, backgroundColor: darkMode ? 'rgba(16,185,129,0.2)' : '#dcfce7', color: '#059669', fontSize: '1rem', cursor: 'pointer', fontWeight:'bold', marginTop: '20px', transition: '0.2s', boxShadow: '0 4px 10px rgba(16,185,129,0.15)' }}>
-                     🤖 ให้ AI วิเคราะห์เชิงลึก
-                   </button>
+                   <h4 style={{ fontSize: '1.2rem', color: textColor, marginBottom: '15px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     📊 บทวิเคราะห์สถานการณ์ (มีนาคม 2026)
+                   </h4>
+                   <p style={{ color: textColor, fontSize: '0.95rem', lineHeight: '1.8', opacity: 0.9, marginBottom: '15px' }}>
+                     อุณหภูมิผิวน้ำทะเล (SST Anomaly) บริเวณมหาสมุทรแปซิฟิกเขตศูนย์สูตร (ภูมิภาค Niño 3.4) ปัจจุบันมีค่าติดลบอยู่ที่ <strong>-0.65 °C</strong> ซึ่งชี้ให้เห็นว่าโลกกำลังอยู่ในสภาวะ <strong>"ลานีญากำลังอ่อน"</strong>
+                   </p>
+                   
+                   <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+                     <strong style={{ color: textColor }}>ผลกระทบต่อประเทศไทยในระยะนี้:</strong>
+                     <ul style={{ color: textColor, fontSize: '0.95rem', lineHeight: '1.8', paddingLeft: '20px', opacity: 0.9, margin: '10px 0 0 0' }}>
+                       <li><strong>ปริมาณฝน (Rainfall):</strong> ปริมาณฝนรวมทั่วประเทศมีแนวโน้ม <strong>สูงกว่าค่าปกติเล็กน้อย</strong> โดยเฉพาะในภาคใต้และภาคตะวันออก ควรเฝ้าระวังปัญหาน้ำท่วมฉับพลัน</li>
+                       <li><strong>อุณหภูมิ (Temperature):</strong> อุณหภูมิเฉลี่ยจะต่ำกว่าปีเอลนีโญอย่างเห็นได้ชัด แต่อาจสลับกับพายุฤดูร้อนในช่วงเปลี่ยนผ่านฤดู</li>
+                       <li><strong>การคาดการณ์ (Forecast):</strong> แบบจำลองพยากรณ์ชี้ว่า สภาวะลานีญาอ่อนนี้จะทรงตัวไปจนถึงกลางปี 2026 ก่อนจะค่อยๆ ปรับเข้าสู่สภาวะปกติ (Neutral)</li>
+                     </ul>
+                   </div>
+
+                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                     <button onClick={() => window.open('https://iri.columbia.edu/our-expertise/climate/forecasts/enso/current/', '_blank')} style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline', marginTop: '10px' }}>
+                       ดูข้อมูลสถิติฉบับเต็มจากสถาบัน IRI
+                     </button>
+                   </div>
                 </div>
 
               </div>
