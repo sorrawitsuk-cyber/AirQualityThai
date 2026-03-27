@@ -42,9 +42,6 @@ export default async function handler(req, res) {
   try {
     const rvDataRes = await fetch('https://api.rainviewer.com/public/weather-maps.json');
     const rvData = await rvDataRes.json();
-    const latestTime = rvData.radar.past[rvData.radar.past.length - 1].time;
-    const timeStr = new Date(latestTime * 1000).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
-    
     let targetDistrict = await getLocationName(lat, lon);
 
     // 🌟 Zoom 6: 1 พิกเซล = พื้นที่กว้างประมาณ 4.8 กิโลเมตร
@@ -54,15 +51,14 @@ export default async function handler(req, res) {
     const latRad = lat * Math.PI / 180;
     const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
 
-    // คำนวณพิกัดสัมบูรณ์ของพิกเซลบนแผนที่โลก
     const centerAbsX = x * 256;
     const centerAbsY = y * 256;
 
     const kmPerPixel = 4.8;
     const maxRadiusKm = 60;
-    const maxRadiusPx = Math.ceil(maxRadiusKm / kmPerPixel); // ~13 พิกเซล
+    const maxRadiusPx = Math.ceil(maxRadiusKm / kmPerPixel); 
 
-    // 🌟 นวัตกรรมใหม่: หาว่า 60 กม. นี้ มันคร่อมแผ่นดาวเทียมกี่แผ่น
+    // คำนวณขอบเขตแผนที่ล้อมรอบ 60 กม.
     const minAbsX = Math.floor(centerAbsX - maxRadiusPx);
     const maxAbsX = Math.floor(centerAbsX + maxRadiusPx);
     const minAbsY = Math.floor(centerAbsY - maxRadiusPx);
@@ -73,24 +69,54 @@ export default async function handler(req, res) {
     const minTileY = Math.floor(minAbsY / 256);
     const maxTileY = Math.floor(maxAbsY / 256);
 
-    // โหลดแผ่นดาวเทียมทั้งหมดที่เกี่ยวข้องกัน (1 ถึง 4 แผ่น)
-    const tilePromises = [];
-    const tileCoords = [];
+    let validTime = null;
+    let tileCache = {};
 
-    for (let tx = minTileX; tx <= maxTileX; tx++) {
-        for (let ty = minTileY; ty <= maxTileY; ty++) {
-            const url = `https://tilecache.rainviewer.com/v2/radar/${latestTime}/256/${zoom}/${tx}/${ty}/2/1_1.png`;
-            tileCoords.push(`${tx}_${ty}`);
-            // ถ้าดึงรูปไม่ได้ (Error 410) แสดงว่าแผ่นนั้นไม่มีฝน ให้ใส่ค่า null ไว้
-            tilePromises.push(Jimp.read(url).catch(() => null));
+    // 🌟 The Time Machine: ถอยหลังหาภาพที่โหลดได้สำเร็จ (สูงสุด 60 นาที)
+    const pastFrames = rvData.radar.past;
+    for (let i = pastFrames.length - 1; i >= Math.max(0, pastFrames.length - 6); i--) {
+        const time = pastFrames[i].time;
+        const tilePromises = [];
+        const tileCoords = [];
+
+        for (let tx = minTileX; tx <= maxTileX; tx++) {
+            for (let ty = minTileY; ty <= maxTileY; ty++) {
+                const url = `https://tilecache.rainviewer.com/v2/radar/${time}/256/${zoom}/${tx}/${ty}/2/1_1.png`;
+                tileCoords.push(`${tx}_${ty}`);
+                
+                // โหลดรูประดับลึกด้วย ArrayBuffer (แก้ปัญหา Timeout 100%)
+                tilePromises.push(
+                    fetch(url).then(async r => {
+                        if (r.ok) {
+                            const arrayBuffer = await r.arrayBuffer();
+                            return Jimp.read(Buffer.from(arrayBuffer));
+                        }
+                        return null;
+                    }).catch(() => null)
+                );
+            }
+        }
+
+        const tiles = await Promise.all(tilePromises);
+        let hasImage = false;
+        
+        tiles.forEach((img, idx) => {
+            if (img) {
+                hasImage = true;
+                tileCache[tileCoords[idx]] = img;
+            }
+        });
+
+        // ถ้าโหลดภาพแผ่นไหนแผ่นหนึ่งได้ ถือว่าเวลานี้ข้อมูลสมบูรณ์!
+        if (hasImage) {
+            validTime = time;
+            break;
         }
     }
 
-    const tiles = await Promise.all(tilePromises);
-    const tileCache = {};
-    tileCoords.forEach((coord, i) => {
-        tileCache[coord] = tiles[i];
-    });
+    const timeStr = validTime 
+        ? new Date(validTime * 1000).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
+        : new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
 
     let centerAlertLevel = 0;
     let nearestStormDistPx = Infinity;
@@ -98,7 +124,7 @@ export default async function handler(req, res) {
     let nearestStormDx = 0;
     let nearestStormDy = 0;
 
-    // กวาดตารางพิกเซลรัศมี 60 กม.
+    // กวาดเรดาร์วงกลม รัศมี 60 กม.
     for (let dy = -maxRadiusPx; dy <= maxRadiusPx; dy++) {
         for (let dx = -maxRadiusPx; dx <= maxRadiusPx; dx++) {
             const distPx = Math.sqrt(dx*dx + dy*dy);
@@ -107,7 +133,6 @@ export default async function handler(req, res) {
             const currAbsX = Math.floor(centerAbsX + dx);
             const currAbsY = Math.floor(centerAbsY + dy);
 
-            // คำนวณหาว่าพิกเซลนี้ตกไปอยู่รูปแผ่นไหน
             const tX = Math.floor(currAbsX / 256);
             const tY = Math.floor(currAbsY / 256);
             const pX = currAbsX % 256;
@@ -118,19 +143,19 @@ export default async function handler(req, res) {
                 const hexColor = img.getPixelColor(pX, pY);
                 const rgba = intToRGBA(hexColor);
 
-                // 🌟 ความไวเซนเซอร์ขั้นสุด! จับได้ตั้งแต่เมฆสีม่วงจางๆ ยันพายุลูกใหญ่
+                // 🌟 ความไวเซนเซอร์: จับเมฆฝนทุกสีที่มีความทึบเกิน 5
                 if (rgba.a > 5) { 
                     let level = 1;
-                    if (rgba.r > 200 && rgba.g < 100) level = 3;
-                    else if (rgba.r > 150 || rgba.g > 150) level = 2;
+                    if (rgba.r > 200 && rgba.g < 100) level = 3; 
+                    else if (rgba.r > 150 || rgba.g > 150) level = 2; 
 
-                    // ถ้าระยะไม่เกิน 1 พิกเซล ถือว่าตกอยู่ "บนหัวเรา" (รัศมี ~4.8 กม.)
-                    if (distPx <= 1) { 
+                    // 1.5 พิกเซลที่ Zoom 6 = รัศมี ~7 กิโลเมตร (ถ้าอยู่ในระยะนี้แปลว่ากำลังตกใส่หัวเรา)
+                    if (distPx <= 1.5) { 
                         if (level > centerAlertLevel) centerAlertLevel = level;
                     }
 
-                    // หาพายุลูกที่อยู่ใกล้เราที่สุด
-                    if (distPx <= maxRadiusPx && distPx > 1 && distPx < nearestStormDistPx) {
+                    // หาพายุลูกที่ใกล้เราที่สุดแต่อยู่วงนอก
+                    if (distPx <= maxRadiusPx && distPx > 1.5 && distPx < nearestStormDistPx) {
                         nearestStormDistPx = distPx;
                         nearestStormLevel = level;
                         nearestStormDx = dx;
@@ -146,7 +171,7 @@ export default async function handler(req, res) {
         currentLocName: targetDistrict,
         alertLevel: 0,
         cardTitle: 'ท้องฟ้าโปร่ง ไม่มีฝน',
-        cardDesc: `สแกนเรดาร์รัศมี ${maxRadiusKm} กม. รอบ ${targetDistrict} ไม่พบกลุ่มเมฆฝน ท้องฟ้าโปร่งครับ (ภาพดาวเทียมล่าสุด)`,
+        cardDesc: `สแกนเรดาร์รัศมี ${maxRadiusKm} กม. รอบ ${targetDistrict} ไม่พบกลุ่มเมฆฝน สามารถทำกิจกรรมหรือเดินทางได้ตามปกติครับ`,
         cardColor: 'blue',
         cardIcon: '☀️',
         cardTag: 'ปลอดภัย'
@@ -170,7 +195,7 @@ export default async function handler(req, res) {
         if (angleDiff > 180) angleDiff = 360 - angleDiff;
         const isApproaching = windSpeed > 5 && angleDiff <= 45;
 
-        const stormLevelText = nearestStormLevel === 3 ? "รุนแรง" : nearestStormLevel === 2 ? "ปานกลาง" : "เล็กน้อย";
+        const stormLevelText = nearestStormLevel === 3 ? "รุนแรง" : nearestStormLevel === 2 ? "ปานกลาง" : "เบาบาง";
 
         if (isApproaching) {
             const timeHours = distKm / windSpeed;
@@ -188,7 +213,7 @@ export default async function handler(req, res) {
             resultData.cardIcon = "👀";
             resultData.cardTitle = "พบกลุ่มฝน/เมฆบริเวณใกล้เคียง";
             resultData.cardTag = "เฝ้าระวัง";
-            resultData.cardDesc = `พบเมฆฝน${stormLevelText} ห่างออกไป ${distKm} กม. ทางทิศ${stormDirText} แต่กระแสลมปัจจุบันไม่ได้พัดมาทางนี้ ค่อนข้างปลอดภัยครับ`;
+            resultData.cardDesc = `พบเมฆฝนระดับ${stormLevelText} ห่างออกไป ${distKm} กม. ทางทิศ${stormDirText} แต่กระแสลมปัจจุบันไม่ได้พัดมาทางนี้ ค่อนข้างปลอดภัยครับ`;
         }
     }
 
