@@ -113,9 +113,8 @@ export default function App() {
     return saved ? saved === 'true' : false;
   });
   
-  // 🌟 State สำหรับสลับหน้าจอแผนที่
   const [showRadar, setShowRadar] = useState(false);
-  const [showHotspots, setShowHotspots] = useState(false); // 🔥 เพิ่ม State สำหรับดูจุดความร้อน
+  const [showHotspots, setShowHotspots] = useState(false);
   
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
@@ -493,7 +492,6 @@ export default function App() {
           } else { contextData += `(ไม่มีข้อมูล)`; }
       }
 
-      // 🌟 จำลองข้อมูลจุดความร้อนส่งให้ AI วิเคราะห์ประกอบ
       if (topic === 'hotspot') {
           contextData += `\n[ข้อมูลเสริมจากดาวเทียม NASA FIRMS]: ตรวจพบจุดความร้อน (Hotspots) สะสมจำนวนมากบริเวณพื้นที่ภาคเหนือและประเทศเพื่อนบ้านตะวันตก ทิศทางลมมีแนวโน้มพัดฝุ่นควันเข้าสู่ภาคกลางและ กทม.`;
       }
@@ -515,7 +513,6 @@ export default function App() {
       else if (topic === 'vendor') { promptText = `คุณคือที่ปรึกษาพ่อค้าแม่ค้าตลาดนัด วิเคราะห์สภาพอากาศ **${dayWord}**: 1.การตั้งร้าน/กางเต็นท์ (ระวังลมและฝน) 2.คาดการณ์คนเดินตลาด 3.การเก็บรักษาสินค้าตามสภาพอากาศ:\n\n${contextData}`; }
       else if (topic === 'construction') { promptText = `คุณคือวิศวกรควบคุมงานก่อสร้าง วิเคราะห์สภาพอากาศ **${dayWord}**: 1.งานทาสี/เทปูน (พิจารณาฝนและความชื้น) 2.ทำงานบนหลังคา/ที่สูง (พิจารณาลมและพายุ) 3.ความปลอดภัยคนงาน (ฮีทสโตรก):\n\n${contextData}`; }
       else if (topic === 'solar') { promptText = `คุณคือผู้เชี่ยวชาญด้านพลังงานโซลาร์เซลล์ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ประสิทธิภาพการผลิตไฟวันนี้ (พิจารณา UV และเมฆ) 2.การวางแผนใช้ไฟฟ้าในบ้าน 3.ควรล้างแผงโซลาร์เซลล์หรือไม่ (ดูแนวโน้มฝุ่นและฝน):\n\n${contextData}`; }
-      // 🌟 เพิ่ม AI หมวดใหม่ (หมอกควันและไฟป่า)
       else if (topic === 'hotspot') { promptText = `คุณคือผู้เชี่ยวชาญด้านมลพิษและภาพถ่ายดาวเทียม วิเคราะห์สถานการณ์ **${dayWord}**: 1. สรุปความเสี่ยงจากจุดความร้อน (Hotspots) และทิศทางลม 2. ผลกระทบต่อระดับฝุ่น PM2.5 ในพื้นที่เป้าหมาย 3. คำแนะนำขั้นเด็ดขาดในการป้องกันสุขภาพ:\n\n${contextData}`; }
 
       promptText += jsonInstruction;
@@ -547,11 +544,6 @@ export default function App() {
         console.error("Connection Error:", error); 
         setAiSummaryJson([{ title: "Connection Error", icon: "🚑", color: "red", tag: "เน็ตหลุด/เชื่อมต่อไม่ได้", desc: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์" }]); 
     } finally { setIsGeneratingAI(false); }
-  };
-
-  const handleShareAI = () => {
-    if(!aiSummaryJson) return; const shareText = `✨ สรุปสภาพอากาศจาก AI\n📍 ${alertsLocationName || 'ประเทศไทย'}\n\n` + aiSummaryJson.map(i => `${i.icon} ${i.title}: ${i.desc}`).join('\n\n') + `\n\n🔗 ดูเพิ่มเติมที่: Thai Weather Dashboard`;
-    if (navigator.share) { navigator.share({ title: 'สรุปสภาพอากาศจาก AI', text: shareText }).catch(console.error); } else { navigator.clipboard.writeText(shareText); alert('คัดลอกข้อความสรุปแล้ว! สามารถนำไปวางส่งให้เพื่อนได้เลยครับ'); }
   };
 
   const getDynamicBackground = () => {
@@ -612,21 +604,26 @@ export default function App() {
               <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '5px 12px', borderRadius: '30px', overflowX: 'auto', whiteSpace: 'nowrap', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>📍</label>
-                  <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                  <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); setShowHotspots(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกภูมิภาค</option>{Object.keys(regionMapping).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div style={{ width: '1px', height: '15px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>🗺️</label>
-                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); setShowHotspots(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
                   </select>
+                  {selectedProvince && (
+                     <button onClick={() => toggleFavorite(selectedProvince)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '0 5px' }} title="บันทึกสถานที่โปรด">
+                        {favLocations.includes(selectedProvince) ? '⭐' : '☆'}
+                     </button>
+                  )}
                 </div>
                 <div style={{ width: '1px', height: '15px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>📌</label>
-                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setIsMobileListOpen(false); setShowRadar(false);} }} style={{ width: '100%', minWidth: '150px', padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem', textOverflow: 'ellipsis' }}>
+                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setIsMobileListOpen(false); setShowRadar(false); setShowHotspots(false);} }} style={{ width: '100%', minWidth: '150px', padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem', textOverflow: 'ellipsis' }}>
                     <option value="">-- เลือกสถานี --</option>{filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(s => (<option key={s.stationID} value={s.stationID}>{s.nameTH}</option>))}
                   </select>
                 </div>
@@ -656,7 +653,7 @@ export default function App() {
 
           <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', flex: 1, minHeight: 0 }}>
             
-            {/* MAP AREA */}
+            {/* MAP AREA (Bento Style) */}
             <div style={{ flex: 7, width: '100%', borderRadius: '20px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '100%' : '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               
               <div 
@@ -674,20 +671,20 @@ export default function App() {
                     <button onClick={() => handleViewModeChange('uv')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isUvMode ? '#a855f7' : 'transparent', color: isUvMode ? '#fff' : textColor }}>☀️ UV</button>
                     <button onClick={() => handleViewModeChange('rain')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isRainMode ? '#3b82f6' : 'transparent', color: isRainMode ? '#fff' : textColor }}>🌧️ ฝน</button>
                     <button onClick={() => handleViewModeChange('wind')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isWindMode ? '#475569' : 'transparent', color: isWindMode ? '#fff' : textColor }}>🌬️ ลม</button>
+                    
                     <div style={{ width: '2px', backgroundColor: borderColor, margin: '0 4px' }}></div>
+                    <button onClick={() => setShowHotspots(!showHotspots)} style={{ padding: '6px 14px', borderRadius: '20px', border: showHotspots ? 'none' : `1px solid ${borderColor}`, fontWeight: 'bold', cursor: 'pointer', backgroundColor: showHotspots ? '#f43f5e' : 'transparent', color: showHotspots ? '#fff' : textColor, transition: 'all 0.2s', boxShadow: showHotspots ? '0 2px 8px rgba(244, 63, 94, 0.4)' : 'none' }}>
+                      {showHotspots ? '🔥 ปิดจุดความร้อน' : '🔥 จุดความร้อน NASA'}
+                    </button>
                   </>
                 ) : (
                   <div style={{ padding: '6px 14px', borderRadius: '20px', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-                    🔴 โหมดเรดาร์ดาวเทียม
+                    🔴 โหมดเรดาร์พายุ
                   </div>
                 )}
-                <button onClick={toggleRadar} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: showRadar ? '#ef4444' : 'transparent', color: showRadar ? '#fff' : textColor }}>{showRadar ? 'ปิดเรดาร์' : '📡 เรดาร์ฝน'}</button>
                 
-                {/* 🌟 ปุ่มสลับดูจุดไฟป่า NASA FIRMS */}
                 <div style={{ width: '2px', backgroundColor: borderColor, margin: '0 4px' }}></div>
-                <button onClick={() => setShowHotspots(!showHotspots)} style={{ padding: '6px 14px', borderRadius: '20px', border: showHotspots ? 'none' : `1px solid ${borderColor}`, fontWeight: 'bold', cursor: 'pointer', backgroundColor: showHotspots ? '#f43f5e' : 'transparent', color: showHotspots ? '#fff' : textColor, transition: 'all 0.2s', boxShadow: showHotspots ? '0 2px 8px rgba(244, 63, 94, 0.4)' : 'none' }}>
-                  {showHotspots ? '🔥 ปิดจุดความร้อน' : '🔥 จุดความร้อน NASA'}
-                </button>
+                <button onClick={toggleRadar} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: showRadar ? '#ef4444' : 'transparent', color: showRadar ? '#fff' : textColor }}>{showRadar ? 'ปิดเรดาร์' : '📡 เรดาร์พายุ (Windy)'}</button>
               </div>
 
               {!showRadar && (
@@ -697,7 +694,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* ป้ายกำกับอธิบายจุดไฟป่าตอนเปิดใช้งาน */}
               {!showRadar && showHotspots && (
                 <div style={{ position: 'absolute', top: '70px', right: '15px', zIndex: 500, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.2)' }}>
                   <span style={{ display:'inline-block', width:'10px', height:'10px', background:'#ff0000', borderRadius:'50%' }}></span> ตรวจพบความร้อนโดยดาวเทียม NASA (VIIRS/MODIS)
@@ -1021,7 +1017,6 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                  {/* 🌟 อัปเดตปุ่ม AI ให้ครบทุกหมวดหมู่ที่คุยกันไว้ */}
                   <button onClick={() => generateAISummary('general')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #3b82f6`, backgroundColor: darkMode ? 'rgba(59,130,246,0.15)' : '#eff6ff', color: '#3b82f6', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(59,130,246,0.1)' }}>🌤️ สรุปภาพรวม</button>
                   <button onClick={() => generateAISummary('rain')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #0ea5e9`, backgroundColor: darkMode ? 'rgba(14,165,233,0.15)' : '#e0f2fe', color: '#0ea5e9', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(14,165,233,0.1)' }}>☔ เช็คเวลาฝนตก</button>
                   <button onClick={() => generateAISummary('hourly')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #6366f1`, backgroundColor: darkMode ? 'rgba(99,102,241,0.15)' : '#e0e7ff', color: '#4f46e5', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(99,102,241,0.1)' }}>⏱️ วางแผนราย ชม.</button>
