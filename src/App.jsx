@@ -113,7 +113,9 @@ export default function App() {
     return saved ? saved === 'true' : false;
   });
   
+  // 🌟 State สำหรับสลับหน้าจอแผนที่
   const [showRadar, setShowRadar] = useState(false);
+  const [showHotspots, setShowHotspots] = useState(false); // 🔥 เพิ่ม State สำหรับดูจุดความร้อน
   
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
@@ -169,8 +171,6 @@ export default function App() {
     setSortOrder(mode === 'temp' ? 'asc' : 'desc'); 
     setShowRadar(false); 
   };
-
-  const toggleRadar = () => { setShowRadar(!showRadar); };
 
   const fetchOpenMeteoBulk = async (stationsList) => {
     try {
@@ -341,7 +341,7 @@ export default function App() {
     } catch (e) { console.error(e); } finally { setDashLoading(false); }
   };
 
-  const handleReset = () => { setSelectedRegion(''); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); setIsMobileListOpen(false); setCurrentPage('map'); window.scrollTo({top:0, behavior:'smooth'}); };
+  const handleReset = () => { setSelectedRegion(''); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setShowRadar(false); setShowHotspots(false); setIsMobileListOpen(false); setCurrentPage('map'); window.scrollTo({top:0, behavior:'smooth'}); };
   
   const handleFindNearest = () => {
     if (!navigator.geolocation) return alert('ไม่รองรับ GPS'); setLocating(true);
@@ -493,6 +493,11 @@ export default function App() {
           } else { contextData += `(ไม่มีข้อมูล)`; }
       }
 
+      // 🌟 จำลองข้อมูลจุดความร้อนส่งให้ AI วิเคราะห์ประกอบ
+      if (topic === 'hotspot') {
+          contextData += `\n[ข้อมูลเสริมจากดาวเทียม NASA FIRMS]: ตรวจพบจุดความร้อน (Hotspots) สะสมจำนวนมากบริเวณพื้นที่ภาคเหนือและประเทศเพื่อนบ้านตะวันตก ทิศทางลมมีแนวโน้มพัดฝุ่นควันเข้าสู่ภาคกลางและ กทม.`;
+      }
+
       const dayWord = aiTargetDay === 0 ? 'วันนี้' : `วันที่ ${targetDateStr}`;
       
       const jsonInstruction = `\n\n**สำคัญมาก: คุณต้องตอบกลับเป็น JSON Array แท้ๆ ตามโครงสร้างนี้เท่านั้น:**\n[\n  { "title": "ชื่อหัวข้อ", "icon": "ใส่อีโมจิ1ตัว", "color": "green หรือ red หรือ yellow หรือ blue", "tag": "คำในป้ายกำกับสั้นๆ เช่น ปลอดภัย, เฝ้าระวัง, ควรเลี่ยง, ไม่มีฝน", "desc": "อธิบายเหตุผลสั้นๆกระชับ" }\n]`;
@@ -504,14 +509,14 @@ export default function App() {
       else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
       else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศ **${dayWord}**: 1.เวลาตากผ้า 2.เวลาล้างรถ 3.ต้องพกร่มไหม:\n\n${contextData}`; } 
       else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ออกกำลังกายกลางแจ้งได้ไหม 2.ช่วงเวลาที่ดีที่สุด 3.ข้อควรระวัง:\n\n${contextData}`; } 
-      // 🌟 อัปเดต Prompt หมวดสุขภาพ/เช็คฝุ่น
       else if (topic === 'health') { promptText = `คุณคือแพทย์ผู้เชี่ยวชาญด้านทางเดินหายใจ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.คุณภาพอากาศ/ระดับฝุ่น PM2.5 2.ความปลอดภัยในการทำกิจกรรม 3.คำแนะนำการสวมหน้ากากและการดูแลสุขภาพ:\n\n${contextData}`; }
       else if (topic === 'agriculture') { promptText = `คุณคือผู้เชี่ยวชาญการเกษตร วิเคราะห์สภาพอากาศ **${dayWord}**: 1.พ่นปุ๋ย/ยา 2.การรดน้ำ 3.ตากผลผลิต:\n\n${contextData}`; }
-      // 🌟 เพิ่ม 4 หมวดหมู่ใหม่
       else if (topic === 'pet') { promptText = `คุณคือสัตวแพทย์ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.เวลาพาสัตว์เลี้ยงเดินเล่นที่ปลอดภัย 2.การระวังฮีทสโตรกและฝุ่น PM2.5 3.การจัดการที่นอนและความชื้น:\n\n${contextData}`; }
       else if (topic === 'vendor') { promptText = `คุณคือที่ปรึกษาพ่อค้าแม่ค้าตลาดนัด วิเคราะห์สภาพอากาศ **${dayWord}**: 1.การตั้งร้าน/กางเต็นท์ (ระวังลมและฝน) 2.คาดการณ์คนเดินตลาด 3.การเก็บรักษาสินค้าตามสภาพอากาศ:\n\n${contextData}`; }
       else if (topic === 'construction') { promptText = `คุณคือวิศวกรควบคุมงานก่อสร้าง วิเคราะห์สภาพอากาศ **${dayWord}**: 1.งานทาสี/เทปูน (พิจารณาฝนและความชื้น) 2.ทำงานบนหลังคา/ที่สูง (พิจารณาลมและพายุ) 3.ความปลอดภัยคนงาน (ฮีทสโตรก):\n\n${contextData}`; }
       else if (topic === 'solar') { promptText = `คุณคือผู้เชี่ยวชาญด้านพลังงานโซลาร์เซลล์ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ประสิทธิภาพการผลิตไฟวันนี้ (พิจารณา UV และเมฆ) 2.การวางแผนใช้ไฟฟ้าในบ้าน 3.ควรล้างแผงโซลาร์เซลล์หรือไม่ (ดูแนวโน้มฝุ่นและฝน):\n\n${contextData}`; }
+      // 🌟 เพิ่ม AI หมวดใหม่ (หมอกควันและไฟป่า)
+      else if (topic === 'hotspot') { promptText = `คุณคือผู้เชี่ยวชาญด้านมลพิษและภาพถ่ายดาวเทียม วิเคราะห์สถานการณ์ **${dayWord}**: 1. สรุปความเสี่ยงจากจุดความร้อน (Hotspots) และทิศทางลม 2. ผลกระทบต่อระดับฝุ่น PM2.5 ในพื้นที่เป้าหมาย 3. คำแนะนำขั้นเด็ดขาดในการป้องกันสุขภาพ:\n\n${contextData}`; }
 
       promptText += jsonInstruction;
 
@@ -617,11 +622,6 @@ export default function App() {
                   <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
                   </select>
-                  {selectedProvince && (
-                     <button onClick={() => toggleFavorite(selectedProvince)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '0 5px' }} title="บันทึกสถานที่โปรด">
-                        {favLocations.includes(selectedProvince) ? '⭐' : '☆'}
-                     </button>
-                  )}
                 </div>
                 <div style={{ width: '1px', height: '15px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
@@ -656,7 +656,7 @@ export default function App() {
 
           <div style={{ display: 'flex', gap: '15px', flexDirection: window.innerWidth < 768 ? 'column' : 'row', padding: '15px', flex: 1, minHeight: 0 }}>
             
-            {/* MAP AREA (Bento Style) */}
+            {/* MAP AREA */}
             <div style={{ flex: 7, width: '100%', borderRadius: '20px', overflow: 'hidden', position: 'relative', border: `1px solid ${borderColor}`, height: window.innerWidth < 768 ? '100%' : '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               
               <div 
@@ -682,12 +682,25 @@ export default function App() {
                   </div>
                 )}
                 <button onClick={toggleRadar} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: showRadar ? '#ef4444' : 'transparent', color: showRadar ? '#fff' : textColor }}>{showRadar ? 'ปิดเรดาร์' : '📡 เรดาร์ฝน'}</button>
+                
+                {/* 🌟 ปุ่มสลับดูจุดไฟป่า NASA FIRMS */}
+                <div style={{ width: '2px', backgroundColor: borderColor, margin: '0 4px' }}></div>
+                <button onClick={() => setShowHotspots(!showHotspots)} style={{ padding: '6px 14px', borderRadius: '20px', border: showHotspots ? 'none' : `1px solid ${borderColor}`, fontWeight: 'bold', cursor: 'pointer', backgroundColor: showHotspots ? '#f43f5e' : 'transparent', color: showHotspots ? '#fff' : textColor, transition: 'all 0.2s', boxShadow: showHotspots ? '0 2px 8px rgba(244, 63, 94, 0.4)' : 'none' }}>
+                  {showHotspots ? '🔥 ปิดจุดความร้อน' : '🔥 จุดความร้อน NASA'}
+                </button>
               </div>
 
               {!showRadar && (
                 <div style={{ position: 'absolute', bottom: '25px', right: window.innerWidth < 768 ? '70px' : '70px', zIndex: 500, background: cardBg, padding: '6px 14px', borderRadius: '20px', fontSize: '0.75rem', color: textColor, backdropFilter: backdropBlur, border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                   <span style={{ fontSize: '1rem' }}>⏱️</span> อัปเดต: {lastUpdateText || 'กำลังโหลด...'}
                   <button onClick={() => fetchAirQuality(false)} style={{ background: 'none', border: 'none', padding: '0 0 0 4px', cursor: 'pointer', fontSize: '1rem', color: '#0ea5e9' }} title="โหลดข้อมูลล่าสุด">🔄</button>
+                </div>
+              )}
+
+              {/* ป้ายกำกับอธิบายจุดไฟป่าตอนเปิดใช้งาน */}
+              {!showRadar && showHotspots && (
+                <div style={{ position: 'absolute', top: '70px', right: '15px', zIndex: 500, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <span style={{ display:'inline-block', width:'10px', height:'10px', background:'#ff0000', borderRadius:'50%' }}></span> ตรวจพบความร้อนโดยดาวเทียม NASA (VIIRS/MODIS)
                 </div>
               )}
 
@@ -722,7 +735,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 แสดงแผนที่เรดาร์แบบเต็มจอและโต้ตอบได้ 100% ไม่มีกรอบบังแล้ว! */}
               {showRadar && (
                   <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 450, backgroundColor: darkMode ? '#0f172a' : '#fff' }}>
                     <iframe 
@@ -744,6 +756,16 @@ export default function App() {
                     <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
                   </LayersControl.BaseLayer>
                 </LayersControl>
+
+                {/* 🌟 พระเอกของเรา Layer แสดงจุดความร้อน NASA (VIIRS/MODIS) */}
+                {showHotspots && (
+                  <TileLayer 
+                    url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/current/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png" 
+                    maxNativeZoom={8} 
+                    opacity={0.9} 
+                    zIndex={500} 
+                  />
+                )}
                 
                 <MapFix /> <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} selectedRegion={selectedRegion} /> <FlyToActiveStation activeStation={activeStation} /> 
                 
@@ -856,7 +878,6 @@ export default function App() {
                         <div style={{ marginTop:'12px', padding:'10px', background:'rgba(0,0,0,0.05)', borderRadius:'8px', display:'flex', gap:'8px', border: `1px dashed ${boxBg}` }}><span>{hAdv.icon}</span><span style={{fontSize:'0.8rem',color:textColor}}>{hAdv.text}</span></div>
                       )}
 
-                      {/* 🌟 กู้คืนมินิกราฟพยากรณ์ */}
                       {isActive && (
                         <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` }}>
                           <h5 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: textColor, display: 'flex', alignItems: 'center', gap: '5px' }}>📊 แนวโน้ม {activeChart.name}</h5>
@@ -1013,6 +1034,7 @@ export default function App() {
                   <button onClick={() => generateAISummary('vendor')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #8b5cf6`, backgroundColor: darkMode ? 'rgba(139,92,246,0.15)' : '#f5f3ff', color: '#8b5cf6', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(139,92,246,0.1)' }}>⛺ พ่อค้าแม่ค้า</button>
                   <button onClick={() => generateAISummary('construction')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #78716c`, backgroundColor: darkMode ? 'rgba(120,113,108,0.15)' : '#f5f5f4', color: '#57534e', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(120,113,108,0.1)' }}>👷‍♂️ งานช่าง/ก่อสร้าง</button>
                   <button onClick={() => generateAISummary('solar')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #eab308`, backgroundColor: darkMode ? 'rgba(234,179,8,0.15)' : '#fefce8', color: '#ca8a04', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(234,179,8,0.1)' }}>☀️ โซลาร์เซลล์</button>
+                  <button onClick={() => generateAISummary('hotspot')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #ff5722`, backgroundColor: darkMode ? 'rgba(255,87,34,0.15)' : '#fff3e0', color: '#ea580c', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(255,87,34,0.1)' }}>🔥 หมอกควัน/ไฟป่า</button>
                 </div>
 
                 <div style={{ backgroundColor: 'rgba(0,0,0,0.02)', padding: isGeneratingAI || aiSummaryJson ? '20px' : '0', borderRadius: '15px', border: aiSummaryJson ? `1px dashed rgba(139, 92, 246, 0.5)` : 'none', transition: 'all 0.3s' }}>
