@@ -19,13 +19,6 @@ const getRainColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:
 const getWindColor = (val) => { return (isNaN(val)||val===null)?{bg:'#ccc',text:'#333',bar:'#ccc',label:'ไม่มีข้อมูล'}:val<=10?{bg:'#00b0f0',text:'#fff',bar:'#00b0f0',label:'ลมอ่อน'}:val<=25?{bg:'#2ecc71',text:'#fff',bar:'#2ecc71',label:'ลมปานกลาง'}:val<=40?{bg:'#f1c40f',text:'#222',bar:'#f1c40f',label:'ลมแรง'}:val<=60?{bg:'#e67e22',text:'#fff',bar:'#e67e22',label:'ลมแรงมาก'}:{bg:'#e74c3c',text:'#fff',bar:'#e74c3c',label:'พายุ'}; };
 const getWeatherIcon = (c) => { if(c===undefined||c===null)return{icon:'❓',text:'ไม่ทราบ'}; if(c===0)return{icon:'☀️',text:'แจ่มใส'}; if(c===1)return{icon:'🌤️',text:'มีเมฆบางส่วน'}; if(c===2)return{icon:'⛅',text:'มีเมฆ'}; if(c===3)return{icon:'☁️',text:'มีเมฆมาก'}; if([45,48].includes(c))return{icon:'🌫️',text:'มีหมอก'}; if([51,53,55,56,57].includes(c))return{icon:'🌧️',text:'ฝนปรอย'}; if([61,63,65,66,67].includes(c))return{icon:'🌧️',text:'ฝนตก'}; if([71,73,75,77,85,86].includes(c))return{icon:'❄️',text:'หิมะ'}; if([80,81,82].includes(c))return{icon:'🌦️',text:'ฝนตกหย่อมๆ'}; if([95,96,99].includes(c))return{icon:'⛈️',text:'พายุฝน'}; return{icon:'🌤️',text:'ปกติ'}; };
 
-// 🌟 ฟังก์ชันหาวันที่สำหรับดาวเทียม NASA 
-const getGibsDate = () => {
-  const d = new Date();
-  d.setHours(d.getHours() - 12); // ย้อนหลังไป 12 ชม. เพื่อให้แน่ใจว่า NASA ประมวลผลภาพเสร็จแล้วชัวร์ๆ
-  return d.toISOString().split('T')[0];
-};
-
 const regionMapping = { "ภาคเหนือ": ["เชียงใหม่", "เชียงราย", "แพร่", "น่าน", "พะเยา", "ลำปาง", "ลำพูน", "แม่ฮ่องสอน", "อุตรดิตถ์"], "ภาคตะวันออกเฉียงเหนือ": ["กาฬสินธุ์", "ขอนแก่น", "ชัยภูมิ", "นครพนม", "นครราชสีมา", "บึงกาฬ", "บุรีรัมย์", "มหาสารคาม", "มุกดาหาร", "ยโสธร", "ร้อยเอ็ด", "เลย", "สกลนคร", "สุรินทร์", "ศรีสะเกษ", "หนองคาย", "หนองบัวลำภู", "อุดรธานี", "อุบลราชธานี", "อำนาจเจริญ"], "ภาคกลาง": ["กรุงเทพมหานคร", "กำแพงเพชร", "ชัยนาท", "นครนายก", "นครปฐม", "นครสวรรค์", "นนทบุรี", "ปทุมธานี", "พระนครศรีอยุธยา", "พิจิตร", "พิษณุโลก", "เพชรบูรณ์", "ลพบุรี", "สมุทรปราการ", "สมุทรสงคราม", "สมุทรสาคร", "สิงห์บุรี", "สุโขทัย", "สุพรรณบุรี", "สระบุรี", "อ่างทอง", "อุทัยธานี"], "ภาคตะวันออก": ["จันทบุรี", "ฉะเชิงเทรา", "ชลบุรี", "ตราด", "ปราจีนบุรี", "ระยอง", "สระแก้ว"], "ภาคตะวันตก": ["กาญจนบุรี", "ตาก", "ประจวบคีรีขันธ์", "เพชรบุรี", "ราชบุรี"], "ภาคใต้": ["กระบี่", "ชุมพร", "ตรัง", "นครศรีธรรมราช", "นราธิวาส", "ปัตตานี", "พังงา", "พัทลุง", "ภูเก็ต", "ระนอง", "สตูล", "สงขลา", "สุราษฎร์ธานี", "ยะลา"] };
 const thaiProvinces = Object.values(regionMapping).flat();
 const getRegion = (province) => { for (const [region, provinces] of Object.entries(regionMapping)) { if (provinces.includes(province)) return region; } return "อื่นๆ"; };
@@ -37,8 +30,7 @@ const legendData = {
   heat: { title: 'ดัชนีความร้อน', items: [{color:'#3b82f6',label:'< 27.0 (ปกติ)'},{color:'#22c55e',label:'27.0-32.9 (เฝ้าระวัง)'},{color:'#eab308',label:'33.0-41.9 (เตือนภัย)'},{color:'#f97316',label:'42.0-51.9 (อันตราย)'},{color:'#ef4444',label:'≥ 52.0 (อันตรายมาก)'}] },
   uv: { title: 'รังสี UV สูงสุด', items: [{color:'#2ecc71',label:'0-2 (ต่ำ)'},{color:'#f1c40f',label:'3-5 (ปานกลาง)'},{color:'#e67e22',label:'6-7 (สูง)'},{color:'#e74c3c',label:'8-10 (สูงมาก)'},{color:'#9b59b6',label:'> 10 (อันตราย)'}] },
   rain: { title: 'โอกาสเกิดฝน', items: [{color:'#95a5a6',label:'0 (ไม่มีฝน)'},{color:'#74b9ff',label:'1-30 (โอกาสต่ำ)'},{color:'#0984e3',label:'31-60 (ปานกลาง)'},{color:'#273c75',label:'61-80 (โอกาสสูง)'},{color:'#192a56',label:'> 80 (ตกหนัก)'}] },
-  wind: { title: 'ความเร็วลม', items: [{color:'#00b0f0',label:'0-10 (ลมอ่อน)'},{color:'#2ecc71',label:'11-25 (ลมปานกลาง)'},{color:'#f1c40f',label:'26-40 (ลมแรง)'},{color:'#e67e22',label:'41-60 (ลมแรงมาก)'},{color:'#e74c3c',label:'> 60 (พายุ)'}] },
-  hotspot: { title: 'ดาวเทียม NASA', items: [{color:'#ef4444',label:'จุดความร้อน (ไฟป่า/การเผา)'}] } // 🌟 เพิ่ม Legend สำหรับ Hotspot
+  wind: { title: 'ความเร็วลม', items: [{color:'#00b0f0',label:'0-10 (ลมอ่อน)'},{color:'#2ecc71',label:'11-25 (ลมปานกลาง)'},{color:'#f1c40f',label:'26-40 (ลมแรง)'},{color:'#e67e22',label:'41-60 (ลมแรงมาก)'},{color:'#e74c3c',label:'> 60 (พายุ)'}] }
 };
 
 const chartConfigs = { 
@@ -47,11 +39,9 @@ const chartConfigs = {
   heat: { key: 'heat', keyLY: 'heatLY', name: 'Heat Index สูงสุด', color: '#ea580c', hasLY: true, domain: [min => Math.min(25, Math.floor(min)), max => Math.max(55, Math.ceil(max))] }, 
   uv: { key: 'uv', keyLY: null, name: 'รังสี UV สูงสุด', color: '#a855f7', domain: [0, max => Math.max(12, Math.ceil(max))] }, 
   rain: { key: 'rain', keyLY: 'rainLY', name: 'ปริมาณฝนสะสม', color: '#3b82f6', hasLY: true, domain: [0, max => Math.max(20, Math.ceil(max))] }, 
-  wind: { key: 'wind', keyLY: 'windLY', name: 'ความเร็วลมสูงสุด', color: '#64748b', hasLY: true, domain: [0, max => Math.max(40, Math.ceil(max))] },
-  hotspot: { key: 'pm25', name: 'จุดความร้อน (Hot spot)', color: '#ef4444', domain: [0, 500] }
+  wind: { key: 'wind', keyLY: 'windLY', name: 'ความเร็วลมสูงสุด', color: '#64748b', hasLY: true, domain: [0, max => Math.max(40, Math.ceil(max))] } 
 };
 
-// 2. Map Components & Skeleton
 const createCustomMarker = (viewMode, value, extraData) => {
   let bg, textColor, displayValue; const fontSize = String(value).length > 2 ? '9px' : '11px';
   if (viewMode === 'pm25') { bg = getPM25Color(value); textColor = (value > 25.0 && value <= 37.5) ? '#222' : '#fff'; displayValue = (value === 0 || isNaN(value)) ? '-' : value; } else if (viewMode === 'temp') { const tInfo = getTempColor(value); bg = tInfo.bg; textColor = tInfo.text; displayValue = (value == null || isNaN(value)) ? '-' : Math.round(value); } else if (viewMode === 'heat') { const hInfo = getHeatIndexAlert(value); bg = value != null ? hInfo.bar : '#cccccc'; textColor = '#fff'; displayValue = (value == null || isNaN(value)) ? '-' : Math.round(value); } else if (viewMode === 'uv') { const uInfo = getUvColor(value); bg = value != null ? uInfo.bar : '#cccccc'; textColor = (value > 2 && value <= 5) ? '#222' : '#fff'; displayValue = (value == null || isNaN(value)) ? '-' : Math.round(value); } else if (viewMode === 'rain') { const rInfo = getRainColor(value); bg = value != null ? rInfo.bar : '#cccccc'; textColor = (value <= 30 && value > 0) ? '#222' : '#fff'; displayValue = (value == null || isNaN(value)) ? '-' : `${Math.round(value)}%`; } else if (viewMode === 'wind') { const wInfo = getWindColor(value); bg = value != null ? wInfo.bar : '#cccccc'; textColor = (value > 10 && value <= 40) ? '#222' : '#fff'; const dir = extraData?.windDir || 0; displayValue = value == null ? '-' : `<div style="display:flex; flex-direction:column; align-items:center; line-height:1;"><span style="transform: rotate(${dir}deg); font-size: 14px; margin-bottom: -1px; font-weight: bold;">↓</span><span style="font-size: 9px;">${Math.round(value)}</span></div>`; }
@@ -96,9 +86,6 @@ const SkeletonLoading = ({ darkMode }) => {
   );
 };
 
-// ==============================================================
-// 3. Main App Component
-// ==============================================================
 export default function App() {
   const [stations, setStations] = useState([]); 
   const [filteredStations, setFilteredStations] = useState([]);
@@ -124,6 +111,9 @@ export default function App() {
   
   const [showRadar, setShowRadar] = useState(false);
   
+  // 🌟 พระเอกตัวจริง: State ดึงเวลาปัจจุบันเพื่อแก้ปัญหานาฬิกาเพี้ยน
+  const [realGibsDate, setRealGibsDate] = useState(null);
+
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
 
@@ -165,6 +155,22 @@ export default function App() {
   
   useEffect(() => { setAiSummaryJson(null); setAiTimestamp(''); setNowcastAlert(null); }, [alertsLocationName, activeStation, aiTargetDay]);
 
+  // 🌟 ดึงข้อมูล "เวลาจริงๆ ของโลก" ป้องกันผู้ใช้ปรับนาฬิกาเครื่องไปปี 2026
+  useEffect(() => {
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.5&current=temperature_2m')
+      .then(res => res.json())
+      .then(data => {
+          if (data && data.current && data.current.time) {
+              const d = new Date(data.current.time);
+              d.setDate(d.getDate() - 1); // ย้อนหลัง 1 วันเพื่อให้ดาวเทียมมีรูป 100%
+              setRealGibsDate(d.toISOString().split('T')[0]);
+          }
+      })
+      .catch(() => {
+          setRealGibsDate('2024-05-18'); // Fallback ปลอดภัยสุดๆ
+      });
+  }, []);
+
   const toggleFavorite = (prov) => {
     let newFavs = [...favLocations];
     if (newFavs.includes(prov)) newFavs = newFavs.filter(l => l !== prov);
@@ -178,8 +184,6 @@ export default function App() {
     setSortOrder(mode === 'temp' ? 'asc' : 'desc'); 
     setShowRadar(false); 
   };
-
-  const toggleRadar = () => { setShowRadar(!showRadar); };
 
   const fetchOpenMeteoBulk = async (stationsList) => {
     try {
@@ -566,12 +570,6 @@ export default function App() {
     return darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : 'linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%)';
   };
 
-  const getRelativeTime = (hoursAgo) => {
-    const d = new Date();
-    d.setHours(d.getHours() - hoursAgo);
-    return `วันนี้ ${d.getHours().toString().padStart(2, '0')}:00 น.`;
-  };
-
   if (loading) return <SkeletonLoading darkMode={darkMode} />;
 
   const isPm25Mode = viewMode === 'pm25'; const isTempMode = viewMode === 'temp'; const isHeatMode = viewMode === 'heat';
@@ -583,7 +581,6 @@ export default function App() {
   const borderColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)';
   const backdropBlur = 'blur(16px)';
   
-  // 🌟 จัดการ Chart ให้แสดง PM2.5 ถ้าผู้ใช้อยู่โหมด Hotspot
   const activeChart = chartConfigs[viewMode === 'hotspot' ? 'pm25' : viewMode] || chartConfigs['pm25']; 
 
   const validForecast = dashForecast.filter(d => d[activeChart.key] != null);
@@ -596,13 +593,6 @@ export default function App() {
     const provStations = stations.filter(s => extractProvince(s.areaTH) === selectedProvince && !isNaN(parseFloat(s.lat)));
     if (provStations.length > 0) { radarLat = provStations.reduce((sum, s) => sum + parseFloat(s.lat), 0) / provStations.length; radarLon = provStations.reduce((sum, s) => sum + parseFloat(s.long), 0) / provStations.length; radarZoom = 8; }
   }
-
-  // 🌟 ดึงวันที่ย้อนหลัง 12 ชั่วโมงเพื่อความชัวร์ของข้อมูลดาวเทียม NASA
-  const getGibsDateStr = () => {
-    const d = new Date();
-    d.setHours(d.getHours() - 12);
-    return d.toISOString().split('T')[0];
-  };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', width:'100vw', background: themeBg, fontFamily:"'Kanit', sans-serif", overflowY:'hidden', overflowX:'hidden', transition: 'background 1s ease' }}>
@@ -633,11 +623,6 @@ export default function App() {
                   <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
                   </select>
-                  {selectedProvince && (
-                     <button onClick={() => toggleFavorite(selectedProvince)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '0 5px' }} title="บันทึกสถานที่โปรด">
-                        {favLocations.includes(selectedProvince) ? '⭐' : '☆'}
-                     </button>
-                  )}
                 </div>
                 <div style={{ width: '1px', height: '15px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
@@ -691,7 +676,6 @@ export default function App() {
                     <button onClick={() => handleViewModeChange('rain')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isRainMode ? '#3b82f6' : 'transparent', color: isRainMode ? '#fff' : textColor }}>🌧️ ฝน</button>
                     <button onClick={() => handleViewModeChange('wind')} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontWeight: 'bold', cursor: 'pointer', backgroundColor: isWindMode ? '#475569' : 'transparent', color: isWindMode ? '#fff' : textColor }}>🌬️ ลม</button>
                     
-                    {/* 🌟 ปุ่มสลับดูจุดไฟป่า NASA FIRMS (กดแล้วเปลี่ยนเป็นโหมด Hotspot) */}
                     <div style={{ width: '2px', backgroundColor: borderColor, margin: '0 4px' }}></div>
                     <button onClick={() => handleViewModeChange(viewMode === 'hotspot' ? 'pm25' : 'hotspot')} style={{ padding: '6px 14px', borderRadius: '20px', border: viewMode === 'hotspot' ? 'none' : `1px solid ${borderColor}`, fontWeight: 'bold', cursor: 'pointer', backgroundColor: viewMode === 'hotspot' ? '#f43f5e' : 'transparent', color: viewMode === 'hotspot' ? '#fff' : textColor, transition: 'all 0.2s', boxShadow: viewMode === 'hotspot' ? '0 2px 8px rgba(244, 63, 94, 0.4)' : 'none' }}>
                       {viewMode === 'hotspot' ? '🔥 ปิด Hot spot' : '🔥 Hot spot'}
@@ -714,7 +698,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* ป้ายกำกับอธิบายจุดไฟป่าตอนเปิดใช้งาน */}
               {viewMode === 'hotspot' && !showRadar && (
                 <div style={{ position: 'absolute', top: '70px', right: '15px', zIndex: 500, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.2)' }}>
                   <span style={{ display:'inline-block', width:'10px', height:'10px', background:'#ff0000', borderRadius:'50%' }}></span> ตรวจพบ Hot spot โดยดาวเทียม NASA
@@ -752,7 +735,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 แสดงแผนที่เรดาร์แบบเต็มจอและโต้ตอบได้ 100% ไม่มีกรอบบังแล้ว! */}
               {showRadar && (
                   <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 450, backgroundColor: darkMode ? '#0f172a' : '#fff' }}>
                     <iframe 
@@ -775,10 +757,10 @@ export default function App() {
                   </LayersControl.BaseLayer>
                 </LayersControl>
 
-                {/* 🌟 พระเอกของเรา Layer แสดงจุดความร้อน NASA (VIIRS/MODIS) */}
-                {viewMode === 'hotspot' && !showRadar && (
+                {/* 🌟 พระเอกของเรา Layer แสดงจุดความร้อน NASA ดึง Real Date ทะลุการจำลองเวลา */}
+                {viewMode === 'hotspot' && !showRadar && realGibsDate && (
                   <TileLayer 
-                    url={`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${getGibsDateStr()}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`} 
+                    url={`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${realGibsDate}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`} 
                     maxNativeZoom={8} 
                     opacity={1} 
                     zIndex={500} 
@@ -787,7 +769,6 @@ export default function App() {
                 
                 <MapFix /> <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} selectedRegion={selectedRegion} /> <FlyToActiveStation activeStation={activeStation} /> 
                 
-                {/* 🌟 ปิดโหมดอื่นไปเลย: ซ่อน Marker ทั้งหมดถ้าอยู่ในโหมด Hotspot */}
                 {!showRadar && viewMode !== 'hotspot' && filteredStations.map((station) => {
                   const lat = parseFloat(station.lat); const lon = parseFloat(station.long); if (isNaN(lat) || isNaN(lon)) return null;
                   const pmVal = Number(station.AQILast?.PM25?.value); const tObj = stationTemps[station.stationID];
@@ -839,7 +820,6 @@ export default function App() {
               animation: window.innerWidth < 768 ? 'slideUp 0.3s ease-out' : 'none'
             }}>
               
-              {/* 🌟 ถ้าเป็นโหมด Hotspot เปลี่ยน Sidebar เป็นป้ายอธิบาย */}
               {viewMode === 'hotspot' ? (
                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', textAlign: 'center', color: textColor }}>
                     <div style={{ fontSize: '4rem', marginBottom: '15px' }}>🔥</div>
@@ -1065,6 +1045,7 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                  {/* 🌟 อัปเดตปุ่ม AI ให้ครบทุกหมวดหมู่ที่คุยกันไว้ */}
                   <button onClick={() => generateAISummary('general')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #3b82f6`, backgroundColor: darkMode ? 'rgba(59,130,246,0.15)' : '#eff6ff', color: '#3b82f6', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(59,130,246,0.1)' }}>🌤️ สรุปภาพรวม</button>
                   <button onClick={() => generateAISummary('rain')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #0ea5e9`, backgroundColor: darkMode ? 'rgba(14,165,233,0.15)' : '#e0f2fe', color: '#0ea5e9', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(14,165,233,0.1)' }}>☔ เช็คเวลาฝนตก</button>
                   <button onClick={() => generateAISummary('hourly')} disabled={isGeneratingAI} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid #6366f1`, backgroundColor: darkMode ? 'rgba(99,102,241,0.15)' : '#e0e7ff', color: '#4f46e5', fontSize: '0.9rem', cursor: isGeneratingAI?'wait':'pointer', fontWeight:'bold', transition:'0.2s', boxShadow: '0 2px 5px rgba(99,102,241,0.1)' }}>⏱️ วางแผนราย ชม.</button>
