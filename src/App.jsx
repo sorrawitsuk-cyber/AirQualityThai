@@ -1344,7 +1344,7 @@ export default function App() {
                   <span style={{ fontSize: '1.8rem' }}>🌪️</span> ศูนย์เฝ้าระวังดาวเทียม (Satellite)
                 </h3>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <select value={windyLayer} onChange={(e) => setWindyLayer(e.target.value)} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid ${borderColor}`, backgroundColor: 'rgba(0,0,0,0.05)', color: textColor, outline: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  <select value={windyLayer} onChange={(e) => setWindyLayer(e.target.value)} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : 'rgba(0,0,0,0.05)', color: textColor, outline: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold' }}>
                     <option value="wind">🌬️ กระแสลม (Wind)</option>
                     <option value="rain">🌧️ เมฆและฝน (Rain, Thunder)</option>
                     <option value="radar">📡 เรดาร์สภาพอากาศ (Radar)</option>
