@@ -800,13 +800,13 @@ export default function App() {
                     <CircleMarker
                       key={`hotspot-${idx}`}
                       center={[lat, lon]}
-                      radius={isStrong ? 8 : 5} // ปรับขนาดให้ใหญ่ขึ้น (จากเดิม 3-5)
-                      pane="markerPane" // บังคับให้อยู่เลเยอร์บนสุด
+                      radius={8} // ปรับจาก 3-5 เป็น 8 ให้เห็นชัดๆ
+                      pane="markerPane" // บังคับให้จุดลอยมาอยู่บนสุดเหนือแผนที่
                       pathOptions={{ 
-                        color: '#ffffff', // ขอบสีขาวให้ตัดกับแผนที่
-                        fillColor: spotColor, 
-                        fillOpacity: 0.8, 
-                        weight: 1 
+                        color: '#ffffff', // ขอบสีขาว
+                        fillColor: '#ff0000', // สีแดงสด
+                        fillOpacity: 1, 
+                        weight: 2 
                       }}
                     >
                       <Popup>
