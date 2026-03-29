@@ -638,14 +638,14 @@ export default function App() {
               <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '5px 12px', borderRadius: '30px', overflowX: 'auto', whiteSpace: 'nowrap', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>📍</label>
-                  <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                  <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#f8fafc' : '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกภูมิภาค</option>{Object.keys(regionMapping).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div style={{ width: '1px', height: '15px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>🗺️</label>
-                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                  <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#f8fafc' : '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกจังหวัด</option>{availableProvinces.map(p => (<option key={p} value={p}>{p}</option>))}
                   </select>
                   {selectedProvince && (
@@ -657,7 +657,7 @@ export default function App() {
                 <div style={{ width: '1px', height: '15px', backgroundColor: 'rgba(255,255,255,0.3)' }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>📌</label>
-                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setIsMobileListOpen(false); setShowRadar(false);} }} style={{ width: '100%', minWidth: '150px', padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', color: '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem', textOverflow: 'ellipsis' }}>
+                  <select value={selectedStationId} onChange={(e) => { setSelectedStationId(e.target.value); const stat = filteredStations.find(s => s.stationID === e.target.value); if(stat) {setActiveStation(stat); setIsMobileListOpen(false); setShowRadar(false);} }} style={{ width: '100%', minWidth: '150px', padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#f8fafc' : '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem', textOverflow: 'ellipsis' }}>
                     <option value="">-- เลือกสถานี --</option>{filteredStations.slice().sort((a, b) => a.nameTH.localeCompare(b.nameTH, 'th')).map(s => (<option key={s.stationID} value={s.stationID}>{s.nameTH}</option>))}
                   </select>
                 </div>
@@ -886,7 +886,7 @@ export default function App() {
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h2 style={{ fontSize: '1rem', color: textColor, margin: '0', fontWeight: 'bold' }}>{activeChart.name} <span style={{fontSize:'0.85rem', color:subTextColor}}>({filteredStations.length} จุด)</span></h2>
-                      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: darkMode?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.5)', color: textColor, outline:'none', border: `1px solid ${borderColor}` }}>
+                      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: darkMode ? '#334155' : 'rgba(255,255,255,0.5)', color: textColor, outline:'none', border: `1px solid ${borderColor}` }}>
                         <option value="desc">⬇️ มากไปน้อย</option><option value="asc">⬆️ น้อยไปมาก</option>
                       </select>
                     </div>
@@ -1007,7 +1007,7 @@ export default function App() {
                       }
                     }
                   }} 
-                  style={{ padding: '6px 5px', borderRadius: '20px', border: 'none', backgroundColor: 'transparent', color: textColor, outline: 'none', cursor: 'pointer', fontSize: '0.9rem', maxWidth: window.innerWidth < 768 ? '140px' : '300px', textOverflow: 'ellipsis' }}
+                  style={{ padding: '6px 5px', borderRadius: '20px', border: 'none', backgroundColor: darkMode ? '#1e293b' : 'transparent', color: textColor, outline: 'none', cursor: 'pointer', fontSize: '0.9rem', maxWidth: window.innerWidth < 768 ? '140px' : '300px', textOverflow: 'ellipsis' }}
                 >
                   <option value="">-- เลือกจังหวัดวิเคราะห์ --</option>
                   {provinces.map(p => (
@@ -1228,7 +1228,7 @@ export default function App() {
                     <h3 style={{ fontSize: '1.5rem', color: textColor, margin: '0 0 8px 0', fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>📊 สถิติเชิงลึก: {activeChart.name}</h3>
                     <p style={{ margin: 0, color: textColor, fontSize: '1rem', opacity: 0.8 }}>พื้นที่วิเคราะห์: <strong style={{color: '#0ea5e9'}}>{dashTitle}</strong></p>
                   </div>
-                  <select value={viewMode} onChange={(e) => handleViewModeChange(e.target.value)} style={{ padding: '10px 15px', borderRadius: '15px', backgroundColor: 'rgba(0,0,0,0.05)', color: textColor, border: `1px solid ${borderColor}`, outline:'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem' }}>
+                  <select value={viewMode} onChange={(e) => handleViewModeChange(e.target.value)} style={{ padding: '10px 15px', borderRadius: '15px', backgroundColor: darkMode ? '#1e293b' : 'rgba(0,0,0,0.05)', color: textColor, border: `1px solid ${borderColor}`, outline:'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem' }}>
                     <option value="temp">🌡️ ดูกราฟอุณหภูมิ</option>
                     <option value="rain">🌧️ ดูกราฟปริมาณฝน</option>
                     <option value="pm25">☁️ ดูกราฟฝุ่น PM2.5</option>
