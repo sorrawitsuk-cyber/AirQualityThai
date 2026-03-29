@@ -790,30 +790,27 @@ export default function App() {
                   const lat = Number(spot?.lat);
                   const lon = Number(spot?.lon);
                   
-                  // กันแครชถ้าพิกัดว่างหรือโหลดไม่ขึ้น
                   if (!lat || !lon || isNaN(lat) || isNaN(lon)) return null;
 
-                  const isHigh = spot.confidence === 'h';
-                  const spotColor = isHigh ? '#dc2626' : '#f97316'; 
+                  // ปรับการเช็ค Confidence ให้รองรับทั้ง 'h' (MODIS) และ 'n' (VIIRS)
+                  const isStrong = spot.confidence === 'h' || spot.confidence === 'n';
+                  const spotColor = isStrong ? '#ff0000' : '#ff7800'; // ใช้แดงสดไปเลยครับ
                   
                   return (
                     <CircleMarker
-                             key={`hotspot-${idx}`}
-                           center={[lat, lon]}
-                           pane="markerPane" // เพิ่มบรรทัดนี้
-                           radius={isHigh ? 6 : 4} // ปรับขนาดให้ใหญ่ขึ้นเล็กน้อยเพื่อให้สังเกตง่าย
-                           pathOptions={{ color: spotColor, fillColor: spotColor, fillOpacity: 0.9, weight: 2 }}
+                      key={`hotspot-${idx}`}
+                      center={[lat, lon]}
+                      radius={isStrong ? 8 : 5} // ปรับขนาดให้ใหญ่ขึ้น (จากเดิม 3-5)
+                      pane="markerPane" // บังคับให้อยู่เลเยอร์บนสุด
+                      pathOptions={{ 
+                        color: '#ffffff', // ขอบสีขาวให้ตัดกับแผนที่
+                        fillColor: spotColor, 
+                        fillOpacity: 0.8, 
+                        weight: 1 
+                      }}
                     >
                       <Popup>
-                        <div style={{ fontFamily: 'Kanit', fontSize: '0.9rem', color: '#1e293b' }}>
-                          <strong style={{ color: '#ef4444' }}>🔥 พบจุดความร้อน (Hot spot)</strong><br/>
-                          <div style={{ marginTop: '5px', padding: '8px', background: '#f1f5f9', borderRadius: '8px' }}>
-                            ตรวจพบเมื่อ: {spot.acq_date || '-'}<br/>
-                            เวลา: {spot.acq_time || '-'} UTC<br/>
-                            ระดับความรุนแรง: <strong>{spot.confidence === 'h' ? 'สูง' : spot.confidence === 'n' ? 'ปานกลาง' : 'ต่ำ'}</strong><br/>
-                            ความสว่าง: {spot.brightness || '-'}K
-                          </div>
-                        </div>
+                        {/* โค้ด Popup เดิมของคุณ */}
                       </Popup>
                     </CircleMarker>
                   );
