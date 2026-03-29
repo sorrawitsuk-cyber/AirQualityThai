@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
@@ -117,7 +117,9 @@ export default function App() {
   
   const [showRadar, setShowRadar] = useState(false);
   
-  const [realGibsDate, setRealGibsDate] = useState(null);
+  // 🌟 เพิ่ม State สำหรับ Hotspots จาก NASA FIRMS API (และลบ realGibsDate เดิมทิ้ง)
+  const [hotspots, setHotspots] = useState([]);
+  const [loadingHotspots, setLoadingHotspots] = useState(false);
 
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
@@ -160,20 +162,26 @@ export default function App() {
   
   useEffect(() => { setAiSummaryJson(null); setAiTimestamp(''); setNowcastAlert(null); }, [alertsLocationName, activeStation, aiTargetDay]);
 
+  // ฟังก์ชันดึงพิกัด Hotspot แบบ Real-Time เมื่อผู้ใช้กดดูโหมด 'hotspot'
   useEffect(() => {
-    fetch('https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.5&current=temperature_2m')
-      .then(res => res.json())
-      .then(data => {
-          if (data && data.current && data.current.time) {
-              const d = new Date(data.current.time);
-              d.setDate(d.getDate() - 1); 
-              setRealGibsDate(d.toISOString().split('T')[0]);
+    if (viewMode === 'hotspot' && hotspots.length === 0) {
+      const fetchHotspots = async () => {
+        setLoadingHotspots(true);
+        try {
+          const res = await fetch('/api/hotspots');
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setHotspots(data);
           }
-      })
-      .catch(() => {
-          setRealGibsDate('2024-05-18'); 
-      });
-  }, []);
+        } catch (err) {
+          console.error("Failed to load hotspots:", err);
+        } finally {
+          setLoadingHotspots(false);
+        }
+      };
+      fetchHotspots();
+    }
+  }, [viewMode, hotspots.length]);
 
   const toggleFavorite = (prov) => {
     let newFavs = [...favLocations];
