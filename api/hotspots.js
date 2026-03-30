@@ -1,26 +1,35 @@
-// api/hotspots.js
-export default async function handler(req, res) {
+// บรรทัดนี้คือสูตรโกงที่บอกให้ Vercel ใช้ระบบ Edge (ทำงานเร็วกว่าและรันได้เสถียรกว่า)
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(req) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { 
+      status: 405, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
   }
 
   const apiKey = process.env.FIRMS_API_KEY?.trim();
   if (!apiKey) {
-    return res.status(500).json({ error: "Missing FIRMS_API_KEY" });
+    return new Response(JSON.stringify({ error: "Missing FIRMS_API_KEY" }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
   }
 
   try {
-    // ใช้ https เพื่อป้องกัน Error บน Vercel Production
     const url = `https://firms.modaps.eosdis.nasa.gov/api/country/csv/${apiKey}/VIIRS_SNPP_NRT/THA/1`;
     const response = await fetch(url);
-    
+
     if (!response.ok) {
        throw new Error(`NASA API responded with status: ${response.status}`);
     }
 
     const csvText = await response.text();
     const lines = csvText.trim().split('\n');
-    lines.shift(); // ลบหัวตาราง (Header)
+    lines.shift(); // ตัด Header ออก
     
     const hotspots = lines.map(line => {
       const values = line.split(',');
@@ -35,9 +44,17 @@ export default async function handler(req, res) {
       };
     }).filter(spot => spot !== null && !isNaN(spot.lat) && !isNaN(spot.lon));
 
-    return res.status(200).json(hotspots);
+    // ส่งข้อมูลกลับไปหาหน้าเว็บ
+    return new Response(JSON.stringify(hotspots), { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+    
   } catch (error) {
     console.error("Hotspots Fetch Error:", error);
-    return res.status(500).json({ error: "Failed to fetch hotspots data" });
+    return new Response(JSON.stringify({ error: "Failed to fetch hotspots data", details: error.message }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
   }
 }
