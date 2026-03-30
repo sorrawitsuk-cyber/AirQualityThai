@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, WMSTileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
@@ -88,6 +88,7 @@ const SkeletonLoading = ({ darkMode }) => {
     </div>
   );
 };
+
 // ==============================================================
 // 3. Main App Component
 // ==============================================================
@@ -115,10 +116,6 @@ export default function App() {
   });
   
   const [showRadar, setShowRadar] = useState(false);
-  
-  // 🌟 เพิ่ม State สำหรับ Hotspots จาก NASA FIRMS
-  const [hotspots, setHotspots] = useState([]);
-  const [loadingHotspots, setLoadingHotspots] = useState(false);
 
   const [activeWeather, setActiveWeather] = useState(null); 
   const [activeForecast, setActiveForecast] = useState(null); 
@@ -160,27 +157,6 @@ export default function App() {
   useEffect(() => { localStorage.setItem('darkMode', darkMode); if(darkMode) document.body.classList.add('dark-theme'); else document.body.classList.remove('dark-theme'); }, [darkMode]);
   
   useEffect(() => { setAiSummaryJson(null); setAiTimestamp(''); setNowcastAlert(null); }, [alertsLocationName, activeStation, aiTargetDay]);
-
-  // 🌟 ฟังก์ชันดึงพิกัด Hotspot
-  useEffect(() => {
-    if (viewMode === 'hotspot' && hotspots.length === 0) {
-      const fetchHotspots = async () => {
-        setLoadingHotspots(true);
-        try {
-          const res = await fetch('/api/hotspots');
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setHotspots(data);
-          }
-        } catch (err) {
-          console.error("Failed to load hotspots:", err);
-        } finally {
-          setLoadingHotspots(false);
-        }
-      };
-      fetchHotspots();
-    }
-  }, [viewMode, hotspots.length]);
 
   const toggleFavorite = (prov) => {
     let newFavs = [...favLocations];
@@ -534,7 +510,7 @@ export default function App() {
       if (topic === 'general') { promptText = `คุณคือผู้ช่วยส่วนตัว สรุปสภาพอากาศสำหรับ **${dayWord}** วิเคราะห์: 1.สภาพอากาศภาพรวม 2.การเดินทาง 3.ข้อควรระวัง:\n\n${contextData}`; } 
       else if (topic === 'rain') { promptText = `คุณคือนักอุตุนิยมวิทยา วิเคราะห์แนวโน้ม "ฝนตก" สำหรับ **${dayWord}** วิเคราะห์: 1. ภาพรวมฝน (โอกาสเปอร์เซ็นต์/หนักแค่ไหน) 2. ช่วงเวลาฝนตก (ระบุเวลาชัดเจน) 3. คำแนะนำการเดินทาง:\n\n${contextData}`; }
       else if (topic === 'hourly') { promptText = `คุณคือนักวางแผนเวลา วิเคราะห์ข้อมูลสำหรับ **${dayWord}** **เลือกมา 3 ช่วงเวลาของวันที่สำคัญที่สุด** ห้ามอธิบายยาว:\n\n${contextData}`; } 
-      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord}** แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
+      else if (topic === 'travel') { promptText = `คุณคือไกด์นำเที่ยว วิเคราะห์สภาพอากาศ **${dayWord} แนะนำการท่องเที่ยว: 1.กิจกรรมกลางแจ้ง 2.สถานที่แนะนำ 3.อุปสรรคการเดินทาง:\n\n${contextData}`; }
       else if (topic === 'lifestyle') { promptText = `คุณคือผู้ช่วยแม่บ้าน วิเคราะห์สภาพอากาศ **${dayWord}**: 1.เวลาตากผ้า 2.เวลาล้างรถ 3.ต้องพกร่มไหม:\n\n${contextData}`; } 
       else if (topic === 'exercise') { promptText = `คุณคือเทรนเนอร์ฟิตเนส วิเคราะห์สภาพอากาศ **${dayWord}**: 1.ออกกำลังกายกลางแจ้งได้ไหม 2.ช่วงเวลาที่ดีที่สุด 3.ข้อควรระวัง:\n\n${contextData}`; } 
       else if (topic === 'health') { promptText = `คุณคือแพทย์ผู้เชี่ยวชาญด้านทางเดินหายใจ วิเคราะห์สภาพอากาศ **${dayWord}**: 1.คุณภาพอากาศ/ระดับฝุ่น PM2.5 2.ความปลอดภัยในการทำกิจกรรม 3.คำแนะนำการสวมหน้ากากและการดูแลสุขภาพ:\n\n${contextData}`; }
@@ -585,12 +561,6 @@ export default function App() {
     return darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : 'linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%)';
   };
 
-  const getRelativeTime = (hoursAgo) => {
-    const d = new Date();
-    d.setHours(d.getHours() - hoursAgo);
-    return `วันนี้ ${d.getHours().toString().padStart(2, '0')}:00 น.`;
-  };
-
   if (loading) return <SkeletonLoading darkMode={darkMode} />;
 
   const isPm25Mode = viewMode === 'pm25'; const isTempMode = viewMode === 'temp'; const isHeatMode = viewMode === 'heat';
@@ -633,7 +603,6 @@ export default function App() {
               <div className="hide-scrollbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '5px 12px', borderRadius: '30px', overflowX: 'auto', whiteSpace: 'nowrap', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>📍</label>
-                  {/* 🌟 แก้ไข: เพิ่มเงื่อนไขสีพื้นหลัง select */}
                   <select value={selectedRegion} onChange={(e) => { setSelectedRegion(e.target.value); setSelectedProvince(''); setSelectedStationId(''); setActiveStation(null); setIsMobileListOpen(false); setShowRadar(false); }} style={{ padding: '5px 10px', borderRadius: '15px', border: 'none', backgroundColor: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#f8fafc' : '#1e293b', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <option value="">ทุกภูมิภาค</option>{Object.keys(regionMapping).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
@@ -726,7 +695,7 @@ export default function App() {
 
               {viewMode === 'hotspot' && !showRadar && (
                 <div style={{ position: 'absolute', top: '70px', right: '15px', zIndex: 500, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.2)' }}>
-                  <span style={{ display:'inline-block', width:'10px', height:'10px', background:'#ff0000', borderRadius:'50%' }}></span> ตรวจพบ Hot spot โดยดาวเทียม NASA
+                  <span style={{ display:'inline-block', width:'10px', height:'10px', background:'#ff0000', borderRadius:'50%' }}></span> ตรวจพบ Hot spot โดยดาวเทียม NASA (WMS)
                 </div>
               )}
 
@@ -785,36 +754,17 @@ export default function App() {
 
                 <MapFix /> <FitBounds stations={filteredStations} activeStation={activeStation} selectedProvince={selectedProvince} selectedRegion={selectedRegion} /> <FlyToActiveStation activeStation={activeStation} /> 
                 
-                {/* 🌟 แสดงจุดความร้อนแบบ Real-Time (NASA FIRMS) วาดด้วย CircleMarker */}
-                {viewMode === 'hotspot' && !showRadar && Array.isArray(hotspots) && hotspots.map((spot, idx) => {
-                  const lat = Number(spot?.lat);
-                  const lon = Number(spot?.lon);
-                  
-                  if (!lat || !lon || isNaN(lat) || isNaN(lon)) return null;
-
-                  // ปรับการเช็ค Confidence ให้รองรับทั้ง 'h' (MODIS) และ 'n' (VIIRS)
-                  const isStrong = spot.confidence === 'h' || spot.confidence === 'n';
-                  const spotColor = isStrong ? '#ff0000' : '#ff7800'; // ใช้แดงสดไปเลยครับ
-                  
-                  return (
-                    <CircleMarker
-                      key={`hotspot-${idx}`}
-                      center={[lat, lon]}
-                      radius={8} // เปลี่ยนจาก 3-5 เป็น 8 เพื่อให้เห็นชัดเจนบนหน้าจอมือถือ
-                      pane="markerPane" // บังคับให้ลอยทับแผนที่
-                      pathOptions={{ 
-                        color: '#ffffff', 
-                        fillColor: '#ff0000', // ใช้สีแดงสด
-                        fillOpacity: 1, 
-                        weight: 1 
-                      }}
-                    >
-                      <Popup>
-                        {/* โค้ด Popup เดิมของคุณ */}
-                      </Popup>
-                    </CircleMarker>
-                  );
-                })}
+                {/* 🌟 แสดงจุดความร้อนแบบ Real-Time ด้วย WMS (ดาวเทียม NASA FIRMS) */}
+                {viewMode === 'hotspot' && !showRadar && (
+                  <WMSTileLayer
+                    url="https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires/12acd7ab2d5fd883cc5b5e44576a62a8/"
+                    layers="fires_viirs_24,fires_modis_24" // 👈 เปลี่ยนบรรทัดนี้ครับ (ใส่ _24 และเพิ่ม modis)
+                    format="image/png"
+                    transparent={true}
+                    opacity={1.0} // 👈 ปรับเป็น 1.0 ให้สีแดงเข้มที่สุดจะได้เห็นชัดๆ
+                    zIndex={1000}
+                  />
+                )}
 
                 {!showRadar && viewMode !== 'hotspot' && filteredStations.map((station) => {
                   const lat = parseFloat(station.lat); const lon = parseFloat(station.long); if (isNaN(lat) || isNaN(lon)) return null;
@@ -897,7 +847,6 @@ export default function App() {
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h2 style={{ fontSize: '1rem', color: textColor, margin: '0', fontWeight: 'bold' }}>{activeChart.name} <span style={{fontSize:'0.85rem', color:subTextColor}}>({filteredStations.length} จุด)</span></h2>
-                      {/* 🌟 แก้ไข: เพิ่มเงื่อนไขสีพื้นหลัง select */}
                       <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '4px', borderRadius: '6px', backgroundColor: darkMode?'#1e293b':'#fff', color: textColor, outline:'none', border: `1px solid ${borderColor}` }}>
                         <option value="desc">⬇️ มากไปน้อย</option><option value="asc">⬆️ น้อยไปมาก</option>
                       </select>
@@ -1005,7 +954,6 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 15px', backgroundColor: cardBg, backdropFilter: backdropBlur, borderRadius: '30px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
                 <label style={{ fontWeight: 'bold', color: '#0ea5e9', fontSize: '0.95rem' }}>🎯</label>
                 
-                {/* 🌟 แก้ไข: เพิ่มเงื่อนไขสีพื้นหลัง select */}
                 <select 
                   value={alertsLocationName.replace('จ.', '')} 
                   onChange={(e) => {
@@ -1241,7 +1189,6 @@ export default function App() {
                     <h3 style={{ fontSize: '1.5rem', color: textColor, margin: '0 0 8px 0', fontWeight:'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>📊 สถิติเชิงลึก: {activeChart.name}</h3>
                     <p style={{ margin: 0, color: textColor, fontSize: '1rem', opacity: 0.8 }}>พื้นที่วิเคราะห์: <strong style={{color: '#0ea5e9'}}>{dashTitle}</strong></p>
                   </div>
-                  {/* 🌟 แก้ไข: เพิ่มเงื่อนไขสีพื้นหลัง select */}
                   <select value={viewMode} onChange={(e) => handleViewModeChange(e.target.value)} style={{ padding: '10px 15px', borderRadius: '15px', backgroundColor: darkMode ? '#1e293b' : 'rgba(0,0,0,0.05)', color: textColor, border: `1px solid ${borderColor}`, outline:'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem' }}>
                     <option value="temp">🌡️ ดูกราฟอุณหภูมิ</option>
                     <option value="rain">🌧️ ดูกราฟปริมาณฝน</option>
@@ -1354,7 +1301,6 @@ export default function App() {
                   <span style={{ fontSize: '1.8rem' }}>🌪️</span> ศูนย์เฝ้าระวังดาวเทียม (Satellite)
                 </h3>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {/* 🌟 แก้ไข: เพิ่มเงื่อนไขสีพื้นหลัง select */}
                   <select value={windyLayer} onChange={(e) => setWindyLayer(e.target.value)} style={{ padding: '8px 16px', borderRadius: '20px', border: `1px solid ${borderColor}`, backgroundColor: darkMode ? '#1e293b' : 'rgba(0,0,0,0.05)', color: textColor, outline: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold' }}>
                     <option value="wind">🌬️ กระแสลม (Wind)</option>
                     <option value="rain">🌧️ เมฆและฝน (Rain, Thunder)</option>
