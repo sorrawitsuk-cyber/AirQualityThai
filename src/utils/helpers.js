@@ -42,7 +42,19 @@ export const thaiProvinces = Object.values(regionMapping).flat();
 
 export const getRegion = (province) => { for (const [region, provinces] of Object.entries(regionMapping)) { if (provinces.includes(province)) return region; } return "อื่นๆ"; };
 
-export const extractProvince = (area) => { if(!area) return 'ไม่ระบุ'; if (area.includes('กรุงเทพ') || area.includes('กทม')) return 'กรุงเทพมหานคร'; for (let i = 0; i < thaiProvinces.length; i++) { if (area.includes(thaiProvinces[i])) return thaiProvinces[i]; } if (area.includes('เขต')) return 'กรุงเทพมหานคร'; let p = area.includes(',') ? area.split(',').pop() : area.trim().split(/\s+/).pop(); p = p.trim().replace(/^(จ\.|จังหวัด)/, '').trim(); if (p.includes('จ.')) p = p.split('จ.').pop().trim(); return p; };
+// src/utils/helpers.js
+
+export const extractProvince = (areaTH) => {
+  if (!areaTH) return 'ไม่ทราบ';
+  // ใช้การ split ธรรมดา ปลอดภัยกับ Safari 100%
+  const parts = areaTH.split('จ.');
+  if (parts.length > 1) {
+    return parts[1].trim(); // เอาข้อความหลังคำว่า "จ."
+  }
+  return areaTH.trim();
+};
+
+// ... (โค้ดอื่นๆ ใน helpers.js เก็บไว้เหมือนเดิมครับ) ...
 
 export const legendData = {
   pm25: { title: 'ระดับ PM2.5', items: [{color:'#00b0f0',label:'0-15.0 (ดีมาก)'},{color:'#92d050',label:'15.1-25.0 (ดี)'},{color:'#ffff00',label:'25.1-37.5 (ปานกลาง)'},{color:'#ffc000',label:'37.6-75.0 (เริ่มมีผลกระทบ)'},{color:'#ff0000',label:'> 75.0 (มีผลกระทบ)'}] },
