@@ -486,7 +486,7 @@ export default function MapPage() {
               </select>
               <select value={selectedProvince} onChange={e => setSelectedProvince(e.target.value)} style={{ padding: '6px 12px', borderRadius: '10px', background: darkMode ? 'rgba(0,0,0,0.3)' : '#f8fafc', color: textColor, border: `1px solid ${borderColor}`, outline: 'none', fontWeight: 'bold', cursor: 'pointer' }}>
                 <option value="">📍 ทุกจังหวัด</option>
-                {(selectedRegion ? regionMapping[selectedRegion] : allProvinces).map(p => <option key={p} value={p}>จ.{p}</option>)}
+                {(selectedRegion ? regionMapping[selectedRegion] : allProvinces).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           )}

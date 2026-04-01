@@ -359,8 +359,8 @@ export default function ForecastPage() {
           <button onClick={handleLocateMe} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 15px', borderRadius: '12px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 'bold', cursor: locatingStatus === 'locating' ? 'wait' : 'pointer', fontSize: '0.95rem' }}>
             📍 ตำแหน่งปัจจุบัน
           </button>
-          <select value={alertsLocationName} onChange={(e) => {setAlertsLocationName(e.target.value); setAiSummaryJson(null); setActiveAiTopic(null);}} style={{ padding: '10px 15px', borderRadius: '12px', backgroundColor: darkMode ? 'rgba(0,0,0,0.3)' : '#f8fafc', color: textColor, border: `1px solid ${borderColor}`, fontWeight: 'bold', outline: 'none' }}>
-            {provinces.map(p => <option key={p} value={p}>จ.{p}</option>)}
+          <select value={alertsLocationName} onChange={(e) => {setAlertsLocationName(e.target.value); setAiSummaryJson(null); setActiveAiTopic(null);}} style={{ /* สไตล์เดิม */ }}>
+           {provinces.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
           <div style={{ width: '2px', height: '30px', backgroundColor: borderColor, margin: '0 5px' }}></div>
           <select value={targetDayOffset} onChange={(e) => {setTargetDayOffset(Number(e.target.value)); setAiSummaryJson(null); setActiveAiTopic(null);}} style={{ padding: '10px 15px', borderRadius: '12px', backgroundColor: darkMode ? 'rgba(59,130,246,0.1)' : '#eff6ff', color: '#0ea5e9', border: '1px solid #bae6fd', fontWeight: 'bold', outline: 'none' }}>
