@@ -1,5 +1,5 @@
 // src/components/Layout.jsx
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { WeatherContext } from '../context/WeatherContext';
 
@@ -7,28 +7,36 @@ export default function Layout() {
   const { darkMode, setDarkMode } = useContext(WeatherContext);
   const location = useLocation();
 
-  // 🌟 ปรับสีพื้นหลังตรงนี้: โหมดมืดเป็นสีกรมท่า, โหมดสว่างเป็นสีฟ้าไล่ระดับ (Sky Blue Gradient) สดใสๆ
+  // 🌟 1. ใช้ State เพื่อเช็คขนาดจอแบบ Real-time (ป้องกันบั๊กตอนหมุนจอมือถือ)
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const themeBg = darkMode 
     ? '#0f172a' 
     : 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)'; 
 
   const sidebarBg = darkMode ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.85)';
-  const headerBg = darkMode ? 'rgba(15, 23, 42, 0.95)' : '#0ea5e9'; // แถบคาดบนมือถือสีฟ้าเข้ม
+  const headerBg = darkMode ? 'rgba(15, 23, 42, 0.95)' : '#0ea5e9'; 
   const textColor = darkMode ? '#f8fafc' : '#1e293b';
   const borderColor = darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255, 255, 255, 0.5)';
 
   const isMapPage = location.pathname === '/map';
-  const isDesktop = window.innerWidth >= 768; 
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', background: themeBg, color: textColor, overflow: 'hidden' }}>
+    // 🌟 2. ใช้ 100dvh แทน 100vh เพื่อป้องกันแถบ URL ของมือถือมาบังปุ่ม
+    <div style={{ display: 'flex', height: '100dvh', width: '100vw', background: themeBg, color: textColor, overflow: 'hidden' }}>
       
       {/* 💻 SIDEBAR สำหรับ Desktop */}
       <aside 
         style={{ 
           display: isDesktop ? 'flex' : 'none', flexDirection: 'column', width: '260px', 
           borderRight: `1px solid ${borderColor}`, position: 'relative', zIndex: 50, 
-          background: sidebarBg, backdropFilter: 'blur(20px)', boxShadow: '4px 0 15px rgba(0,0,0,0.05)', flexShrink: 0
+          background: sidebarBg, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '4px 0 15px rgba(0,0,0,0.05)', flexShrink: 0
         }}
       >
         <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: `1px solid ${borderColor}` }}>
@@ -83,7 +91,7 @@ export default function Layout() {
 
         {/* BOTTOM NAV สำหรับ Mobile */}
         {!isDesktop && (
-          <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '75px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', borderTop: `1px solid ${borderColor}`, backdropFilter: 'blur(20px)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom)', background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)' }}>
+          <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '75px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', borderTop: `1px solid ${borderColor}`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom)', background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)' }}>
             <MobileNavItem to="/" icon="📊" label="ภาพรวม" />
             <MobileNavItem to="/map" icon="🗺️" label="แผนที่" />
             <MobileNavItem to="/forecast" icon="✨" label="AI & สถิติ" />
