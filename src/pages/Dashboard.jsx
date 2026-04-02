@@ -3,19 +3,27 @@ import React, { useContext, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, useMap } from 'react-leaflet';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { WeatherContext } from '../context/WeatherContext';
-import { extractProvince, formatLocationName, getPM25Color, getTempColor, getDistanceFromLatLonInKm } from '../utils/helpers';
+import { extractProvince, formatLocationName, getPM25Color, getDistanceFromLatLonInKm } from '../utils/helpers';
 
-// 🌟 ฟังก์ชันคำนวณสถานะสุขภาพแบบ GISTDA (มีหน้าคนและสีชัดเจน)
+// 🌟 ฟังก์ชันคำนวณสถานะฝุ่น (อัปเดตสีให้สวยขึ้น)
 const getHealthStatus = (pm) => {
   if (pm == null || isNaN(pm)) return { face: '❓', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)' };
-  if (pm <= 15.0) return { face: '😁', text: 'คุณภาพอากาศดีมาก', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' }; 
-  if (pm <= 25.0) return { face: '🙂', text: 'คุณภาพอากาศดี', color: '#16a34a', bg: 'rgba(22, 163, 74, 0.1)' }; 
-  if (pm <= 37.5) return { face: '😐', text: 'คุณภาพอากาศปานกลาง', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)' }; 
-  if (pm <= 75.0) return { face: '😷', text: 'เริ่มมีผลกระทบต่อสุขภาพ', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)' }; 
-  return { face: '🤢', text: 'มีผลกระทบต่อสุขภาพ', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' }; 
+  if (pm <= 15.0) return { face: '😁', text: 'คุณภาพอากาศดีมาก', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' }; 
+  if (pm <= 25.0) return { face: '🙂', text: 'คุณภาพอากาศดี', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' }; 
+  if (pm <= 37.5) return { face: '😐', text: 'คุณภาพปานกลาง', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' }; 
+  if (pm <= 75.0) return { face: '😷', text: 'เริ่มมีผลกระทบสุขภาพ', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' }; 
+  return { face: '🤢', text: 'มีผลกระทบสุขภาพ', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' }; 
 };
 
-// คอมโพเนนต์ช่วยเลื่อนแผนที่อัตโนมัติ
+// 🌟 ฟังก์ชันใหม่! คำนวณสถานะดัชนีความร้อน (Heat Index)
+const getHeatStatus = (val) => {
+  if (val == null || isNaN(val)) return { face: '❓', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)' };
+  if (val >= 52) return { face: '🥵', text: 'อันตรายมาก (ฮีทสโตรก)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+  if (val >= 41) return { face: '😰', text: 'อันตราย (เลี่ยงแดดจัด)', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' };
+  if (val >= 32) return { face: '😅', text: 'เฝ้าระวัง (เตือนภัย)', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
+  return { face: '😎', text: 'ปกติ (ปลอดภัย)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
+};
+
 function MiniMapUpdate({ lat, lon }) {
   const map = useMap();
   useEffect(() => {
@@ -48,7 +56,6 @@ export default function Dashboard() {
     else setGreeting('สวัสดีตอนเย็น 🌙');
   }, []);
 
-  // 🌟 ระบบหาพิกัดและตั้งค่าเริ่มต้น
   useEffect(() => {
     if (stations && stations.length > 0 && !selectedStationId && !gpsAttempted) {
       setGpsAttempted(true);
@@ -93,7 +100,6 @@ export default function Dashboard() {
     }
   }, [selectedStationId, stations]);
 
-  // 🌟 ดึงข้อมูลพยากรณ์ฝุ่นล่วงหน้า 24 ชม. มาทำกราฟแบบ GISTDA
   useEffect(() => {
     if (activeStation && activeStation.lat && activeStation.long) {
       const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${activeStation.lat}&longitude=${activeStation.long}&hourly=pm2_5&timezone=auto&forecast_days=2`;
@@ -136,11 +142,10 @@ export default function Dashboard() {
   const humidityVal = tObj && tObj.humidity != null ? tObj.humidity : '-';
   const windVal = tObj ? tObj.windSpeed : null;
   const heatVal = tObj ? tObj.feelsLike : null;
-  const uvVal = tObj && tObj.uvMax != null ? Math.round(tObj.uvMax) : '-';
 
   const health = getHealthStatus(pmVal);
+  const heatStatus = getHeatStatus(heatVal);
   const pmColor = getPM25Color(pmVal);
-  const tempColor = getTempColor(tempVal).bg;
 
   return (
     <div style={{ background: bgGradient, minHeight: '100%', padding: isMobile ? '15px' : '30px', paddingBottom: isMobile ? '90px' : '40px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box', overflowY: 'auto' }} className="hide-scrollbar">
@@ -158,50 +163,54 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 🌟 MAIN GRID: ซ้าย (GISTDA Hero Card) | ขวา (แผนที่ + ลึกซึ้ง) */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.3fr 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: '20px' }}>
         
-        {/* 📍 ฝั่งซ้าย: Hero Card สไตล์ GISTDA */}
+        {/* 📍 ฝั่งซ้าย: DUAL HERO CARD (PM2.5 คู่กับ Heat Index) */}
         <div style={{ background: cardBg, borderRadius: '24px', padding: isMobile ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
           
-          {/* ตัวเลือกสถานที่ (ทรงแคปซูลแบบ GISTDA) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: innerCardBg, padding: '5px 5px 5px 15px', borderRadius: '50px', marginBottom: '30px', border: `1px solid ${borderColor}` }}>
+          {/* ตัวเลือกสถานที่ */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: innerCardBg, padding: '5px 5px 5px 15px', borderRadius: '50px', marginBottom: '25px', border: `1px solid ${borderColor}` }}>
             <span style={{ fontSize: '1.2rem' }}>📍</span>
             <select value={selectedStationId} onChange={handleStationChange} style={{ flex: 1, background: 'transparent', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', outline: 'none', cursor: 'pointer', appearance: 'none', textOverflow: 'ellipsis' }}>
               {allLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
             </select>
           </div>
 
-          {/* ข้อมูล PM2.5 แบบเน้นอารมณ์ (Humanized) */}
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? '20px' : '40px', flex: 1, justifyContent: 'center' }}>
+          {/* 🌟 2 ดัชนีหลัก (PM2.5 คู่กับ Heat Index) */}
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '30px' : '20px', flex: 1, alignItems: 'center', justifyContent: 'space-around', padding: '10px 0' }}>
             
-            {/* ไอคอนหน้าคนเต้นดุ๊กดิ๊ก */}
-            <div style={{ position: 'relative' }}>
-              <div style={{ fontSize: isMobile ? '6rem' : '8rem', filter: `drop-shadow(0 10px 20px ${health.color}40)`, lineHeight: 1 }}>
-                {health.face}
-              </div>
-              <div style={{ position: 'absolute', bottom: isMobile ? '-10px' : '0', right: '-10px', background: health.color, color: '#fff', width: '35px', height: '35px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', border: `3px solid ${cardBg}` }}>
-                {pmVal <= 25 ? '✓' : '!'}
+            {/* ฝุ่น PM2.5 */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+              <div style={{ fontSize: isMobile ? '5.5rem' : '6.5rem', filter: `drop-shadow(0 10px 20px ${health.color}50)`, lineHeight: 1 }}>{health.face}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                 <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', letterSpacing: '0.5px' }}>PM2.5 (µg/m³)</span>
+                 {/* 🌟 ลงสีที่ตัวเลขตามระดับฝุ่น */}
+                 <span style={{ fontSize: isMobile ? '3.5rem' : '4.5rem', fontWeight: '900', color: health.color, lineHeight: 1.1, filter: darkMode ? `drop-shadow(0 0 10px ${health.color}30)` : 'none' }}>{pmVal != null && !isNaN(pmVal) ? pmVal : '-'}</span>
+                 <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', marginTop: '5px', border: `1px solid ${health.color}30` }}>{health.text}</span>
               </div>
             </div>
 
-            {/* ตัวเลขและสถานะ */}
-            <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
-              <div style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>PM2.5 (µg/m³)</div>
-              <div style={{ fontSize: isMobile ? '4.5rem' : '6rem', fontWeight: '900', color: textColor, lineHeight: '1' }}>
-                {pmVal != null && !isNaN(pmVal) ? pmVal : '-'}
-              </div>
-              <div style={{ background: health.bg, color: health.color, padding: '8px 20px', borderRadius: '50px', display: 'inline-block', fontWeight: 'bold', fontSize: '1rem', marginTop: '10px', border: `1px solid ${health.color}30` }}>
-                {health.text}
+            {/* เส้นแบ่งกลาง */}
+            {!isMobile && <div style={{ width: '1px', height: '100px', background: borderColor }}></div>}
+            {isMobile && <div style={{ width: '80%', height: '1px', background: borderColor }}></div>}
+
+            {/* ดัชนีความร้อน */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+              <div style={{ fontSize: isMobile ? '5.5rem' : '6.5rem', filter: `drop-shadow(0 10px 20px ${heatStatus.color}50)`, lineHeight: 1 }}>{heatStatus.face}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                 <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', letterSpacing: '0.5px' }}>ความร้อนรู้สึกจริง (°C)</span>
+                 {/* 🌟 ลงสีที่ตัวเลขตามระดับความร้อน */}
+                 <span style={{ fontSize: isMobile ? '3.5rem' : '4.5rem', fontWeight: '900', color: heatStatus.color, lineHeight: 1.1, filter: darkMode ? `drop-shadow(0 0 10px ${heatStatus.color}30)` : 'none' }}>{heatVal != null ? Math.round(heatVal) : '-'}</span>
+                 <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', marginTop: '5px', border: `1px solid ${heatStatus.color}30` }}>{heatStatus.text}</span>
               </div>
             </div>
 
           </div>
 
-          {/* แถบข้อมูลรองด้านล่าง (Footer Stats) */}
+          {/* แถบข้อมูลรองด้านล่าง */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '30px', paddingTop: '20px', borderTop: `1px dashed ${borderColor}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.5rem', color: tempColor }}>🌡️</span>
+              <span style={{ fontSize: '1.5rem', color: darkMode ? '#cbd5e1' : '#64748b' }}>🌡️</span>
               <div><div style={{ fontSize: '0.7rem', color: subTextColor }}>อุณหภูมิ</div><div style={{ fontWeight: 'bold', color: textColor }}>{tempVal ? Math.round(tempVal) : '-'}°C</div></div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderLeft: `1px solid ${borderColor}`, borderRight: `1px solid ${borderColor}` }}>
@@ -218,7 +227,6 @@ export default function Dashboard() {
         {/* 📍 ฝั่งขวา: แผนที่ย่อ + กราฟ 24 ชม. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* แผนที่แบบย่อ */}
           <div style={{ background: cardBg, borderRadius: '24px', padding: '15px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.04)', flex: 1, minHeight: '200px', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', margin: '0 0 10px 5px' }}>🗺️ ตำแหน่งจุดตรวจวัด</h3>
             <div style={{ flex: 1, borderRadius: '15px', overflow: 'hidden', background: innerCardBg, position: 'relative' }}>
@@ -226,7 +234,6 @@ export default function Dashboard() {
                 <MapContainer center={[parseFloat(activeStation.lat), parseFloat(activeStation.long)]} zoom={10} style={{ height: '100%', width: '100%', zIndex: 1 }} zoomControl={false} dragging={!isMobile} scrollWheelZoom={false}>
                   <TileLayer url={darkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"} />
                   <MiniMapUpdate lat={parseFloat(activeStation.lat)} lon={parseFloat(activeStation.long)} />
-                  {/* วงกลมรัศมีฝุ่นแบบสวยงาม */}
                   <CircleMarker center={[parseFloat(activeStation.lat), parseFloat(activeStation.long)]} radius={25} pathOptions={{ color: pmColor, fillColor: pmColor, fillOpacity: 0.3, weight: 0 }} />
                   <CircleMarker center={[parseFloat(activeStation.lat), parseFloat(activeStation.long)]} radius={6} pathOptions={{ color: '#fff', fillColor: pmColor, fillOpacity: 1, weight: 2 }} />
                 </MapContainer>
@@ -236,7 +243,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* กราฟแนวโน้มฝุ่น 24 ชม. (GISTDA Style) */}
           <div style={{ background: cardBg, borderRadius: '24px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.04)', height: '220px', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', margin: '0 0 15px 5px' }}>📊 แนวโน้มฝุ่น PM2.5 ล่วงหน้า (24 ชม.)</h3>
             <div style={{ flex: 1 }}>
