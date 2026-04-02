@@ -31,7 +31,6 @@ const getStatColor = (type, val) => {
   return '#94a3b8';
 };
 
-// 🌟 ตัวช่วยตัดคำให้เหลือแค่ชื่อสถานที่ (ตำบล/เขต)
 const formatAreaName = (areaTH) => areaTH ? areaTH.split(',')[0].trim() : '';
 
 function MiniMapUpdate({ lat, lon }) {
@@ -46,13 +45,13 @@ export default function Dashboard() {
   const navigate = useNavigate(); 
   const { stations, stationTemps, loading, darkMode, lastUpdateText } = useContext(WeatherContext);
   
-  // 🌟 State สำหรับตัวกรอง 2 ชั้น
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedStationId, setSelectedStationId] = useState(() => localStorage.getItem('lastStationId') || '');
   const [activeStation, setActiveStation] = useState(null);
   
   const [greeting, setGreeting] = useState('สวัสดี');
   const [timeOfDay, setTimeOfDay] = useState('morning'); 
+  const [gpsAttempted, setGpsAttempted] = useState(false);
   
   const [statFilter, setStatFilter] = useState('pm25');
   const [historicalData, setHistoricalData] = useState([]);
@@ -61,8 +60,9 @@ export default function Dashboard() {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
 
-  // ดึงรายชื่อจังหวัดทั้งหมดแบบไม่ซ้ำ
-  const allProvinces = [...new Set((stations || []).map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th'));
+  // ป้องกัน error หาก stations เป็น null ระหว่างโหลด
+  const safeStations = stations || [];
+  const allProvinces = [...new Set(safeStations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th'));
 
   useEffect(() => {
     if (window.innerWidth >= 1024 && !sessionStorage.getItem('hasRedirectedToMap')) {
@@ -87,40 +87,37 @@ export default function Dashboard() {
     else { setGreeting('สวัสดีตอนเย็น 🌙'); setTimeOfDay('evening'); }
   }, []);
 
-  // 🌟 การตั้งค่าเริ่มต้นเมื่อโหลดแอป
   useEffect(() => {
-    if (stations && stations.length > 0 && !selectedProv) {
+    if (safeStations.length > 0 && !selectedProv) {
       const savedStId = localStorage.getItem('lastStationId');
       if (savedStId) {
-        const st = stations.find(s => s.stationID === savedStId);
+        const st = safeStations.find(s => s.stationID === savedStId);
         if (st) {
           setSelectedProv(extractProvince(st.areaTH));
           setSelectedStationId(savedStId);
           return;
         }
       }
-      // ถ้าไม่มีให้ค่าเริ่มต้นเป็นกรุงเทพฯ
-      const bkk = stations.find(s => extractProvince(s.areaTH) === 'กรุงเทพมหานคร');
-      const initial = bkk || stations[0];
+      const bkk = safeStations.find(s => extractProvince(s.areaTH) === 'กรุงเทพมหานคร');
+      const initial = bkk || safeStations[0];
       setSelectedProv(extractProvince(initial.areaTH));
       setSelectedStationId(initial.stationID);
     }
-  }, [stations, selectedProv]);
+  }, [safeStations, selectedProv]);
 
   useEffect(() => {
-    if (stations && stations.length > 0 && selectedStationId) {
-      const target = stations.find(s => s.stationID === selectedStationId);
+    if (safeStations.length > 0 && selectedStationId) {
+      const target = safeStations.find(s => s.stationID === selectedStationId);
       if (target) setActiveStation(target);
     }
-  }, [selectedStationId, stations]);
+  }, [selectedStationId, safeStations]);
 
-  // 🌟 ฟังก์ชันหาพิกัดปัจจุบัน (GPS Button)
   const handleGPS = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           let nearest = null; let minD = Infinity;
-          stations.forEach(s => { 
+          safeStations.forEach(s => { 
             const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); 
             if (d < minD) { minD = d; nearest = s; } 
           });
@@ -138,8 +135,14 @@ export default function Dashboard() {
     }
   };
 
+  const handleStationChange = (e) => {
+    const newId = e.target.value;
+    setSelectedStationId(newId);
+    localStorage.setItem('lastStationId', newId);
+  };
+
   useEffect(() => {
-    if (stations && stations.length > 0) {
+    if (safeStations.length > 0) {
       const baseValue = statFilter === 'pm25' ? 30 : statFilter === 'heat' ? 40 : statFilter === 'temp' ? 32 : 20;
       const historyMock = Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
@@ -152,7 +155,7 @@ export default function Dashboard() {
 
       if (isDesktop) {
         const tableArr = allProvinces.map(prov => {
-          const provStations = stations.filter(s => extractProvince(s.areaTH) === prov);
+          const provStations = safeStations.filter(s => extractProvince(s.areaTH) === prov);
           let sumPm = 0, sumTemp = 0, sumHeat = 0, sumRain = 0; let validPm = 0, validTemp = 0;
           provStations.forEach(s => {
             const pm = s.AQILast && s.AQILast.PM25 ? Number(s.AQILast.PM25.value) : NaN;
@@ -177,7 +180,7 @@ export default function Dashboard() {
         setMasterTableData(tableArr.sort((a, b) => b.pm25 - a.pm25));
       }
     }
-  }, [stations, stationTemps, statFilter, isDesktop]);
+  }, [safeStations, stationTemps, statFilter, isDesktop]);
 
   const todayStr = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -201,26 +204,22 @@ export default function Dashboard() {
   const heatStatus = getHeatStatus(heatVal);
   const pmColor = getPM25Color(pmVal);
 
-  // 🌟 ฟังก์ชันเรนเดอร์อิโมจิในวงกลมเปลี่ยนสี
   const renderEmojiBadge = (emoji, color) => (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       width: isMobile ? '70px' : '90px', height: isMobile ? '70px' : '90px',
-      background: `radial-gradient(circle at 30% 30%, ${color} 0%, ${color}dd 100%)`, // วงกลมสีทึบตามความอันตราย
+      background: `radial-gradient(circle at 30% 30%, ${color} 0%, ${color}dd 100%)`, 
       borderRadius: '50%',
-      boxShadow: `0 8px 20px ${color}60, inset 0 2px 5px rgba(255,255,255,0.4)`, // เงาเรืองแสงรอบๆ
+      boxShadow: `0 8px 20px ${color}60, inset 0 2px 5px rgba(255,255,255,0.4)`, 
       border: `3px solid ${darkMode ? 'rgba(255,255,255,0.1)' : '#fff'}`
     }}>
-      <span style={{ fontSize: isMobile ? '3rem' : '4rem', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>
-        {emoji}
-      </span>
+      <span style={{ fontSize: isMobile ? '3rem' : '4rem', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>{emoji}</span>
     </div>
   );
 
   return (
     <div style={{ height: '100%', width: '100%', maxWidth: '100vw', padding: !isDesktop ? '15px' : '30px', paddingBottom: !isDesktop ? '100px' : '40px', display: 'flex', flexDirection: 'column', gap: !isDesktop ? '12px' : '20px', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', background: dynamicBg, fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       
-      {/* 🟢 HEADER (ซ่อนอัปเดตในมือถือ เพราะย้ายไป Layout แล้ว) */}
       <div style={{ display: !isDesktop ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div>
           <h1 style={{ fontSize: '2rem', color: textColor, margin: 0, fontWeight: '800', filter: darkMode ? 'none' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.05))' }}>{greeting}</h1>
@@ -236,16 +235,9 @@ export default function Dashboard() {
         {/* 📍 ฝั่งซ้าย: HERO CARD */}
         <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: isMobile ? '20px' : '24px', padding: !isDesktop ? '15px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
           
-          {/* 🌟 ตัวกรอง 2 ชั้น & ปุ่ม GPS */}
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '8px', width: '100%', marginBottom: isMobile ? '15px' : '25px' }}>
-            
-            {/* ชั้นที่ 1: ปุ่ม GPS + เลือกจังหวัด */}
             <div style={{ display: 'flex', gap: '8px', flex: isDesktop ? 0.4 : 1 }}>
-              <button 
-                onClick={handleGPS} 
-                style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '14px', padding: '0 15px', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(14,165,233,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-                title="ค้นหาตำแหน่งปัจจุบัน"
-              >
+              <button onClick={handleGPS} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '14px', padding: '0 15px', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(14,165,233,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="ค้นหาตำแหน่งปัจจุบัน">
                 🎯
               </button>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: innerCardBg, padding: '10px 15px', borderRadius: '14px', border: `1px solid ${borderColor}` }}>
@@ -253,7 +245,7 @@ export default function Dashboard() {
                 <select value={selectedProv} onChange={e => {
                   const prov = e.target.value;
                   setSelectedProv(prov);
-                  const firstSt = stations.find(s => extractProvince(s.areaTH) === prov);
+                  const firstSt = safeStations.find(s => extractProvince(s.areaTH) === prov);
                   if (firstSt) { setSelectedStationId(firstSt.stationID); localStorage.setItem('lastStationId', firstSt.stationID); }
                 }} style={{ flex: 1, background: 'transparent', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '0.95rem', outline: 'none', cursor: 'pointer', appearance: 'none' }}>
                   {allProvinces.map(p => <option key={p} value={p}>{p}</option>)}
@@ -262,11 +254,10 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* ชั้นที่ 2: เลือกจุดตรวจวัด (ตำบล/เขต) */}
             <div style={{ flex: isDesktop ? 0.6 : 1, display: 'flex', alignItems: 'center', background: innerCardBg, padding: '10px 15px', borderRadius: '14px', border: `1px solid ${borderColor}` }}>
               <span style={{ marginRight: '8px', fontSize: '1.1rem' }}>🏢</span>
               <select value={selectedStationId} onChange={handleStationChange} style={{ flex: 1, background: 'transparent', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '0.95rem', outline: 'none', cursor: 'pointer', appearance: 'none', textOverflow: 'ellipsis' }}>
-                {stations.filter(s => extractProvince(s.areaTH) === selectedProv).map(s => (
+                {safeStations.filter(s => extractProvince(s.areaTH) === selectedProv).map(s => (
                   <option key={s.stationID} value={s.stationID}>{formatAreaName(s.areaTH)}</option>
                 ))}
               </select>
@@ -275,7 +266,6 @@ export default function Dashboard() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', width: '100%' }}>
-            {/* การ์ด PM2.5 (วงกลมเปลี่ยนสีตามความอันตราย) */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: '12px 20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
               {renderEmojiBadge(health.face, health.color)}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
@@ -284,7 +274,6 @@ export default function Dashboard() {
                  <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px' }}>{health.text}</span>
               </div>
             </div>
-            {/* การ์ดดัชนีความร้อน (วงกลมเปลี่ยนสีตามความอันตราย) */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: '12px 20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
               {renderEmojiBadge(heatStatus.face, heatStatus.color)}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
@@ -295,7 +284,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* แถบข้อมูลรองด้านล่าง */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: isMobile ? '15px' : '20px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               <span style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>🌡️</span>
@@ -407,11 +395,10 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td style={{ padding: '10px 15px' }}>
-                          <ResponsiveContainer width="100%" height={35}>
-                            <LineChart data={row.trend.map(v => ({val: v.val}))}>
-                              <Line type="monotone" dataKey="val" stroke={getPM25Color(row.pm25)} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                            </LineChart>
-                          </ResponsiveContainer>
+                          {/* 🌟 จุดที่แก้บั๊ก ResponsiveContainer ในตาราง ใช้ความกว้างและความสูงตายตัวไปเลย */}
+                          <LineChart width={100} height={35} data={row.trend.map(v => ({val: v.val}))}>
+                            <Line type="monotone" dataKey="val" stroke={getPM25Color(row.pm25)} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                          </LineChart>
                         </td>
                       </tr>
                     );
