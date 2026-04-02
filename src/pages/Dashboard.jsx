@@ -48,10 +48,10 @@ export default function Dashboard() {
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedStationId, setSelectedStationId] = useState(() => localStorage.getItem('lastStationId') || '');
   const [activeStation, setActiveStation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false); // 🌟 State สำหรับปุ่ม GPS โหลดหมุนๆ
   
   const [greeting, setGreeting] = useState('สวัสดี');
   const [timeOfDay, setTimeOfDay] = useState('morning'); 
-  const [gpsAttempted, setGpsAttempted] = useState(false);
   
   const [statFilter, setStatFilter] = useState('pm25');
   const [historicalData, setHistoricalData] = useState([]);
@@ -60,7 +60,6 @@ export default function Dashboard() {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
 
-  // ป้องกัน error หาก stations เป็น null ระหว่างโหลด
   const safeStations = stations || [];
   const allProvinces = [...new Set(safeStations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th'));
 
@@ -112,26 +111,37 @@ export default function Dashboard() {
     }
   }, [selectedStationId, safeStations]);
 
+  // 🌟 ฟังก์ชันหาพิกัด (เพิ่ม Loading State & ความแม่นยำสูง)
   const handleGPS = () => {
+    setIsLocating(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           let nearest = null; let minD = Infinity;
           safeStations.forEach(s => { 
-            const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); 
-            if (d < minD) { minD = d; nearest = s; } 
+            const lat = parseFloat(s.lat);
+            const lon = parseFloat(s.long);
+            if(!isNaN(lat) && !isNaN(lon)){
+              const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, lat, lon); 
+              if (d < minD) { minD = d; nearest = s; } 
+            }
           });
           if (nearest) { 
             setSelectedProv(extractProvince(nearest.areaTH));
             setSelectedStationId(nearest.stationID); 
             localStorage.setItem('lastStationId', nearest.stationID); 
           }
+          setIsLocating(false);
         }, 
-        () => alert("⚠️ ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาเปิด GPS"),
-        { timeout: 10000 }
+        (error) => {
+          alert("⚠️ ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบว่าคุณอนุญาตการเข้าถึง GPS บนเบราว์เซอร์แล้วหรือยัง");
+          setIsLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
-      alert("❌ อุปกรณ์ของคุณไม่รองรับ GPS");
+      alert("❌ อุปกรณ์ของคุณไม่รองรับการดึงพิกัด GPS");
+      setIsLocating(false);
     }
   };
 
@@ -158,7 +168,7 @@ export default function Dashboard() {
           const provStations = safeStations.filter(s => extractProvince(s.areaTH) === prov);
           let sumPm = 0, sumTemp = 0, sumHeat = 0, sumRain = 0; let validPm = 0, validTemp = 0;
           provStations.forEach(s => {
-            const pm = s.AQILast && s.AQILast.PM25 ? Number(s.AQILast.PM25.value) : NaN;
+            const pm = s.AQILast?.PM25?.value ? Number(s.AQILast.PM25.value) : NaN;
             if (!isNaN(pm)) { sumPm += pm; validPm++; }
             const tObj = stationTemps[s.stationID];
             if (tObj) {
@@ -193,12 +203,17 @@ export default function Dashboard() {
   
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: dynamicBg, color: textColor, fontWeight: 'bold' }}>กำลังโหลดข้อมูล... ⏳</div>;
 
-  const pmVal = activeStation && activeStation.AQILast && activeStation.AQILast.PM25 ? Number(activeStation.AQILast.PM25.value) : null;
+  // 🌟 ป้องกันตัวเลขหาย (Safe Binding)
+  const pmVal = activeStation?.AQILast?.PM25?.value ? Number(activeStation.AQILast.PM25.value) : null;
   const tObj = activeStation ? stationTemps[activeStation.stationID] : null;
-  const tempVal = tObj ? tObj.temp : null;
-  const humidityVal = tObj && tObj.humidity != null ? tObj.humidity : '-';
-  const windVal = tObj ? tObj.windSpeed : null;
-  const heatVal = tObj ? tObj.feelsLike : null;
+  
+  const tempVal = tObj?.temp;
+  const humidityVal = tObj?.humidity != null ? tObj.humidity : '-';
+  const windVal = tObj?.windSpeed;
+  const heatVal = tObj?.feelsLike;
+  const rainVal = tObj?.rainProb;
+  const uvVal = tObj?.uv; // สมมติว่ามีค่า UV หรือคุณสามารถนำข้อมูลอื่นมาแทนได้
+  const windDirVal = tObj?.windDir || '-'; // ทิศทางลม
 
   const health = getHealthStatus(pmVal);
   const heatStatus = getHeatStatus(heatVal);
@@ -236,10 +251,37 @@ export default function Dashboard() {
         <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: isMobile ? '20px' : '24px', padding: !isDesktop ? '15px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
           
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '8px', width: '100%', marginBottom: isMobile ? '15px' : '25px' }}>
+            
             <div style={{ display: 'flex', gap: '8px', flex: isDesktop ? 0.4 : 1 }}>
-              <button onClick={handleGPS} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '14px', padding: '0 15px', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(14,165,233,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="ค้นหาตำแหน่งปัจจุบัน">
-                🎯
+              {/* 🌟 ปุ่ม GPS เปลี่ยนเป็นไอคอน SVG ทันสมัย พร้อมระบบ Loading */}
+              <button 
+                onClick={handleGPS} 
+                disabled={isLocating}
+                style={{ 
+                  background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '14px', padding: '0 15px', 
+                  cursor: isLocating ? 'wait' : 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(14,165,233,0.3)', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isLocating ? 0.7 : 1, transition: 'all 0.2s'
+                }} 
+                title="ค้นหาตำแหน่งปัจจุบัน"
+              >
+                {isLocating ? (
+                  <svg width="22" height="22" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+                    <g style={{ animation: 'spin 1.5s linear infinite', transformOrigin: 'center' }}>
+                      <circle cx="12" cy="12" r="10" fill="none" strokeWidth="2.5" strokeDasharray="30 30" strokeLinecap="round"></circle>
+                    </g>
+                  </svg>
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="7"></circle>
+                    <line x1="12" y1="1" x2="12" y2="5"></line>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="1" y1="12" x2="5" y2="12"></line>
+                    <line x1="19" y1="12" x2="23" y2="12"></line>
+                  </svg>
+                )}
               </button>
+              
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: innerCardBg, padding: '10px 15px', borderRadius: '14px', border: `1px solid ${borderColor}` }}>
                 <span style={{ marginRight: '8px', fontSize: '1.1rem' }}>📍</span>
                 <select value={selectedProv} onChange={e => {
@@ -284,19 +326,29 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: isMobile ? '15px' : '20px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>🌡️</span>
-              <div><div style={{ fontSize: '0.65rem', color: subTextColor }}>อุณหภูมิ</div><div style={{ fontWeight: 'bold', color: textColor, fontSize: '0.85rem' }}>{tempVal ? Math.round(tempVal) : '-'}°C</div></div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderLeft: `1px solid ${borderColor}`, borderRight: `1px solid ${borderColor}` }}>
-              <span style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>💧</span>
-              <div><div style={{ fontSize: '0.65rem', color: subTextColor }}>ความชื้น</div><div style={{ fontWeight: 'bold', color: textColor, fontSize: '0.85rem' }}>{humidityVal}%</div></div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>🌬️</span>
-              <div><div style={{ fontSize: '0.65rem', color: subTextColor }}>ลม</div><div style={{ fontWeight: 'bold', color: textColor, fontSize: '0.85rem' }}>{windVal != null ? Math.round(windVal) : '-'} <span style={{fontSize: '0.6rem'}}>km/h</span></div></div>
-            </div>
+          {/* 🌟 ปรับปรุงการแสดงผลข้อมูลรองด้านล่าง เป็น 6 กล่องแคปซูลเล็กๆ อ่านง่าย สวยงาม */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', 
+            gap: '10px', marginTop: isMobile ? '15px' : '20px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` 
+          }}>
+            {[
+              { icon: '🌡️', label: 'อุณหภูมิ', val: tempVal != null ? `${Math.round(tempVal)}°C` : '-' },
+              { icon: '💧', label: 'ความชื้น', val: humidityVal !== '-' ? `${humidityVal}%` : '-' },
+              { icon: '🌬️', label: 'ความเร็วลม', val: windVal != null ? `${Math.round(windVal)} km/h` : '-' },
+              { icon: '🧭', label: 'ทิศทางลม', val: windDirVal },
+              { icon: '☔', label: 'โอกาสฝน', val: rainVal != null ? `${Math.round(rainVal)}%` : '-' },
+              { icon: '☀️', label: 'UV Index', val: uvVal != null ? uvVal : '-' },
+            ].map((item, idx) => (
+              <div key={idx} style={{ 
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+                background: innerCardBg, padding: '10px 5px', borderRadius: '14px', border: `1px solid ${borderColor}` 
+              }}>
+                <span style={{ fontSize: '1.2rem', marginBottom: '2px', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))' }}>{item.icon}</span>
+                <span style={{ fontSize: '0.65rem', color: subTextColor, fontWeight: 'bold' }}>{item.label}</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: '900', color: textColor }}>{item.val}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -395,7 +447,6 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td style={{ padding: '10px 15px' }}>
-                          {/* 🌟 จุดที่แก้บั๊ก ResponsiveContainer ในตาราง ใช้ความกว้างและความสูงตายตัวไปเลย */}
                           <LineChart width={100} height={35} data={row.trend.map(v => ({val: v.val}))}>
                             <Line type="monotone" dataKey="val" stroke={getPM25Color(row.pm25)} strokeWidth={2.5} dot={false} isAnimationActive={false} />
                           </LineChart>
