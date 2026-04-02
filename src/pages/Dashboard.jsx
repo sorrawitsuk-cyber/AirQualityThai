@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { WeatherContext } from '../context/WeatherContext';
 import { extractProvince, formatLocationName, getPM25Color, getDistanceFromLatLonInKm } from '../utils/helpers';
 
-// 🌟 สถานะสุขภาพ (เพิ่มอารมณ์ 5 ระดับ และข้อความเตือน ⚠️)
+// 🌟 สถานะสุขภาพ
 const getHealthStatus = (pm) => {
   if (pm == null || isNaN(pm)) return { level: 0, text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', warning: '' };
   if (pm <= 15.0) return { level: 1, text: 'คุณภาพอากาศดีมาก', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', warning: '' }; 
@@ -16,7 +16,7 @@ const getHealthStatus = (pm) => {
   return { level: 5, text: 'มีผลกระทบสุขภาพ', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', warning: '⚠️ อันตราย! งดกิจกรรมกลางแจ้ง' }; 
 };
 
-// 🌟 สถานะความร้อน (เพิ่มอารมณ์ 5 ระดับ และข้อความเตือน ⚠️)
+// 🌟 สถานะความร้อน
 const getHeatStatus = (val) => {
   if (val == null || isNaN(val)) return { level: 0, text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', warning: '' };
   if (val >= 52) return { level: 5, text: 'อันตรายมาก (ฮีทสโตรก)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', warning: '⚠️ อันตรายถึงชีวิต' };
@@ -37,7 +37,6 @@ const getStatColor = (type, val) => {
 
 const formatAreaName = (areaTH) => areaTH ? areaTH.split(',')[0].trim() : '';
 
-// 🌟 ฟังก์ชันสร้างเข็มทิศทิศทางลม
 const getWindArrow = (dir) => {
   if (dir == null || dir === '-') return null;
   let deg = 0;
@@ -54,23 +53,23 @@ const getWindArrow = (dir) => {
   );
 };
 
-// 🌟 ใบหน้าอัจฉริยะ (เปลี่ยนอารมณ์ตามระดับอันตราย)
+// 🌟 ใบหน้าอัจฉริยะ 
 const SVGFace = ({ level }) => {
   let eyes = <g><circle cx="35" cy="40" r="7" fill="#fff"/><circle cx="65" cy="40" r="7" fill="#fff"/></g>;
   let mouth = "M 35 65 Q 50 80 65 65"; 
 
-  if (level === 0) { // ไม่มีข้อมูล
+  if (level === 0) { 
     eyes = <g><line x1="30" y1="40" x2="40" y2="40" stroke="#fff" strokeWidth="5" strokeLinecap="round"/><line x1="60" y1="40" x2="70" y2="40" stroke="#fff" strokeWidth="5" strokeLinecap="round"/></g>;
     mouth = "M 35 65 L 65 65";
-  } else if (level === 1) { // ดีมาก
+  } else if (level === 1) { 
     mouth = "M 30 60 Q 50 85 70 60";
-  } else if (level === 2) { // ดี
+  } else if (level === 2) { 
     mouth = "M 35 65 Q 50 75 65 65";
-  } else if (level === 3) { // ปานกลาง
+  } else if (level === 3) { 
     mouth = "M 35 65 L 65 65";
-  } else if (level === 4) { // เริ่มมีผลกระทบ
+  } else if (level === 4) { 
     mouth = "M 35 70 Q 50 55 65 70";
-  } else if (level === 5) { // อันตรายมาก
+  } else if (level === 5) { 
     eyes = <g><line x1="28" y1="33" x2="42" y2="47" stroke="#fff" strokeWidth="5" strokeLinecap="round"/><line x1="28" y1="47" x2="42" y2="33" stroke="#fff" strokeWidth="5" strokeLinecap="round"/><line x1="58" y1="33" x2="72" y2="47" stroke="#fff" strokeWidth="5" strokeLinecap="round"/><line x1="58" y1="47" x2="72" y2="33" stroke="#fff" strokeWidth="5" strokeLinecap="round"/></g>;
     mouth = "M 35 75 Q 50 55 65 75";
   }
@@ -282,6 +281,9 @@ export default function Dashboard() {
 
   const health = getHealthStatus(pmVal);
   const heatStatus = getHeatStatus(heatVal);
+  
+  // 🌟 แก้ไขบั๊กจอขาว: นำตัวแปร pmColor กลับมาใช้งานให้แผนที่
+  const pmColor = getStatColor('pm25', pmVal);
 
   const renderFaceBadge = (level, color) => (
     <div style={{
@@ -298,7 +300,6 @@ export default function Dashboard() {
     </div>
   );
 
-  // 🌟 ฟังก์ชัน Tooltip ที่แก้จอขาว!
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -363,24 +364,24 @@ export default function Dashboard() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', width: '100%' }}>
-            {/* 🌟 การ์ด PM2.5 ที่ป้องกันตัวหนังสือหลุดขอบ (ใช้ flex: 1 และ minWidth: 0) */}
-            <div style={{ display: 'flex', alignItems: 'center', background: innerCardBg, padding: '15px', borderRadius: '20px', border: `1px solid ${borderColor}`, gap: '15px' }}>
+            {/* 🌟 แก้ไขบั๊กตัวเลขหายในมือถือ (ปรับ Flexbox ให้ไม่เบียดกัน) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
               {renderFaceBadge(health.level, health.color)}
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, alignItems: 'flex-end', justifyContent: 'center' }}>
-                 <span style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>PM2.5 (µg/m³)</span>
-                 <span style={{ fontSize: isMobile ? '2.8rem' : '3.5rem', fontWeight: '900', color: health.color, lineHeight: 1 }}>{pmVal != null ? pmVal : '-'}</span>
-                 <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px' }}>{health.text}</span>
-                 {health.warning && <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px 10px', borderRadius: '12px' }}>{health.warning}</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', width: '60%' }}>
+                 <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>PM2.5 (µg/m³)</span>
+                 <span style={{ fontSize: isMobile ? '2.5rem' : '3.5rem', fontWeight: '900', color: health.color, lineHeight: 1.1 }}>{pmVal != null ? pmVal : '-'}</span>
+                 <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '6px', textAlign: 'center' }}>{health.text}</span>
+                 {health.warning && <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px 10px', borderRadius: '12px', textAlign: 'center' }}>{health.warning}</div>}
               </div>
             </div>
-            {/* 🌟 การ์ดความร้อน */}
-            <div style={{ display: 'flex', alignItems: 'center', background: innerCardBg, padding: '15px', borderRadius: '20px', border: `1px solid ${borderColor}`, gap: '15px' }}>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
               {renderFaceBadge(heatStatus.level, heatStatus.color)}
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, alignItems: 'flex-end', justifyContent: 'center' }}>
-                 <span style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>ดัชนีความร้อน (°C)</span>
-                 <span style={{ fontSize: isMobile ? '2.8rem' : '3.5rem', fontWeight: '900', color: heatStatus.color, lineHeight: 1 }}>{heatVal != null ? Math.round(heatVal) : '-'}</span>
-                 <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px' }}>{heatStatus.text}</span>
-                 {heatStatus.warning && <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px 10px', borderRadius: '12px' }}>{heatStatus.warning}</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', width: '60%' }}>
+                 <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>ดัชนีความร้อน (°C)</span>
+                 <span style={{ fontSize: isMobile ? '2.5rem' : '3.5rem', fontWeight: '900', color: heatStatus.color, lineHeight: 1.1 }}>{heatVal != null ? Math.round(heatVal) : '-'}</span>
+                 <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '6px', textAlign: 'center' }}>{heatStatus.text}</span>
+                 {heatStatus.warning && <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px 10px', borderRadius: '12px', textAlign: 'center' }}>{heatStatus.warning}</div>}
               </div>
             </div>
           </div>
