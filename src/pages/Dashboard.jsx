@@ -5,26 +5,25 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { WeatherContext } from '../context/WeatherContext';
 import { extractProvince, formatLocationName, getPM25Color, getDistanceFromLatLonInKm } from '../utils/helpers';
 
-// 🌟 ฟังก์ชันสถานะฝุ่น (ปรับข้อความและไอคอนให้เข้ากับสไตล์การ์ตูน)
+// 🌟 ฟังก์ชันสถานะสุขภาพ (สไตล์ Clean กึ่ง 3D แบบภาพที่คุณชอบ)
 const getHealthStatus = (pm) => {
-  if (pm == null || isNaN(pm)) return { face: '😶', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: '#f1f5f9' };
-  if (pm <= 15.0) return { face: '😇', text: '⭐ อากาศดีเยี่ยม ⭐', color: '#059669', bg: '#d1fae5' }; 
-  if (pm <= 25.0) return { face: '🙂', text: '⭐ อากาศดี ⭐', color: '#16a34a', bg: '#dcfce7' }; 
-  if (pm <= 37.5) return { face: '😐', text: '⭐ ปานกลาง ⭐', color: '#d97706', bg: '#fef3c7' }; 
-  if (pm <= 75.0) return { face: '😷', text: '⭐ เริ่มมีผลกระทบ ⭐', color: '#ea580c', bg: '#ffedd5' }; 
-  return { face: '🤢', text: '⭐ อันตราย ⭐', color: '#dc2626', bg: '#fee2e2' }; 
+  if (pm == null || isNaN(pm)) return { face: '😶', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
+  if (pm <= 15.0) return { face: '😁', text: 'คุณภาพอากาศดีมาก', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' }; 
+  if (pm <= 25.0) return { face: '🙂', text: 'คุณภาพอากาศดี', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' }; 
+  if (pm <= 37.5) return { face: '😐', text: 'คุณภาพปานกลาง', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' }; 
+  if (pm <= 75.0) return { face: '😷', text: 'เริ่มมีผลกระทบสุขภาพ', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' }; 
+  return { face: '🤢', text: 'มีผลกระทบสุขภาพ', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' }; 
 };
 
-// 🌟 ฟังก์ชันสถานะความร้อน (ปรับข้อความและไอคอนให้เข้ากับสไตล์การ์ตูน)
+// 🌟 ฟังก์ชันสถานะความร้อน (เข้าชุดกัน)
 const getHeatStatus = (val) => {
-  if (val == null || isNaN(val)) return { face: '😶', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: '#f1f5f9' };
-  if (val >= 52) return { face: '🤯', text: '⭐ อันตรายมาก ⭐', color: '#dc2626', bg: '#fee2e2' };
-  if (val >= 41) return { face: '🥵', text: '⭐ อันตราย ⭐', color: '#ea580c', bg: '#ffedd5' };
-  if (val >= 32) return { face: '😰', text: '⭐ เฝ้าระวัง ⭐', color: '#d97706', bg: '#fef3c7' };
-  return { face: '😎', text: '⭐ ปกติ ⭐', color: '#16a34a', bg: '#dcfce7' };
+  if (val == null || isNaN(val)) return { face: '😶', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
+  if (val >= 52) return { face: '🥵', text: 'อันตรายมาก (ฮีทสโตรก)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+  if (val >= 41) return { face: '😰', text: 'อันตราย (เลี่ยงแดดจัด)', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' };
+  if (val >= 32) return { face: '😅', text: 'เฝ้าระวัง (เตือนภัย)', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
+  return { face: '😎', text: 'ปกติ (ปลอดภัย)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
 };
 
-// ฟังก์ชันช่วยเลื่อนแผนที่
 function MiniMapUpdate({ lat, lon }) {
   const map = useMap();
   useEffect(() => {
@@ -38,6 +37,8 @@ export default function Dashboard() {
   
   const [selectedStationId, setSelectedStationId] = useState(() => localStorage.getItem('lastStationId') || '');
   const [activeStation, setActiveStation] = useState(null);
+  const [greeting, setGreeting] = useState('สวัสดี');
+  const [timeOfDay, setTimeOfDay] = useState('morning'); 
   const [gpsAttempted, setGpsAttempted] = useState(false);
   const [forecastData, setForecastData] = useState([]);
   
@@ -47,6 +48,14 @@ export default function Dashboard() {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 🌟 ตั้งเวลาและคำทักทาย
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour >= 6 && hour < 12) { setGreeting('สวัสดีตอนเช้า ⛅'); setTimeOfDay('morning'); }
+    else if (hour >= 12 && hour < 18) { setGreeting('สวัสดีตอนบ่าย ☀️'); setTimeOfDay('afternoon'); }
+    else { setGreeting('สวัสดีตอนเย็น 🌙'); setTimeOfDay('evening'); }
   }, []);
 
   // ระบบดึงพิกัดอัตโนมัติ
@@ -104,11 +113,9 @@ export default function Dashboard() {
           let sIdx = data.hourly.time.findIndex(t => new Date(t).getTime() >= now);
           if (sIdx === -1) sIdx = 0;
           const pmF = [];
-          const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-          for (let i = sIdx; i < sIdx + 24; i += 4) { 
+          for (let i = sIdx; i < sIdx + 24; i += 2) { 
             if (data.hourly.pm2_5[i] != null) {
-              const d = new Date(data.hourly.time[i]);
-              pmF.push({ time: `${days[d.getDay()]} ${d.getHours()}h`, val: Math.round(data.hourly.pm2_5[i]) });
+              pmF.push({ time: `${new Date(data.hourly.time[i]).getHours().toString().padStart(2, '0')}:00`, val: Math.round(data.hourly.pm2_5[i]) });
             }
           }
           setForecastData(pmF);
@@ -117,18 +124,29 @@ export default function Dashboard() {
     }
   }, [activeStation]);
 
+  const todayStr = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+  
   const allLocations = [...(stations || [])].map(s => ({
     id: s.stationID, name: formatLocationName(s.areaTH)
   })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
 
-  // 🌟 ธีมสีสไตล์การ์ตูน (Cartoon UI Theme)
-  const bgMain = darkMode ? '#0f172a' : '#bae6fd'; // สีฟ้าพาสเทลอ่อนๆ แบบในรูป
-  const cardBg = darkMode ? '#1e293b' : '#ffffff';
-  const borderStyle = darkMode ? '2px solid #334155' : '2px solid #1e3a8a'; // ขอบหนาสีน้ำเงินเข้ม
-  const textDark = darkMode ? '#f8fafc' : '#1e3a8a';
-  const cardShadow = darkMode ? 'none' : '4px 4px 0px rgba(30, 58, 138, 0.1)'; // เงาแข็งๆ แบบการ์ตูน
+  // 🌟 Dynamic Background: เปลี่ยนสีฟ้าตามช่วงเวลาของวัน
+  let dynamicBg = '';
+  if (darkMode) {
+    dynamicBg = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+  } else {
+    if (timeOfDay === 'morning') dynamicBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)'; // เช้า: ฟ้าพาสเทลอ่อนละมุน
+    else if (timeOfDay === 'afternoon') dynamicBg = 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)'; // บ่าย: ฟ้าสว่างสดใส
+    else dynamicBg = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'; // เย็น: ฟ้าอมม่วง/เทา สบายตา
+  }
+
+  const cardBg = darkMode ? 'rgba(30, 41, 59, 0.85)' : 'rgba(255, 255, 255, 0.85)';
+  const innerCardBg = darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.7)';
+  const textColor = darkMode ? '#f8fafc' : '#0f172a';
+  const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
+  const borderColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)'; 
   
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: bgMain, color: textDark, fontWeight: 'bold' }}>กำลังโหลดข้อมูล... ⏳</div>;
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: dynamicBg, color: textColor, fontWeight: 'bold' }}>กำลังโหลดข้อมูล... ⏳</div>;
 
   const pmVal = activeStation && activeStation.AQILast && activeStation.AQILast.PM25 ? Number(activeStation.AQILast.PM25.value) : null;
   const tObj = activeStation ? stationTemps[activeStation.stationID] : null;
@@ -143,128 +161,110 @@ export default function Dashboard() {
   const pmColor = getPM25Color(pmVal);
 
   return (
-    <div style={{ background: bgMain, minHeight: '100%', padding: isMobile ? '15px' : '25px', paddingBottom: isMobile ? '90px' : '40px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
+    <div style={{ background: dynamicBg, minHeight: '100%', padding: isMobile ? '15px' : '30px', paddingBottom: isMobile ? '90px' : '40px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       
-      {/* 🟢 HEADER: ตัวเลือกสถานที่แบบการ์ด */}
-      <div style={{ display: 'flex', justifyContent: isMobile ? 'center' : 'flex-start' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 20px', borderRadius: '16px', border: borderStyle, boxShadow: cardShadow, width: isMobile ? '100%' : 'auto', minWidth: '300px' }}>
-          <span style={{ fontSize: '1.5rem' }}>📍</span>
-          <select value={selectedStationId} onChange={handleStationChange} style={{ flex: 1, background: 'transparent', color: textDark, border: 'none', fontWeight: 'bold', fontSize: '1.1rem', outline: 'none', cursor: 'pointer', appearance: 'none' }}>
-            {allLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
-          </select>
-          <span style={{ fontSize: '0.8rem', color: textDark }}>▼</span>
+      {/* 🟢 HEADER */}
+      <div style={{ display: 'flex', justifyContent: isMobile ? 'flex-end' : 'space-between', alignItems: 'center' }}>
+        {!isMobile && (
+          <div>
+            <h1 style={{ fontSize: '2rem', color: textColor, margin: 0, fontWeight: '800', filter: darkMode ? 'none' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.05))' }}>{greeting}</h1>
+            <p style={{ margin: '2px 0 0 0', color: subTextColor, fontSize: '0.95rem' }}>{todayStr}</p>
+          </div>
+        )}
+        <div style={{ background: innerCardBg, backdropFilter: 'blur(10px)', padding: '8px 15px', borderRadius: '12px', color: subTextColor, fontSize: '0.8rem', fontWeight: 'bold', border: `1px solid ${borderColor}`, boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
+          ⏱️ อัปเดต: {lastUpdateText || '-'}
         </div>
       </div>
 
-      {/* 🌟 MAIN GRID: 3 คอลัมน์ (PM | Heat | RightPanel) */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 300px', gap: '20px' }}>
+      {/* 🌟 MAIN GRID */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: '20px' }}>
         
-        {/* 📍 CARD 1: ฝุ่น PM2.5 */}
-        <div style={{ background: cardBg, borderRadius: '24px', border: borderStyle, boxShadow: cardShadow, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* 📍 ฝั่งซ้าย: DUAL HERO CARD (Clean Style) */}
+        <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: isMobile ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
           
-          <div style={{ padding: '25px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          {/* ตัวเลือกสถานที่ (แคปซูลมนๆ) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: innerCardBg, padding: '8px 10px 8px 15px', borderRadius: '50px', marginBottom: '25px', border: `1px solid ${borderColor}` }}>
+            <span style={{ fontSize: '1.2rem' }}>📍</span>
+            <select value={selectedStationId} onChange={handleStationChange} style={{ flex: 1, background: 'transparent', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', outline: 'none', cursor: 'pointer', appearance: 'none', textOverflow: 'ellipsis' }}>
+              {allLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+            </select>
+          </div>
+
+          {/* 🌟 2 ดัชนีหลัก */}
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '30px' : '20px', flex: 1, alignItems: 'center', justifyContent: 'space-around', padding: '10px 0' }}>
             
-            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '6rem', filter: `drop-shadow(0 10px 15px ${health.color}40)`, lineHeight: 1 }}>{health.face}</div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '1rem', color: textDark, fontWeight: 'bold' }}>PM2.5 (µg/m³)</div>
-                <div style={{ fontSize: '4.5rem', fontWeight: '900', color: textDark, lineHeight: 1 }}>{pmVal != null && !isNaN(pmVal) ? pmVal : '-'}</div>
+            {/* PM2.5 */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+              <div style={{ fontSize: isMobile ? '5.5rem' : '6.5rem', filter: `drop-shadow(0 15px 25px ${health.color}50)`, lineHeight: 1, transform: 'scale(1.05)' }}>{health.face}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                 <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', letterSpacing: '0.5px' }}>PM2.5 (µg/m³)</span>
+                 <span style={{ fontSize: isMobile ? '3.5rem' : '4.5rem', fontWeight: '900', color: health.color, lineHeight: 1.1, filter: darkMode ? `drop-shadow(0 0 10px ${health.color}30)` : 'none' }}>{pmVal != null && !isNaN(pmVal) ? pmVal : '-'}</span>
+                 <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', marginTop: '5px' }}>{health.text}</span>
               </div>
             </div>
 
-            {/* ป้ายสถานะ */}
-            <div style={{ background: health.color, color: '#fff', padding: '8px 25px', borderRadius: '50px', fontWeight: 'bold', fontSize: '1.1rem', width: '80%', textAlign: 'center', border: `2px solid ${darkMode?'#fff':textDark}`, boxShadow: '0 4px 0 rgba(0,0,0,0.1)' }}>
-              {health.text}
+            {/* เส้นแบ่งกลาง */}
+            {!isMobile && <div style={{ width: '1px', height: '100px', background: borderColor }}></div>}
+            {isMobile && <div style={{ width: '80%', height: '1px', background: borderColor }}></div>}
+
+            {/* ดัชนีความร้อน */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+              <div style={{ fontSize: isMobile ? '5.5rem' : '6.5rem', filter: `drop-shadow(0 15px 25px ${heatStatus.color}50)`, lineHeight: 1, transform: 'scale(1.05)' }}>{heatStatus.face}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                 <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', letterSpacing: '0.5px' }}>ความร้อนรู้สึกจริง (°C)</span>
+                 <span style={{ fontSize: isMobile ? '3.5rem' : '4.5rem', fontWeight: '900', color: heatStatus.color, lineHeight: 1.1, filter: darkMode ? `drop-shadow(0 0 10px ${heatStatus.color}30)` : 'none' }}>{heatVal != null ? Math.round(heatVal) : '-'}</span>
+                 <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', marginTop: '5px' }}>{heatStatus.text}</span>
+              </div>
             </div>
+
           </div>
 
-          {/* Footer (อุณหภูมิ, ความชื้น, ลม) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', background: darkMode ? '#334155' : '#e0f2fe', borderTop: borderStyle, padding: '15px 10px' }}>
-            <div style={{ textAlign: 'center', borderRight: borderStyle }}>
-              <div style={{ fontSize: '0.85rem', color: textDark, fontWeight: 'bold' }}>อุณหภูมิ</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: textDark }}>🌡️ {tempVal ? Math.round(tempVal) : '-'}°C</div>
+          {/* แถบข้อมูลรองด้านล่าง */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '30px', paddingTop: '20px', borderTop: `1px dashed ${borderColor}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.5rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>🌡️</span>
+              <div><div style={{ fontSize: '0.7rem', color: subTextColor }}>อุณหภูมิ</div><div style={{ fontWeight: 'bold', color: textColor }}>{tempVal ? Math.round(tempVal) : '-'}°C</div></div>
             </div>
-            <div style={{ textAlign: 'center', borderRight: borderStyle }}>
-              <div style={{ fontSize: '0.85rem', color: textDark, fontWeight: 'bold' }}>ความชื้น</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: textDark }}>💧 {humidityVal}%</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderLeft: `1px solid ${borderColor}`, borderRight: `1px solid ${borderColor}` }}>
+              <span style={{ fontSize: '1.5rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>💧</span>
+              <div><div style={{ fontSize: '0.7rem', color: subTextColor }}>ความชื้น</div><div style={{ fontWeight: 'bold', color: textColor }}>{humidityVal}%</div></div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.85rem', color: textDark, fontWeight: 'bold' }}>ลม</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: textDark }}>🌬️ {windVal != null ? Math.round(windVal) : '-'} <span style={{fontSize:'0.7rem'}}>km/h</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.5rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>🌬️</span>
+              <div><div style={{ fontSize: '0.7rem', color: subTextColor }}>ลม</div><div style={{ fontWeight: 'bold', color: textColor }}>{windVal != null ? Math.round(windVal) : '-'} km/h</div></div>
             </div>
           </div>
         </div>
 
-        {/* 📍 CARD 2: ดัชนีความร้อน */}
-        <div style={{ background: cardBg, borderRadius: '24px', border: borderStyle, boxShadow: cardShadow, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          
-          <div style={{ padding: '20px 25px 5px 25px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', color: textDark, fontWeight: 'bold' }}>ดัชนีความร้อน</h3>
-          </div>
-
-          <div style={{ padding: '0 25px 25px 25px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            
-            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '6rem', filter: `drop-shadow(0 10px 15px ${heatStatus.color}40)`, lineHeight: 1 }}>{heatStatus.face}</div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '1rem', color: textDark, fontWeight: 'bold' }}>ดัชนีความร้อน</div>
-                <div style={{ fontSize: '4.5rem', fontWeight: '900', color: textDark, lineHeight: 1 }}>{heatVal != null ? Math.round(heatVal) : '-'}°C</div>
-              </div>
-            </div>
-
-            {/* ป้ายสถานะ */}
-            <div style={{ background: heatStatus.color, color: '#fff', padding: '8px 25px', borderRadius: '50px', fontWeight: 'bold', fontSize: '1.1rem', width: '80%', textAlign: 'center', border: `2px solid ${darkMode?'#fff':textDark}`, boxShadow: '0 4px 0 rgba(0,0,0,0.1)' }}>
-              {heatStatus.text}
-            </div>
-          </div>
-
-          {/* Footer (อุณหภูมิ, ความชื้น, ลม) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', background: darkMode ? '#334155' : '#e0f2fe', borderTop: borderStyle, padding: '15px 10px' }}>
-            <div style={{ textAlign: 'center', borderRight: borderStyle }}>
-              <div style={{ fontSize: '0.85rem', color: textDark, fontWeight: 'bold' }}>อุณหภูมิ</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: textDark }}>🌡️ {tempVal ? Math.round(tempVal) : '-'}°C</div>
-            </div>
-            <div style={{ textAlign: 'center', borderRight: borderStyle }}>
-              <div style={{ fontSize: '0.85rem', color: textDark, fontWeight: 'bold' }}>ความชื้น</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: textDark }}>💧 {humidityVal}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.85rem', color: textDark, fontWeight: 'bold' }}>ลม</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: textDark }}>🌬️ {windVal != null ? Math.round(windVal) : '-'} <span style={{fontSize:'0.7rem'}}>km/h</span></div>
-            </div>
-          </div>
-        </div>
-
-        {/* 📍 CARD 3: Sidebar (Map + Forecast) */}
+        {/* 📍 ฝั่งขวา: แผนที่ย่อ + กราฟ 24 ชม. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Mini Map */}
-          <div style={{ background: cardBg, borderRadius: '24px', border: borderStyle, boxShadow: cardShadow, padding: '15px', height: '220px', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: textDark, fontWeight: 'bold' }}>Map</h3>
-            <div style={{ flex: 1, borderRadius: '12px', overflow: 'hidden', border: borderStyle, position: 'relative' }}>
+          <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '15px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', flex: 1, minHeight: '200px', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', margin: '0 0 10px 5px' }}>🗺️ ตำแหน่งจุดตรวจวัด</h3>
+            <div style={{ flex: 1, borderRadius: '15px', overflow: 'hidden', background: innerCardBg, position: 'relative' }}>
               {activeStation && !isNaN(parseFloat(activeStation.lat)) ? (
                 <MapContainer center={[parseFloat(activeStation.lat), parseFloat(activeStation.long)]} zoom={10} style={{ height: '100%', width: '100%', zIndex: 1 }} zoomControl={false} dragging={!isMobile} scrollWheelZoom={false}>
                   <TileLayer url={darkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"} />
                   <MiniMapUpdate lat={parseFloat(activeStation.lat)} lon={parseFloat(activeStation.long)} />
-                  <CircleMarker center={[parseFloat(activeStation.lat), parseFloat(activeStation.long)]} radius={8} pathOptions={{ color: textDark, fillColor: pmColor, fillOpacity: 1, weight: 2 }} />
+                  <CircleMarker center={[parseFloat(activeStation.lat), parseFloat(activeStation.long)]} radius={25} pathOptions={{ color: pmColor, fillColor: pmColor, fillOpacity: 0.3, weight: 0 }} />
+                  <CircleMarker center={[parseFloat(activeStation.lat), parseFloat(activeStation.long)]} radius={6} pathOptions={{ color: '#fff', fillColor: pmColor, fillOpacity: 1, weight: 2 }} />
                 </MapContainer>
               ) : (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textDark }}>ไม่มีข้อมูลแผนที่</div>
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: subTextColor }}>ไม่มีข้อมูลแผนที่</div>
               )}
             </div>
           </div>
 
-          {/* Forecast Chart */}
-          <div style={{ background: cardBg, borderRadius: '24px', border: borderStyle, boxShadow: cardShadow, padding: '15px', flex: 1, minHeight: '200px', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: textDark, fontWeight: 'bold' }}>Forecast</h3>
+          <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', height: '220px', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', margin: '0 0 15px 5px' }}>📊 แนวโน้มฝุ่น PM2.5 ล่วงหน้า (24 ชม.)</h3>
             <div style={{ flex: 1 }}>
               {forecastData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={forecastData} margin={{ top: 10, right: 0, bottom: 0, left: -30 }}>
-                    <XAxis dataKey="time" stroke={textDark} fontSize={10} tickLine={false} axisLine={{stroke: textDark, strokeWidth: 2}} />
-                    <YAxis stroke={textDark} fontSize={10} tickLine={false} axisLine={false} />
-                    <Tooltip cursor={{ fill: darkMode ? '#334155' : '#e0f2fe' }} contentStyle={{ borderRadius: '10px', border: borderStyle, background: cardBg, color: textDark, fontWeight: 'bold' }} />
-                    <Bar dataKey="val" radius={[4, 4, 0, 0]} stroke={textDark} strokeWidth={1}>
+                  <BarChart data={forecastData} margin={{ top: 5, right: 5, bottom: -5, left: -25 }}>
+                    <XAxis dataKey="time" stroke={subTextColor} fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis stroke={subTextColor} fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip cursor={{ fill: innerCardBg }} contentStyle={{ borderRadius: '10px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} />
+                    <Bar dataKey="val" radius={[4, 4, 0, 0]}>
                       {forecastData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={getPM25Color(entry.val)} />
                       ))}
@@ -272,14 +272,14 @@ export default function Dashboard() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textDark, fontSize: '0.85rem' }}>กำลังโหลด...</div>
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: subTextColor, fontSize: '0.85rem' }}>กำลังคำนวณโมเดลพยากรณ์...</div>
               )}
             </div>
           </div>
 
         </div>
-
       </div>
+
     </div>
   );
 }
