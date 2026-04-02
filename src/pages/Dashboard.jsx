@@ -135,6 +135,7 @@ export default function Dashboard() {
     else { setGreeting('สวัสดีตอนเย็น 🌙'); setTimeOfDay('evening'); }
   }, []);
 
+  // 🌟 เลือสถานีตั้งต้นให้ฉลาดขึ้น (หาอันที่มีข้อมูลก่อน)
   useEffect(() => {
     if (safeStations.length > 0 && !selectedProv) {
       const savedStId = localStorage.getItem('lastStationId');
@@ -146,8 +147,11 @@ export default function Dashboard() {
           return;
         }
       }
-      const bkk = safeStations.find(s => extractProvince(s.areaTH) === 'กรุงเทพมหานคร');
-      const initial = bkk || safeStations[0];
+      // ถ้าเลือก กทม ให้หาสถานีที่มีค่า PM2.5 จริงๆ ก่อน ถ้าไม่มีค่อยเอาอันแรก
+      const bkkStations = safeStations.filter(s => extractProvince(s.areaTH) === 'กรุงเทพมหานคร');
+      const validBkk = bkkStations.find(s => s.AQILast?.PM25?.value) || bkkStations[0];
+      const initial = validBkk || safeStations[0];
+      
       setSelectedProv(extractProvince(initial.areaTH));
       setSelectedStationId(initial.stationID);
     }
@@ -285,7 +289,7 @@ export default function Dashboard() {
   const renderFaceBadge = (level, color) => (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      width: isMobile ? '75px' : '90px', height: isMobile ? '75px' : '90px',
+      width: isMobile ? '70px' : '90px', height: isMobile ? '70px' : '90px',
       background: `radial-gradient(circle at 30% 30%, ${color} 0%, ${color}dd 100%)`, 
       borderRadius: '50%',
       boxShadow: `0 8px 20px ${color}60, inset 0 2px 5px rgba(255,255,255,0.4)`, 
@@ -361,25 +365,43 @@ export default function Dashboard() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', width: '100%' }}>
-            {/* 🌟 ฆ่าบั๊กมือถือข้อความหาย! เพิ่ม flex: 1, minWidth: 0 ช่วยล็อก Layout */}
-            <div style={{ display: 'flex', alignItems: 'center', background: innerCardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}`, gap: '15px' }}>
-              {renderFaceBadge(health.level, health.color)}
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, alignItems: 'flex-end', justifyContent: 'center' }}>
-                 <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>PM2.5 (µg/m³)</span>
-                 <span style={{ fontSize: isMobile ? '2.5rem' : '3.5rem', fontWeight: '900', color: health.color, lineHeight: 1 }}>{pmVal != null ? pmVal : '-'}</span>
-                 <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '6px', textAlign: 'center', wordBreak: 'break-word' }}>{health.text}</span>
-                 {health.warning && <div style={{ width: '100%', fontSize: '0.65rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px', borderRadius: '8px', textAlign: 'center', wordBreak: 'break-word' }}>{health.warning}</div>}
+            
+            {/* 🌟 1. การ์ด PM2.5 (ปรับ Layout ป้องกันตัวหนังสือล้นจอ) */}
+            <div style={{ display: 'flex', flexDirection: 'column', background: innerCardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}`, gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px' }}>
+                {renderFaceBadge(health.level, health.color)}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flex: 1, minWidth: 0 }}>
+                   <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>PM2.5 (µg/m³)</span>
+                   <span style={{ fontSize: isMobile ? '2.8rem' : '3.5rem', fontWeight: '900', color: health.color, lineHeight: 1 }}>{pmVal != null ? pmVal : '-'}</span>
+                   <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px', textAlign: 'center', wordBreak: 'break-word', maxWidth: '100%' }}>{health.text}</span>
+                </div>
               </div>
+              {/* ย้าย Warning ลงมาด้านล่างสุดของการ์ด เพื่อไม่ให้ดันด้านขวา */}
+              {health.warning && (
+                <div style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.75rem', color: '#ef4444', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.15)', padding: '8px 10px', borderRadius: '12px', textAlign: 'center', wordBreak: 'break-word' }}>
+                  {health.warning}
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', background: innerCardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}`, gap: '15px' }}>
-              {renderFaceBadge(heatStatus.level, heatStatus.color)}
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, alignItems: 'flex-end', justifyContent: 'center' }}>
-                 <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>ดัชนีความร้อน (°C)</span>
-                 <span style={{ fontSize: isMobile ? '2.5rem' : '3.5rem', fontWeight: '900', color: heatStatus.color, lineHeight: 1 }}>{heatVal != null ? Math.round(heatVal) : '-'}</span>
-                 <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '6px', textAlign: 'center', wordBreak: 'break-word' }}>{heatStatus.text}</span>
-                 {heatStatus.warning && <div style={{ width: '100%', fontSize: '0.65rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px', borderRadius: '8px', textAlign: 'center', wordBreak: 'break-word' }}>{heatStatus.warning}</div>}
+
+            {/* 🌟 2. การ์ดดัชนีความร้อน (ปรับ Layout เหมือนกัน) */}
+            <div style={{ display: 'flex', flexDirection: 'column', background: innerCardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}`, gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px' }}>
+                {renderFaceBadge(heatStatus.level, heatStatus.color)}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flex: 1, minWidth: 0 }}>
+                   <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>ดัชนีความร้อน (°C)</span>
+                   <span style={{ fontSize: isMobile ? '2.8rem' : '3.5rem', fontWeight: '900', color: heatStatus.color, lineHeight: 1 }}>{heatVal != null ? Math.round(heatVal) : '-'}</span>
+                   <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px', textAlign: 'center', wordBreak: 'break-word', maxWidth: '100%' }}>{heatStatus.text}</span>
+                </div>
               </div>
+              {/* ย้าย Warning ลงมาด้านล่างสุด */}
+              {heatStatus.warning && (
+                <div style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.75rem', color: '#ef4444', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.15)', padding: '8px 10px', borderRadius: '12px', textAlign: 'center', wordBreak: 'break-word' }}>
+                  {heatStatus.warning}
+                </div>
+              )}
             </div>
+
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: '10px', marginTop: isMobile ? '15px' : '20px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` }}>

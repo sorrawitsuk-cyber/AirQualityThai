@@ -1,17 +1,17 @@
 // src/pages/MapPage.jsx
 import React, { useContext, useState, useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+// 🌟 แก้บั๊กแผนที่พัง! เติม Tooltip เข้ามาใน Import เรียบร้อยแล้วครับ
+import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from 'react-leaflet';
 import { WeatherContext } from '../context/WeatherContext';
 import { extractProvince, getPM25Color } from '../utils/helpers';
 import 'leaflet/dist/leaflet.css';
 
-// 🌟 ฟังก์ชันจัดการสีของแต่ละโหมด
 const getHeatColor = (val) => {
   if (val == null) return '#94a3b8';
-  if (val >= 41) return '#ef4444'; // แดง (อันตราย)
-  if (val >= 32) return '#f97316'; // ส้ม (เฝ้าระวัง)
-  if (val >= 27) return '#eab308'; // เหลือง
-  return '#22c55e'; // เขียว
+  if (val >= 41) return '#ef4444'; 
+  if (val >= 32) return '#f97316'; 
+  if (val >= 27) return '#eab308'; 
+  return '#22c55e'; 
 };
 
 const getTempColor = (val) => {
@@ -20,34 +20,33 @@ const getTempColor = (val) => {
   if (val >= 30) return '#f97316';
   if (val >= 25) return '#eab308';
   if (val >= 20) return '#22c55e';
-  return '#3b82f6'; // ฟ้า (เย็น)
+  return '#3b82f6'; 
 };
 
 const getRainColor = (val) => {
   if (val == null) return '#94a3b8';
-  if (val >= 80) return '#1e3a8a'; // น้ำเงินเข้ม (ตกหนักแน่)
-  if (val >= 50) return '#3b82f6'; // ฟ้าเข้ม
-  if (val >= 20) return '#93c5fd'; // ฟ้าอ่อน
-  return '#e0f2fe'; // ขาวฟ้า (แทบไม่ตก)
+  if (val >= 80) return '#1e3a8a'; 
+  if (val >= 50) return '#3b82f6'; 
+  if (val >= 20) return '#93c5fd'; 
+  return '#e0f2fe'; 
 };
 
 const getHumidityColor = (val) => {
   if (val == null) return '#94a3b8';
-  if (val >= 80) return '#064e3b'; // เขียวเข้มจัด (ชื้นมาก)
-  if (val >= 60) return '#059669'; // เขียวกลาง
-  if (val >= 40) return '#34d399'; // เขียวสว่าง
-  return '#a7f3d0'; // เขียวอ่อนพาสเทล
+  if (val >= 80) return '#064e3b'; 
+  if (val >= 60) return '#059669'; 
+  if (val >= 40) return '#34d399'; 
+  return '#a7f3d0'; 
 };
 
 const getWindColor = (val) => {
   if (val == null) return '#94a3b8';
-  if (val >= 30) return '#831843'; // ชมพูเข้ม/แดง (ลมแรงจัด)
-  if (val >= 15) return '#db2777'; // ชมพู
-  if (val >= 5) return '#f472b6'; // ชมพูอ่อน
-  return '#fbcfe8'; // อ่อนมาก (ลมสงบ)
+  if (val >= 30) return '#831843'; 
+  if (val >= 15) return '#db2777'; 
+  if (val >= 5) return '#f472b6'; 
+  return '#fbcfe8'; 
 };
 
-// Component อัปเดตพิกัดเมื่อเลือกสถานี
 function MapUpdater({ lat, lon }) {
   const map = useMap();
   useEffect(() => {
@@ -59,11 +58,9 @@ function MapUpdater({ lat, lon }) {
 export default function MapPage() {
   const { stations, stationTemps, loading, darkMode } = useContext(WeatherContext);
   
-  // 🌟 State จัดการโหมดแผนที่และสถานีที่เลือก
   const [activeMode, setActiveMode] = useState('pm25');
   const [selectedStation, setSelectedStation] = useState(null);
   
-  // 🌟 State จัดการหน้าต่าง Mobile (เปิด/ซ่อน)
   const [isMobileCardOpen, setIsMobileCardOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
@@ -73,7 +70,6 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // เปิดการ์ดอัตโนมัติเวลากดเลือกสถานีบนมือถือ
   useEffect(() => {
     if (selectedStation && isMobile) {
       setIsMobileCardOpen(true);
@@ -86,7 +82,6 @@ export default function MapPage() {
 
   const safeStations = stations || [];
   
-  // 🌟 โหมดข้อมูลทั้งหมด (6 โหมด)
   const modes = [
     { id: 'pm25', label: 'ฝุ่น PM2.5', icon: '😷', color: '#0ea5e9' },
     { id: 'heat', label: 'ดัชนีร้อน', icon: '🥵', color: '#f97316' },
@@ -126,7 +121,6 @@ export default function MapPage() {
             let valToShow = '-';
             let circleColor = '#94a3b8';
 
-            // 🌟 กำหนดค่าและสีตามโหมดที่เลือก
             if (activeMode === 'pm25') { valToShow = pmVal; circleColor = getPM25Color(pmVal); }
             else if (activeMode === 'heat') { valToShow = tObj.feelsLike != null ? Math.round(tObj.feelsLike) : '-'; circleColor = getHeatColor(tObj.feelsLike); }
             else if (activeMode === 'temp') { valToShow = tObj.temp != null ? Math.round(tObj.temp) : '-'; circleColor = getTempColor(tObj.temp); }
@@ -143,7 +137,6 @@ export default function MapPage() {
                 eventHandlers={{ click: () => setSelectedStation(st) }}
                 pathOptions={{ color: isSelected ? '#fff' : circleColor, fillColor: circleColor, fillOpacity: 0.8, weight: isSelected ? 3 : 1 }}
               >
-                {/* Tooltip เล็กๆ เวลากดหรือเอาเมาส์ชี้ */}
                 <Tooltip direction="top" offset={[0, -10]} opacity={1} permanent={false}>
                   <div style={{ textAlign: 'center', fontWeight: 'bold', fontFamily: 'Kanit' }}>
                     <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{extractProvince(st.areaTH)}</div>
@@ -156,13 +149,12 @@ export default function MapPage() {
         </MapContainer>
       </div>
 
-      {/* 🎛️ แถบควบคุมโหมดด้านบน (ลอยทับแผนที่) */}
+      {/* 🎛️ แถบควบคุมโหมดด้านบน */}
       <div style={{ position: 'absolute', top: isMobile ? 15 : 20, left: isMobile ? 15 : 20, right: isMobile ? 15 : 20, zIndex: 1000, pointerEvents: 'none' }}>
         <div style={{ background: cardBg, backdropFilter: 'blur(15px)', borderRadius: '20px', padding: '12px 15px', border: `1px solid ${borderColor}`, boxShadow: '0 8px 25px rgba(0,0,0,0.1)', pointerEvents: 'auto' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '0 5px' }}>
             <span style={{ fontWeight: 'bold', color: textColor, fontSize: '0.9rem' }}>🗺️ ข้อมูลบนแผนที่</span>
-            {/* 🌟 จุดแก้ปัญหา! เพิ่มข้อความบอกใบ้ว่าให้เลื่อนซ้าย-ขวาได้ (กระพริบเบาๆ) */}
             {isMobile && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#0ea5e9', fontSize: '0.75rem', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>
                 <span style={{ fontSize: '1rem' }}>👈</span> เลื่อนดูโหมดอื่น <span style={{ fontSize: '1rem' }}>👉</span>
@@ -189,7 +181,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* 📱 ปุ่ม Toggle เปิด/ซ่อน การ์ดข้อมูล (แสดงเฉพาะมือถือ) */}
+      {/* 📱 ปุ่ม Toggle เปิด/ซ่อน การ์ดข้อมูล */}
       {isMobile && selectedStation && (
         <div style={{ position: 'absolute', bottom: isMobileCardOpen ? '320px' : '90px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
           <button 
@@ -199,7 +191,6 @@ export default function MapPage() {
               padding: '10px 20px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
               boxShadow: '0 10px 25px rgba(0,0,0,0.3)', backdropFilter: 'blur(10px)'
             }}>
-            {/* 🌟 เปลี่ยนจากหมุดงงๆ เป็นไอคอน ⬆️ ⬇️ และข้อความที่สื่อความหมายชัดเจน */}
             {isMobileCardOpen ? (
                <><span style={{ fontSize: '1.2rem' }}>⬇️</span> ซ่อนข้อมูลสถานี</>
             ) : (
@@ -209,7 +200,7 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* 📋 การ์ดแสดงข้อมูลสถานีที่เลือก (Desktop อยู่ขวา / Mobile ลอยอยู่ล่าง) */}
+      {/* 📋 การ์ดแสดงข้อมูลสถานีที่เลือก */}
       {selectedStation && (
         <div style={{ 
           position: 'absolute', zIndex: 1000, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -229,7 +220,6 @@ export default function MapPage() {
             )}
           </div>
 
-          {/* ข้อมูล 6 ช่อง */}
           {(() => {
             const tObj = stationTemps[selectedStation.stationID] || {};
             const pmVal = selectedStation.AQILast?.PM25?.value ? Number(selectedStation.AQILast.PM25.value) : '-';
@@ -262,7 +252,6 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* สไตล์สำหรับอนิเมชันกระพริบ */}
       <style dangerouslySetInlineStyle={{__html: `
         @keyframes pulse {
           0% { opacity: 0.5; transform: scale(0.95); }
