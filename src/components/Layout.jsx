@@ -4,7 +4,8 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function Layout() {
-  const { darkMode, setDarkMode } = useContext(WeatherContext);
+  // 🌟 ดึง lastUpdateText มาใช้ใน Header
+  const { darkMode, setDarkMode, lastUpdateText } = useContext(WeatherContext);
   const location = useLocation();
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
@@ -50,7 +51,6 @@ export default function Layout() {
         </div>
 
         <nav style={{ flex: 1, padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }} className="hide-scrollbar">
-          {/* 🌟 อัปเดตชื่อเมนูและไอคอนใหม่สำหรับ Desktop */}
           <NavItem to="/" icon="📊" label="ภาพรวม" darkMode={darkMode} />
           <NavItem to="/map" icon="🗺️" label="แผนที่" darkMode={darkMode} />
           <NavItem to="/forecast" icon="✨" label="AI ผู้ช่วย" darkMode={darkMode} />
@@ -77,12 +77,16 @@ export default function Layout() {
         
         {/* HEADER สำหรับ Mobile */}
         {!isDesktop && !isMapPage && (
-          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', zIndex: 50, borderBottom: `1px solid ${borderColor}`, background: headerBg, color: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', zIndex: 50, borderBottom: `1px solid ${borderColor}`, background: headerBg, color: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '1.6rem', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))' }}>{darkMode ? '🌙' : '🌤️'}</span>
-              <h1 style={{ fontWeight: 'bold', fontSize: '1.2rem', margin: 0 }}>Thai Weather</h1>
+              <span style={{ fontSize: '1.8rem', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))' }}>{darkMode ? '🌙' : '🌤️'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h1 style={{ fontWeight: 'bold', fontSize: '1.2rem', margin: 0, lineHeight: 1.2 }}>Thai Weather</h1>
+                {/* 🌟 ย้ายเวลาอัปเดตมาไว้ตรงนี้ เล็กๆ กะทัดรัด */}
+                <span style={{ fontSize: '0.7rem', opacity: 0.9, fontWeight: 'normal' }}>อัปเดต: {lastUpdateText || '-'}</span>
+              </div>
             </div>
-            <button onClick={() => setDarkMode(!darkMode)} style={{ fontSize: '1.3rem', background: 'transparent', border: 'none', cursor: 'pointer', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))' }}>
+            <button onClick={() => setDarkMode(!darkMode)} style={{ fontSize: '1.4rem', background: 'transparent', border: 'none', cursor: 'pointer', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))' }}>
               {darkMode ? '☀️' : '🌙'}
             </button>
           </header>
@@ -95,7 +99,6 @@ export default function Layout() {
         {/* BOTTOM NAV สำหรับ Mobile */}
         {!isDesktop && (
           <nav style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '75px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', borderTop: `1px solid ${borderColor}`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom)', background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)' }}>
-            {/* 🌟 อัปเดตชื่อเมนูและไอคอนใหม่สำหรับ Mobile */}
             <MobileNavItem to="/" icon="📊" label="ภาพรวม" />
             <MobileNavItem to="/map" icon="🗺️" label="แผนที่" />
             <MobileNavItem to="/forecast" icon="✨" label="AI ผู้ช่วย" />
