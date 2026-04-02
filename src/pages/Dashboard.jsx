@@ -1,7 +1,7 @@
 // src/pages/Dashboard.jsx
 import React, { useContext, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, useMap } from 'react-leaflet';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { useNavigate } from 'react-router-dom'; 
 import { WeatherContext } from '../context/WeatherContext';
 import { extractProvince, formatLocationName, getPM25Color, getDistanceFromLatLonInKm } from '../utils/helpers';
@@ -33,7 +33,8 @@ function MiniMapUpdate({ lat, lon }) {
 
 export default function Dashboard() {
   const navigate = useNavigate(); 
-  const { stations, stationTemps, loading, darkMode, lastUpdateText } = useContext(WeatherContext);
+  // 🌟 ดึง nationwideSummary มาใช้ทำ Top 5
+  const { stations, stationTemps, loading, darkMode, lastUpdateText, nationwideSummary } = useContext(WeatherContext);
   
   const [selectedStationId, setSelectedStationId] = useState(() => localStorage.getItem('lastStationId') || '');
   const [activeStation, setActiveStation] = useState(null);
@@ -42,7 +43,9 @@ export default function Dashboard() {
   const [gpsAttempted, setGpsAttempted] = useState(false);
   const [forecastData, setForecastData] = useState([]);
   
-  // 🌟 สร้าง Breakpoint ให้ละเอียดขึ้น (Mobile / Tablet / Desktop)
+  // 🌟 State สำหรับข้อมูล 7 วัน (จำลองสถิติรายวัน)
+  const [weeklyData, setWeeklyData] = useState([]);
+
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
 
@@ -106,21 +109,20 @@ export default function Dashboard() {
     if (stations && stations.length > 0 && selectedStationId) {
       const target = stations.find(s => s.stationID === selectedStationId);
       if (target) { setActiveStation(target); } 
-      else {
-         const bkk = stations.find(s => s.areaTH && s.areaTH.includes('กรุงเทพ'));
-         setSelectedStationId(bkk ? bkk.stationID : stations[0].stationID);
-      }
     }
   }, [selectedStationId, stations]);
 
+  // ดึงกราฟฝุ่นล่วงหน้า 24 ชม. และคำนวณจำลอง 7 วัน
   useEffect(() => {
     if (activeStation && activeStation.lat && activeStation.long) {
-      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${activeStation.lat}&longitude=${activeStation.long}&hourly=pm2_5&timezone=auto&forecast_days=2`;
+      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${activeStation.lat}&longitude=${activeStation.long}&hourly=pm2_5&timezone=auto&forecast_days=7`;
       fetch(url).then(r=>r.json()).then(data => {
         if (data && data.hourly && data.hourly.pm2_5) {
           const now = new Date().getTime();
           let sIdx = data.hourly.time.findIndex(t => new Date(t).getTime() >= now);
           if (sIdx === -1) sIdx = 0;
+          
+          // 24 ชม. สำหรับกราฟแท่ง
           const pmF = [];
           for (let i = sIdx; i < sIdx + 24; i += 2) { 
             if (data.hourly.pm2_5[i] != null) {
@@ -128,26 +130,32 @@ export default function Dashboard() {
             }
           }
           setForecastData(pmF);
+
+          // 🌟 ประมวลผลเป็นกราฟ 7 วัน (หาค่าเฉลี่ยรายวัน)
+          const weekly = [];
+          const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+          for (let day = 0; day < 7; day++) {
+             const startIdx = day * 24;
+             let dailySum = 0; let count = 0;
+             for (let i = startIdx; i < startIdx + 24; i++) {
+                if (data.hourly.pm2_5[i] != null) { dailySum += data.hourly.pm2_5[i]; count++; }
+             }
+             if (count > 0) {
+                const dateObj = new Date(data.hourly.time[startIdx]);
+                const dayName = day === 0 ? 'วันนี้' : day === 1 ? 'พรุ่งนี้' : days[dateObj.getDay()];
+                weekly.push({ day: dayName, val: Math.round(dailySum / count) });
+             }
+          }
+          setWeeklyData(weekly);
         }
-      }).catch(() => setForecastData([]));
+      }).catch(() => { setForecastData([]); setWeeklyData([]); });
     }
   }, [activeStation]);
 
   const todayStr = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
-  
-  const allLocations = [...(stations || [])].map(s => ({
-    id: s.stationID, name: formatLocationName(s.areaTH)
-  })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  const allLocations = [...(stations || [])].map(s => ({ id: s.stationID, name: formatLocationName(s.areaTH) })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
 
-  let dynamicBg = '';
-  if (darkMode) {
-    dynamicBg = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
-  } else {
-    if (timeOfDay === 'morning') dynamicBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)'; 
-    else if (timeOfDay === 'afternoon') dynamicBg = 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)'; 
-    else dynamicBg = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'; 
-  }
-
+  let dynamicBg = darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : (timeOfDay === 'morning' ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' : (timeOfDay === 'afternoon' ? 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)' : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)')); 
   const cardBg = darkMode ? 'rgba(30, 41, 59, 0.85)' : 'rgba(255, 255, 255, 0.85)';
   const innerCardBg = darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.7)';
   const textColor = darkMode ? '#f8fafc' : '#0f172a';
@@ -169,7 +177,6 @@ export default function Dashboard() {
   const pmColor = getPM25Color(pmVal);
 
   return (
-    // 🌟 ควบคุมความกว้าง 100% ห้ามทะลุขอบเด็ดขาด
     <div style={{ background: dynamicBg, minHeight: '100%', width: '100%', maxWidth: '100vw', padding: !isDesktop ? '15px' : '30px', paddingBottom: !isDesktop ? '100px' : '40px', display: 'flex', flexDirection: 'column', gap: !isDesktop ? '15px' : '20px', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       
       <div style={{ display: 'flex', justifyContent: !isDesktop ? 'flex-end' : 'space-between', alignItems: 'center' }}>
@@ -184,7 +191,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 🌟 ปรับ Grid: คอมพิวเตอร์ = 2 คอลัมน์ / มือถือ+แท็บเล็ต = 1 คอลัมน์ยาวลงมา */}
       <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? '1.4fr 1fr' : '1fr', gap: '20px', width: '100%' }}>
         
         {/* 📍 ฝั่งซ้าย: HERO CARD */}
@@ -197,10 +203,8 @@ export default function Dashboard() {
             </select>
           </div>
 
-          {/* 🌟 2 ดัชนีหลัก: มือถือ = เรียงบนล่าง / แท็บเล็ต+คอม = เรียงซ้ายขวา */}
+          {/* 🌟 2 ดัชนีหลัก */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', width: '100%' }}>
-            
-            {/* การ์ด PM2.5 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: '15px 20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
               <div style={{ fontSize: '4.5rem', filter: `drop-shadow(0 8px 15px ${health.color}40)`, lineHeight: 1 }}>{health.face}</div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
@@ -210,7 +214,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* การ์ดดัชนีความร้อน */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: '15px 20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
               <div style={{ fontSize: '4.5rem', filter: `drop-shadow(0 8px 15px ${heatStatus.color}40)`, lineHeight: 1 }}>{heatStatus.face}</div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
@@ -219,7 +222,6 @@ export default function Dashboard() {
                  <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px' }}>{heatStatus.text}</span>
               </div>
             </div>
-
           </div>
 
           {/* แถบข้อมูลรองด้านล่าง */}
@@ -242,7 +244,6 @@ export default function Dashboard() {
         {/* 📍 ฝั่งขวา: แผนที่ย่อ (เฉพาะคอม) + กราฟ 24 ชม. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', boxSizing: 'border-box' }}>
           
-          {/* 🌟 ซ่อนแผนที่ในมือถือ เพื่อประหยัดพื้นที่แนวตั้ง */}
           {isDesktop && (
             <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '15px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', flex: 1, minHeight: '180px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', margin: '0 0 10px 5px' }}>🗺️ ตำแหน่งจุดตรวจวัด</h3>
@@ -261,9 +262,8 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* 🌟 กราฟแท่ง (แสดงทุกอุปกรณ์ แต่บีบความสูงลงในมือถือ) */}
           <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: !isDesktop ? '20px' : '24px', padding: '15px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', height: isMobile ? '180px' : '220px', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
-            <h3 style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', margin: '0 0 10px 5px' }}>📊 แนวโน้มฝุ่น PM2.5 ล่วงหน้า</h3>
+            <h3 style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', margin: '0 0 10px 5px' }}>📊 แนวโน้มฝุ่น PM2.5 ล่วงหน้า (24 ชม.)</h3>
             <div style={{ flex: 1, width: '100%' }}>
               {forecastData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -285,6 +285,63 @@ export default function Dashboard() {
           </div>
 
         </div>
+      </div>
+
+      {/* 🌟🌟 ส่วนต่อขยายใหม่: สถิติ 7 วัน & Top 5 Rankings 🌟🌟 */}
+      <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? '1fr 1fr' : '1fr', gap: '20px', width: '100%', marginTop: '5px' }}>
+        
+        {/* 🏆 การ์ดจัดอันดับ Top 5 */}
+        <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
+          <h3 style={{ fontSize: '1rem', color: textColor, fontWeight: 'bold', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            🏆 5 อันดับจังหวัดฝุ่น PM2.5 สูงสุด
+          </h3>
+          {nationwideSummary && nationwideSummary.pm25 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {nationwideSummary.pm25.map((item, idx) => (
+                <div key={idx} onClick={() => {
+                  const target = stations.find(s => extractProvince(s.areaTH) === item.prov);
+                  if(target) { setSelectedStationId(target.stationID); localStorage.setItem('lastStationId', target.stationID); }
+                }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', background: innerCardBg, borderRadius: '12px', cursor: 'pointer', transition: 'transform 0.2s', border: `1px solid ${borderColor}` }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: '900', width: '20px' }}>{idx+1}.</span>
+                    <span style={{ fontSize: '0.95rem', color: textColor, fontWeight: 'bold' }}>{item.prov}</span>
+                  </div>
+                  <span style={{ color: '#fff', background: getPM25Color(item.val), padding: '4px 10px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>{item.val}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.85rem', color: subTextColor, textAlign: 'center', padding: '20px' }}>กำลังประมวลผลอันดับ...</div>
+          )}
+        </div>
+
+        {/* 📉 กราฟเทรนด์ 7 วัน */}
+        <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ fontSize: '1rem', color: textColor, fontWeight: 'bold', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            📅 แนวโน้มฝุ่น PM2.5 (7 วัน)
+          </h3>
+          <div style={{ flex: 1, minHeight: '220px', width: '100%' }}>
+            {weeklyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weeklyData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                  <defs>
+                    <linearGradient id="colorPm" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" stroke={subTextColor} fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke={subTextColor} fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip cursor={{ stroke: borderColor, strokeWidth: 2 }} contentStyle={{ borderRadius: '10px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor }} />
+                  <Area type="monotone" dataKey="val" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorPm)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: subTextColor, fontSize: '0.85rem' }}>กำลังรวบรวมสถิติรายสัปดาห์...</div>
+            )}
+          </div>
+        </div>
+
       </div>
 
     </div>
