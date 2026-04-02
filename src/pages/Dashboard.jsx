@@ -7,7 +7,11 @@ import { extractProvince, formatLocationName, getPM25Color, getTempColor, getDis
 export default function Dashboard() {
   const { stations, stationTemps, loading, darkMode, favLocations, lastUpdateText } = useContext(WeatherContext);
   
-  const [selectedStationId, setSelectedStationId] = useState('');
+  // 🌟 ใช้ localStorage เพื่อจำสถานีล่าสุดไว้ สลับหน้าไปมาข้อมูลจะได้ไม่หาย
+  const [selectedStationId, setSelectedStationId] = useState(() => {
+    return localStorage.getItem('lastStationId') || '';
+  });
+  
   const [activeStation, setActiveStation] = useState(null);
   const [greeting, setGreeting] = useState('สวัสดี');
   const [timeOfDay, setTimeOfDay] = useState('morning'); 
@@ -32,10 +36,10 @@ export default function Dashboard() {
     }
   }, []);
 
-  // 🌟 ระบบหาพิกัดอัตโนมัติเมื่อเข้าแอปครั้งแรก
+  // 🌟 ระบบหาพิกัดอัตโนมัติ (จะทำงานเฉพาะตอนเข้าแอปครั้งแรกที่ยังไม่มีค่าในเครื่อง)
   useEffect(() => {
-    if (stations && stations.length > 0 && !gpsAttempted) {
-      setGpsAttempted(true); // ป้องกันการวนลูป
+    if (stations && stations.length > 0 && !selectedStationId && !gpsAttempted) {
+      setGpsAttempted(true);
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -44,25 +48,46 @@ export default function Dashboard() {
               const d = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, parseFloat(s.lat), parseFloat(s.long)); 
               if (d < minD) { minD = d; nearest = s; } 
             });
-            if (nearest) setSelectedStationId(nearest.stationID);
+            if (nearest) {
+              setSelectedStationId(nearest.stationID);
+              localStorage.setItem('lastStationId', nearest.stationID);
+            }
           }, 
           () => {
-            // ถ้าไม่เปิด GPS ให้ตั้งค่าเริ่มต้นเป็นกรุงเทพฯ หรือสถานีแรก
+            // ถ้าผู้ใช้ไม่เปิด GPS ให้ตั้งค่าเริ่มต้นเป็นสถานีในกรุงเทพฯ
             const bkk = stations.find(s => s.areaTH && s.areaTH.includes('กรุงเทพ'));
-            setSelectedStationId(bkk ? bkk.stationID : stations[0].stationID);
+            const fallbackId = bkk ? bkk.stationID : stations[0].stationID;
+            setSelectedStationId(fallbackId);
+            localStorage.setItem('lastStationId', fallbackId);
           }
         );
       } else {
         const bkk = stations.find(s => s.areaTH && s.areaTH.includes('กรุงเทพ'));
-        setSelectedStationId(bkk ? bkk.stationID : stations[0].stationID);
+        const fallbackId = bkk ? bkk.stationID : stations[0].stationID;
+        setSelectedStationId(fallbackId);
+        localStorage.setItem('lastStationId', fallbackId);
       }
     }
-  }, [stations, gpsAttempted]);
+  }, [stations, selectedStationId, gpsAttempted]);
 
+  // ฟังก์ชันบันทึกค่าเมื่อผู้ใช้เปลี่ยนตัวกรอง (Dropdown)
+  const handleStationChange = (e) => {
+    const newId = e.target.value;
+    setSelectedStationId(newId);
+    localStorage.setItem('lastStationId', newId);
+  };
+
+  // ดึงข้อมูล activeStation มาโชว์
   useEffect(() => {
-    if (stations && selectedStationId) {
+    if (stations && stations.length > 0 && selectedStationId) {
       const target = stations.find(s => s.stationID === selectedStationId);
-      if (target) setActiveStation(target);
+      if (target) {
+        setActiveStation(target);
+      } else {
+         // กันเหนียวกรณี ID ที่จำไว้ไม่มีในระบบ
+         const bkk = stations.find(s => s.areaTH && s.areaTH.includes('กรุงเทพ'));
+         setSelectedStationId(bkk ? bkk.stationID : stations[0].stationID);
+      }
     }
   }, [selectedStationId, stations]);
 
@@ -86,7 +111,6 @@ export default function Dashboard() {
   const borderColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'; 
   const backdropBlur = 'blur(20px)';
 
-  // 🌟 จัดตัวอักษรให้อยู่ตรงกลางเป๊ะด้วย height: '100%'
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: bgGradient, color: textColor }}>กำลังโหลดข้อมูล... ⏳</div>;
 
   const pmVal = activeStation && activeStation.AQILast && activeStation.AQILast.PM25 ? Number(activeStation.AQILast.PM25.value) : null;
@@ -119,18 +143,19 @@ export default function Dashboard() {
             <p style={{ margin: 0, color: subTextColor, fontSize: '0.95rem' }}>{todayStr}</p>
           </div>
         )}
-        <div style={{ background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '10px', color: subTextColor, fontSize: '0.75rem', fontWeight: 'bold' }}>
-          ⏱️ {lastUpdateText ? lastUpdateText.split(' ')[1] : '-'}
+        {/* 🌟 แสดงวันที่และเวลาอัปเดตแบบเต็ม (เอาโค้ดตัดคำออกแล้ว) */}
+        <div style={{ background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', padding: '6px 12px', borderRadius: '10px', color: subTextColor, fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 'bold' }}>
+          ⏱️ อัปเดต: {lastUpdateText || '-'}
         </div>
       </div>
 
       <div style={{ background: dynamicCardBg, backdropFilter: backdropBlur, borderRadius: '20px', padding: isMobile ? '15px' : '25px', border: `1px solid ${borderColor}`, boxShadow: '0 8px 30px rgba(0,0,0,0.05)' }}>
         
-        {/* 🌟 ลบปุ่มพิกัดปัจจุบันออก ให้เหลือแต่ Dropdown */}
+        {/* 🌟 ลบปุ่ม GPS ออกเหลือแต่ Dropdown คลีนๆ */}
         <div style={{ display: 'flex', marginBottom: isMobile ? '15px' : '20px' }}>
           <select 
             value={selectedStationId} 
-            onChange={(e) => setSelectedStationId(e.target.value)} 
+            onChange={handleStationChange} 
             style={{ flex: 1, padding: isMobile ? '10px' : '12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#fff', color: textColor, border: `1px solid ${borderColor}`, fontWeight: 'bold', fontSize: '0.9rem', outline: 'none' }}
           >
             {allLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
@@ -194,7 +219,9 @@ export default function Dashboard() {
               </div>
             );
           }) : (
-            <p style={{ fontSize: '0.8rem', color: subTextColor, textAlign: 'center' }}>ยังไม่มีพื้นที่โปรด กด ⭐ ที่หน้าแผนที่เพื่อเพิ่มข้อมูล</p>
+            <p style={{ fontSize: '0.8rem', color: subTextColor, textAlign: 'center', padding: '10px', border: `1px dashed ${borderColor}`, borderRadius: '12px' }}>
+              กดเมนูแผนที่ 🗺️ แล้วกดถูกใจ ⭐ เพื่อเพิ่มพื้นที่โปรด
+            </p>
           )}
         </div>
       </div>
