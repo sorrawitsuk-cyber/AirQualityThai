@@ -18,7 +18,7 @@ const getHealthStatus = (pm) => {
 
 const getHeatStatus = (val) => {
   if (val == null || isNaN(val)) return { face: '😶', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
-  if (val >= 52) return { face: '🥵', text: 'อันตรายมาก (ฮีท)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+  if (val >= 52) return { face: '🥵', text: 'อันตรายมาก (ฮีทสโตรก)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
   if (val >= 41) return { face: '😰', text: 'อันตราย (เลี่ยงแดด)', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' };
   if (val >= 32) return { face: '😅', text: 'เฝ้าระวัง (เตือนภัย)', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
   return { face: '😎', text: 'ปกติ (ปลอดภัย)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
@@ -51,7 +51,7 @@ export default function Dashboard() {
   const [timeOfDay, setTimeOfDay] = useState('morning'); 
   const [gpsAttempted, setGpsAttempted] = useState(false);
   
-  // 🌟 State สำหรับการกรองข้อมูลสถิติ (pm25, heat, temp, rain)
+  // State สำหรับข้อมูลกราฟและการกรอง
   const [statFilter, setStatFilter] = useState('pm25');
   const [historicalData, setHistoricalData] = useState([]);
   const [masterTableData, setMasterTableData] = useState([]);
@@ -120,10 +120,10 @@ export default function Dashboard() {
     }
   }, [selectedStationId, stations]);
 
-  // 🌟 ประมวลผลข้อมูลสำหรับกราฟ 7 วันย้อนหลัง + ตาราง 77 จังหวัด
+  // ประมวลผลข้อมูลสำหรับกราฟ 7 วันย้อนหลัง + ตาราง 77 จังหวัด
   useEffect(() => {
     if (stations && stations.length > 0) {
-      // 1. สร้าง Mock Data สำหรับกราฟ 7 วันย้อนหลัง + ค่าเฉลี่ย 10 ปี (ผันแปรตาม statFilter)
+      // 1. จำลองข้อมูลสำหรับกราฟ 7 วัน (อิงตามฟิลเตอร์ที่เลือก)
       const baseValue = statFilter === 'pm25' ? 30 : statFilter === 'heat' ? 40 : statFilter === 'temp' ? 32 : 20;
       const historyMock = Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
@@ -133,12 +133,12 @@ export default function Dashboard() {
         return {
           day: i === 6 ? 'วันนี้' : days[d.getDay()],
           val: Math.max(0, Math.round(randomVal)),
-          avg10Year: Math.max(0, Math.round(baseValue + 2)) // เส้นค่าเฉลี่ย 10 ปี สมมติว่านิ่งๆ
+          avg10Year: Math.max(0, Math.round(baseValue + 2)) 
         };
       });
       setHistoricalData(historyMock);
 
-      // 2. สร้างข้อมูลตารางสรุป 77 จังหวัด (ถ้าเป็นหน้าจอ Desktop)
+      // 2. สร้างข้อมูลตารางสรุป 77 จังหวัด
       if (isDesktop) {
         const allProvinces = [...new Set(stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th'));
         
@@ -164,7 +164,6 @@ export default function Dashboard() {
           const avgHeat = validTemp > 0 ? Math.round(sumHeat / validTemp) : 0;
           const avgRain = validTemp > 0 ? Math.round(sumRain / validTemp) : 0;
 
-          // สร้างข้อมูลแนวโน้มจิ๋ว 7 วัน (Sparkline)
           const trendMock = Array.from({ length: 7 }, () => ({ val: Math.max(0, avgPm + (Math.random() * 20 - 10)) }));
 
           return { 
@@ -177,7 +176,6 @@ export default function Dashboard() {
           };
         });
 
-        // เรียงตาม PM2.5 จากมากไปน้อยเป็นค่าเริ่มต้น
         setMasterTableData(tableArr.sort((a, b) => b.pm25 - a.pm25));
       }
     }
@@ -207,9 +205,11 @@ export default function Dashboard() {
   const pmColor = getPM25Color(pmVal);
 
   return (
-    <div style={{ background: dynamicBg, minHeight: '100%', width: '100%', maxWidth: '100vw', padding: !isDesktop ? '15px' : '30px', paddingBottom: !isDesktop ? '100px' : '40px', display: 'flex', flexDirection: 'column', gap: !isDesktop ? '15px' : '20px', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
+    // 🌟 แก้ไขจุดที่ 1: เปลี่ยนจาก minHeight: '100%' เป็น height: '100%' เพื่อให้ Scrollbar ทำงานอย่างถูกต้อง
+    <div style={{ height: '100%', width: '100%', maxWidth: '100vw', padding: !isDesktop ? '15px' : '30px', paddingBottom: !isDesktop ? '100px' : '40px', display: 'flex', flexDirection: 'column', gap: !isDesktop ? '15px' : '20px', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', background: dynamicBg, fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       
-      <div style={{ display: 'flex', justifyContent: !isDesktop ? 'flex-end' : 'space-between', alignItems: 'center' }}>
+      {/* 🟢 HEADER */}
+      <div style={{ display: 'flex', justifyContent: !isDesktop ? 'flex-end' : 'space-between', alignItems: 'center', flexShrink: 0 }}>
         {isDesktop && (
           <div>
             <h1 style={{ fontSize: '2rem', color: textColor, margin: 0, fontWeight: '800', filter: darkMode ? 'none' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.05))' }}>{greeting}</h1>
@@ -221,7 +221,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? '1.4fr 1fr' : '1fr', gap: '20px', width: '100%' }}>
+      {/* 🌟 MAIN GRID (Hero Card) */}
+      <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? '1.4fr 1fr' : '1fr', gap: '20px', width: '100%', flexShrink: 0 }}>
         
         {/* 📍 ฝั่งซ้าย: HERO CARD */}
         <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: !isDesktop ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
@@ -291,9 +292,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* 🌟🌟 ส่วนต่อขยายใหม่: สถิติเชิงลึก (ซ่อนในมือถือ) 🌟🌟 */}
+      {/* 🌟🌟 ส่วนต่อขยาย: สถิติเชิงลึก (ซ่อนในมือถือ) 🌟🌟 */}
+      {/* 🌟 แก้ไขจุดที่ 2: เติม flexShrink: 0 ป้องกันไม่ให้ส่วนนี้โดนบีบจนตารางพัง */}
       {isDesktop && (
-        <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+        <div style={{ background: cardBg, backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '25px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '25px', flexShrink: 0 }}>
           
           {/* Header สถิติ & Filter */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${borderColor}`, paddingBottom: '15px' }}>
@@ -323,39 +325,41 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* กราฟแท่ง 7 วันย้อนหลัง + เส้นค่าเฉลี่ย 10 ปี */}
-          <div style={{ height: '250px', width: '100%', background: innerCardBg, borderRadius: '16px', padding: '15px', boxSizing: 'border-box' }}>
-            <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+          {/* 🌟 แก้ไขจุดที่ 3: ปรับขนาดกราฟ, เพิ่มพื้นที่ความสูง, ลดขนาดแท่งบาร์ (maxBarSize) และปรับ margin ให้ตัวอักษร */}
+          <div style={{ height: '350px', width: '100%', background: innerCardBg, borderRadius: '16px', padding: '20px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
               <span>สถิติ 7 วันย้อนหลัง ณ จุดตรวจวัด</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><div style={{ width: '15px', height: '3px', background: '#94a3b8', borderStyle: 'dashed' }}></div> ค่าเฉลี่ย 10 ปี</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '20px', height: '3px', background: darkMode ? '#cbd5e1' : '#64748b', borderStyle: 'dashed' }}></div> ค่าเฉลี่ย 10 ปี</span>
             </div>
-            <ResponsiveContainer width="100%" height="85%">
-              <ComposedChart data={historicalData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
-                <XAxis dataKey="day" stroke={subTextColor} fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke={subTextColor} fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: '10px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor }} />
-                
-                {/* 🌟 แท่งกราฟ 7 วัน (เปลี่ยนสีตามค่าความอันตราย) */}
-                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={40}>
-                  {historicalData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={getStatColor(statFilter, entry.val)} />
-                  ))}
-                </Bar>
-                
-                {/* 🌟 เส้นประค่าเฉลี่ย 10 ปี */}
-                <Line type="monotone" dataKey="avg10Year" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={historicalData} margin={{ top: 20, right: 20, bottom: 5, left: -20 }}>
+                  <XAxis dataKey="day" stroke={subTextColor} fontSize={12} tickLine={false} axisLine={false} dy={10} />
+                  <YAxis stroke={subTextColor} fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor }} />
+                  
+                  {/* กำหนด maxBarSize เพื่อไม่ให้แท่งอ้วนเกินไปเมื่อจอใหญ่ */}
+                  <Bar dataKey="val" radius={[6, 6, 0, 0]} maxBarSize={35}>
+                    {historicalData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getStatColor(statFilter, entry.val)} />
+                    ))}
+                  </Bar>
+                  
+                  {/* เส้นไข่ปลาดูสวยงามขึ้น ตัดกับสีแท่งบาร์ */}
+                  <Line type="monotone" dataKey="avg10Year" stroke={darkMode ? '#cbd5e1' : '#64748b'} strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* 📋 Master Table 77 จังหวัด */}
-          <div>
-            <h3 style={{ fontSize: '1rem', color: textColor, fontWeight: 'bold', margin: '0 0 10px 0' }}>📋 ตารางข้อมูลระดับจังหวัด (77 จังหวัด)</h3>
+          <div style={{ marginTop: '10px' }}>
+            <h3 style={{ fontSize: '1rem', color: textColor, fontWeight: 'bold', margin: '0 0 15px 0' }}>📋 ตารางข้อมูลระดับจังหวัด (77 จังหวัด)</h3>
             <div style={{ overflowX: 'auto', background: innerCardBg, borderRadius: '16px', border: `1px solid ${borderColor}` }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem', color: textColor }}>
                 <thead>
                   <tr style={{ borderBottom: `2px solid ${borderColor}`, color: subTextColor }}>
-                    <th style={{ padding: '15px', fontWeight: 'bold' }}>จังหวัด</th>
+                    <th style={{ padding: '15px 20px', fontWeight: 'bold' }}>จังหวัด</th>
                     <th style={{ padding: '15px', fontWeight: 'bold', textAlign: 'center' }}>PM2.5</th>
                     <th style={{ padding: '15px', fontWeight: 'bold', textAlign: 'center' }}>ดัชนีร้อน</th>
                     <th style={{ padding: '15px', fontWeight: 'bold', textAlign: 'center' }}>อุณหภูมิ</th>
@@ -369,20 +373,20 @@ export default function Dashboard() {
                     const status = getHealthStatus(row.pm25);
                     return (
                       <tr key={idx} style={{ borderBottom: `1px solid ${borderColor}`, transition: 'background 0.2s' }} onMouseOver={e=>e.currentTarget.style.background=darkMode?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.02)'} onMouseOut={e=>e.currentTarget.style.background='transparent'}>
-                        <td style={{ padding: '12px 15px', fontWeight: 'bold' }}>{row.prov}</td>
-                        <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: '900', color: getPM25Color(row.pm25) }}>{row.pm25}</td>
-                        <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', color: getHeatStatus(row.heat).color }}>{row.heat}°</td>
-                        <td style={{ padding: '12px 15px', textAlign: 'center', color: subTextColor }}>{row.temp}°C</td>
-                        <td style={{ padding: '12px 15px', textAlign: 'center', color: '#3b82f6' }}>{row.rain}%</td>
-                        <td style={{ padding: '12px 15px', textAlign: 'center' }}>
-                          <span style={{ background: status.bg, color: status.color, padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: `1px solid ${status.color}30` }}>
+                        <td style={{ padding: '15px 20px', fontWeight: 'bold' }}>{row.prov}</td>
+                        <td style={{ padding: '15px', textAlign: 'center', fontWeight: '900', color: getPM25Color(row.pm25) }}>{row.pm25}</td>
+                        <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: getHeatStatus(row.heat).color }}>{row.heat}°</td>
+                        <td style={{ padding: '15px', textAlign: 'center', color: subTextColor }}>{row.temp}°C</td>
+                        <td style={{ padding: '15px', textAlign: 'center', color: '#3b82f6', fontWeight: 'bold' }}>{row.rain}%</td>
+                        <td style={{ padding: '15px', textAlign: 'center' }}>
+                          <span style={{ background: status.bg, color: status.color, padding: '6px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', border: `1px solid ${status.color}30` }}>
                             {status.face} {status.text.replace('⭐', '').replace('⭐', '')}
                           </span>
                         </td>
-                        <td style={{ padding: '8px 15px' }}>
-                          <ResponsiveContainer width="100%" height={30}>
+                        <td style={{ padding: '10px 15px' }}>
+                          <ResponsiveContainer width="100%" height={35}>
                             <LineChart data={row.trend.map(v => ({val: v.val}))}>
-                              <Line type="monotone" dataKey="val" stroke={getPM25Color(row.pm25)} strokeWidth={2} dot={false} isAnimationActive={false} />
+                              <Line type="monotone" dataKey="val" stroke={getPM25Color(row.pm25)} strokeWidth={2.5} dot={false} isAnimationActive={false} />
                             </LineChart>
                           </ResponsiveContainer>
                         </td>
