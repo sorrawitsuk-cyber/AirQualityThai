@@ -6,21 +6,22 @@ import { useNavigate } from 'react-router-dom';
 import { WeatherContext } from '../context/WeatherContext';
 import { extractProvince, formatLocationName, getPM25Color, getDistanceFromLatLonInKm } from '../utils/helpers';
 
+// 🌟 เพิ่ม Level และ Warning Text สำหรับระบบ AI ประเมินใบหน้า
 const getHealthStatus = (pm) => {
-  if (pm == null || isNaN(pm)) return { face: '😶', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
-  if (pm <= 15.0) return { face: '😁', text: 'คุณภาพอากาศดีมาก', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' }; 
-  if (pm <= 25.0) return { face: '🙂', text: 'คุณภาพอากาศดี', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' }; 
-  if (pm <= 37.5) return { face: '😐', text: 'คุณภาพปานกลาง', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' }; 
-  if (pm <= 75.0) return { face: '😷', text: 'เริ่มมีผลกระทบ', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' }; 
-  return { face: '🤢', text: 'มีผลกระทบสุขภาพ', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' }; 
+  if (pm == null || isNaN(pm)) return { level: 0, text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', warning: '' };
+  if (pm <= 15.0) return { level: 1, text: 'คุณภาพอากาศดีมาก', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', warning: '' }; 
+  if (pm <= 25.0) return { level: 2, text: 'คุณภาพอากาศดี', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)', warning: '' }; 
+  if (pm <= 37.5) return { level: 3, text: 'คุณภาพปานกลาง', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', warning: '' }; 
+  if (pm <= 75.0) return { level: 4, text: 'เริ่มมีผลกระทบ', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', warning: '⚠️ ควรสวมหน้ากากอนามัย' }; 
+  return { level: 5, text: 'มีผลกระทบสุขภาพ', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', warning: '⚠️ งดกิจกรรมกลางแจ้ง' }; 
 };
 
 const getHeatStatus = (val) => {
-  if (val == null || isNaN(val)) return { face: '😶', text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
-  if (val >= 52) return { face: '🥵', text: 'อันตรายมาก (ฮีทสโตรก)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
-  if (val >= 41) return { face: '😰', text: 'อันตราย (เลี่ยงแดด)', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' };
-  if (val >= 32) return { face: '😅', text: 'เฝ้าระวัง (เตือนภัย)', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
-  return { face: '😎', text: 'ปกติ (ปลอดภัย)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
+  if (val == null || isNaN(val)) return { level: 0, text: 'ไม่มีข้อมูล', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', warning: '' };
+  if (val >= 52) return { level: 5, text: 'อันตรายมาก (ฮีทสโตรก)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', warning: '⚠️ อันตรายถึงชีวิต' };
+  if (val >= 41) return { level: 4, text: 'อันตราย (เลี่ยงแดด)', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', warning: '⚠️ ระวังเพลียแดด' };
+  if (val >= 32) return { level: 3, text: 'เฝ้าระวัง (เตือนภัย)', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', warning: '⚠️ ดื่มน้ำให้เพียงพอ' };
+  return { level: 1, text: 'ปกติ (ปลอดภัย)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)', warning: '' };
 };
 
 const getStatColor = (type, val) => {
@@ -32,6 +33,52 @@ const getStatColor = (type, val) => {
 };
 
 const formatAreaName = (areaTH) => areaTH ? areaTH.split(',')[0].trim() : '';
+
+// 🌟 ฟังก์ชันคำนวณลูกศรทิศทางลม
+const getWindArrow = (dir) => {
+  if (!dir || dir === '-') return null;
+  let deg = 0;
+  if (typeof dir === 'number') deg = dir;
+  else {
+    const d = dir.toUpperCase();
+    if (d==='N') deg=0; else if (d==='NE') deg=45; else if (d==='E') deg=90; else if (d==='SE') deg=135; else if (d==='S') deg=180; else if (d==='SW') deg=225; else if (d==='W') deg=270; else if (d==='NW') deg=315;
+  }
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: `rotate(${deg}deg)`, marginLeft: '4px', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.2))' }}>
+      <line x1="12" y1="19" x2="12" y2="5"></line>
+      <polyline points="5 12 12 5 19 12"></polyline>
+    </svg>
+  );
+};
+
+// 🌟 Component สร้างใบหน้า SVG อัจฉริยะ (เปลี่ยนอารมณ์ตาม level)
+const SVGFace = ({ level }) => {
+  let eyes = <g><circle cx="35" cy="40" r="6" fill="#fff"/><circle cx="65" cy="40" r="6" fill="#fff"/></g>;
+  let mouth = "M 35 65 Q 50 80 65 65"; 
+
+  if (level === 0) {
+    eyes = <g><line x1="30" y1="40" x2="40" y2="40" stroke="#fff" strokeWidth="4" strokeLinecap="round"/><line x1="60" y1="40" x2="70" y2="40" stroke="#fff" strokeWidth="4" strokeLinecap="round"/></g>;
+    mouth = "M 35 65 L 65 65";
+  } else if (level === 1) {
+    mouth = "M 30 60 Q 50 85 70 60";
+  } else if (level === 2) {
+    mouth = "M 35 65 Q 50 75 65 65";
+  } else if (level === 3) {
+    mouth = "M 35 65 L 65 65";
+  } else if (level === 4) {
+    mouth = "M 35 70 Q 50 55 65 70";
+  } else if (level === 5) {
+    eyes = <g><line x1="28" y1="33" x2="42" y2="47" stroke="#fff" strokeWidth="4" strokeLinecap="round"/><line x1="28" y1="47" x2="42" y2="33" stroke="#fff" strokeWidth="4" strokeLinecap="round"/><line x1="58" y1="33" x2="72" y2="47" stroke="#fff" strokeWidth="4" strokeLinecap="round"/><line x1="58" y1="47" x2="72" y2="33" stroke="#fff" strokeWidth="4" strokeLinecap="round"/></g>;
+    mouth = "M 35 75 Q 50 55 65 75";
+  }
+
+  return (
+    <svg viewBox="0 0 100 100" width="100%" height="100%">
+      {eyes}
+      <path d={mouth} fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" />
+    </svg>
+  );
+};
 
 function MiniMapUpdate({ lat, lon }) {
   const map = useMap();
@@ -48,7 +95,7 @@ export default function Dashboard() {
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedStationId, setSelectedStationId] = useState(() => localStorage.getItem('lastStationId') || '');
   const [activeStation, setActiveStation] = useState(null);
-  const [isLocating, setIsLocating] = useState(false); // 🌟 State สำหรับปุ่ม GPS โหลดหมุนๆ
+  const [isLocating, setIsLocating] = useState(false); 
   
   const [greeting, setGreeting] = useState('สวัสดี');
   const [timeOfDay, setTimeOfDay] = useState('morning'); 
@@ -111,7 +158,6 @@ export default function Dashboard() {
     }
   }, [selectedStationId, safeStations]);
 
-  // 🌟 ฟังก์ชันหาพิกัด (เพิ่ม Loading State & ความแม่นยำสูง)
   const handleGPS = () => {
     setIsLocating(true);
     if (navigator.geolocation) {
@@ -134,7 +180,7 @@ export default function Dashboard() {
           setIsLocating(false);
         }, 
         (error) => {
-          alert("⚠️ ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบว่าคุณอนุญาตการเข้าถึง GPS บนเบราว์เซอร์แล้วหรือยัง");
+          alert("⚠️ ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบว่าคุณอนุญาตการเข้าถึง GPS แล้ว");
           setIsLocating(false);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -203,23 +249,25 @@ export default function Dashboard() {
   
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: dynamicBg, color: textColor, fontWeight: 'bold' }}>กำลังโหลดข้อมูล... ⏳</div>;
 
-  // 🌟 ป้องกันตัวเลขหาย (Safe Binding)
-  const pmVal = activeStation?.AQILast?.PM25?.value ? Number(activeStation.AQILast.PM25.value) : null;
+  // 🌟 แก้บั๊กตัวเลขหาย! เช็ค undefined ป้องกันเลข 0 โดนซ่อน
+  const pmRaw = activeStation?.AQILast?.PM25?.value;
+  const pmVal = (pmRaw !== undefined && pmRaw !== null) ? Number(pmRaw) : null;
   const tObj = activeStation ? stationTemps[activeStation.stationID] : null;
   
-  const tempVal = tObj?.temp;
+  const tempVal = tObj?.temp != null ? tObj.temp : null;
   const humidityVal = tObj?.humidity != null ? tObj.humidity : '-';
-  const windVal = tObj?.windSpeed;
-  const heatVal = tObj?.feelsLike;
-  const rainVal = tObj?.rainProb;
-  const uvVal = tObj?.uv; // สมมติว่ามีค่า UV หรือคุณสามารถนำข้อมูลอื่นมาแทนได้
-  const windDirVal = tObj?.windDir || '-'; // ทิศทางลม
+  const windVal = tObj?.windSpeed != null ? tObj.windSpeed : null;
+  const heatVal = tObj?.feelsLike != null ? tObj.feelsLike : null;
+  const rainVal = tObj?.rainProb != null ? tObj.rainProb : null;
+  const uvVal = tObj?.uv != null ? tObj.uv : '-'; 
+  const windDirVal = tObj?.windDir || '-'; 
 
   const health = getHealthStatus(pmVal);
   const heatStatus = getHeatStatus(heatVal);
   const pmColor = getPM25Color(pmVal);
 
-  const renderEmojiBadge = (emoji, color) => (
+  // 🌟 เรนเดอร์ Badge ไอคอนหน้ายิ้ม/หน้าบึ้ง
+  const renderFaceBadge = (level, color) => (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       width: isMobile ? '70px' : '90px', height: isMobile ? '70px' : '90px',
@@ -228,7 +276,9 @@ export default function Dashboard() {
       boxShadow: `0 8px 20px ${color}60, inset 0 2px 5px rgba(255,255,255,0.4)`, 
       border: `3px solid ${darkMode ? 'rgba(255,255,255,0.1)' : '#fff'}`
     }}>
-      <span style={{ fontSize: isMobile ? '3rem' : '4rem', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>{emoji}</span>
+      <div style={{ width: '65%', height: '65%', filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.2))' }}>
+        <SVGFace level={level} />
+      </div>
     </div>
   );
 
@@ -253,7 +303,6 @@ export default function Dashboard() {
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '8px', width: '100%', marginBottom: isMobile ? '15px' : '25px' }}>
             
             <div style={{ display: 'flex', gap: '8px', flex: isDesktop ? 0.4 : 1 }}>
-              {/* 🌟 ปุ่ม GPS เปลี่ยนเป็นไอคอน SVG ทันสมัย พร้อมระบบ Loading */}
               <button 
                 onClick={handleGPS} 
                 disabled={isLocating}
@@ -308,37 +357,50 @@ export default function Dashboard() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', width: '100%' }}>
+            {/* การ์ด PM2.5 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: '12px 20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
-              {renderEmojiBadge(health.face, health.color)}
+              {renderFaceBadge(health.level, health.color)}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                  <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold', letterSpacing: '0.5px' }}>PM2.5 (µg/m³)</span>
-                 <span style={{ fontSize: isMobile ? '3rem' : '3.5rem', fontWeight: '900', color: health.color, lineHeight: 1.1 }}>{pmVal != null && !isNaN(pmVal) ? pmVal : '-'}</span>
+                 <span style={{ fontSize: isMobile ? '3rem' : '3.5rem', fontWeight: '900', color: health.color, lineHeight: 1.1 }}>{pmVal != null ? pmVal : '-'}</span>
                  <span style={{ background: health.bg, color: health.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px' }}>{health.text}</span>
+                 {/* 🌟 แจ้งเตือนฉุกเฉิน (ถ้ามี) */}
+                 {health.warning && (
+                   <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px 10px', borderRadius: '12px' }}>
+                     {health.warning}
+                   </div>
+                 )}
               </div>
             </div>
+            {/* การ์ดดัชนีความร้อน */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: innerCardBg, padding: '12px 20px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
-              {renderEmojiBadge(heatStatus.face, heatStatus.color)}
+              {renderFaceBadge(heatStatus.level, heatStatus.color)}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                  <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold', letterSpacing: '0.5px' }}>ดัชนีความร้อน (°C)</span>
                  <span style={{ fontSize: isMobile ? '3rem' : '3.5rem', fontWeight: '900', color: heatStatus.color, lineHeight: 1.1 }}>{heatVal != null ? Math.round(heatVal) : '-'}</span>
                  <span style={{ background: heatStatus.bg, color: heatStatus.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px' }}>{heatStatus.text}</span>
+                 {/* 🌟 แจ้งเตือนฉุกเฉิน (ถ้ามี) */}
+                 {heatStatus.warning && (
+                   <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 'bold', marginTop: '6px', background: 'rgba(239, 68, 68, 0.15)', padding: '4px 10px', borderRadius: '12px' }}>
+                     {heatStatus.warning}
+                   </div>
+                 )}
               </div>
             </div>
           </div>
 
-          {/* 🌟 ปรับปรุงการแสดงผลข้อมูลรองด้านล่าง เป็น 6 กล่องแคปซูลเล็กๆ อ่านง่าย สวยงาม */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', 
             gap: '10px', marginTop: isMobile ? '15px' : '20px', paddingTop: '15px', borderTop: `1px dashed ${borderColor}` 
           }}>
             {[
-              { icon: '🌡️', label: 'อุณหภูมิ', val: tempVal != null ? `${Math.round(tempVal)}°C` : '-' },
-              { icon: '💧', label: 'ความชื้น', val: humidityVal !== '-' ? `${humidityVal}%` : '-' },
-              { icon: '🌬️', label: 'ความเร็วลม', val: windVal != null ? `${Math.round(windVal)} km/h` : '-' },
-              { icon: '🧭', label: 'ทิศทางลม', val: windDirVal },
-              { icon: '☔', label: 'โอกาสฝน', val: rainVal != null ? `${Math.round(rainVal)}%` : '-' },
-              { icon: '☀️', label: 'UV Index', val: uvVal != null ? uvVal : '-' },
+              { icon: '🌡️', label: 'อุณหภูมิ', val: tempVal != null ? <span style={{fontWeight:'900'}}>{Math.round(tempVal)}<span style={{fontSize:'0.7rem'}}>°C</span></span> : '-' },
+              { icon: '💧', label: 'ความชื้น', val: humidityVal !== '-' ? <span style={{fontWeight:'900'}}>{humidityVal}<span style={{fontSize:'0.7rem'}}>%</span></span> : '-' },
+              { icon: '🌬️', label: 'ความเร็วลม', val: windVal != null ? <span style={{fontWeight:'900'}}>{Math.round(windVal)}<span style={{fontSize:'0.6rem'}}> km/h</span></span> : '-' },
+              { icon: '🧭', label: 'ทิศทางลม', val: windDirVal !== '-' ? <div style={{display:'flex', alignItems:'center', gap:'2px'}}><span style={{fontWeight:'900'}}>{windDirVal}</span>{getWindArrow(windDirVal)}</div> : '-' },
+              { icon: '☔', label: 'โอกาสฝน', val: rainVal != null ? <span style={{fontWeight:'900'}}>{Math.round(rainVal)}<span style={{fontSize:'0.7rem'}}>%</span></span> : '-' },
+              { icon: '☀️', label: 'UV Index', val: uvVal != null ? <span style={{fontWeight:'900'}}>{uvVal}</span> : '-' },
             ].map((item, idx) => (
               <div key={idx} style={{ 
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
@@ -346,7 +408,7 @@ export default function Dashboard() {
               }}>
                 <span style={{ fontSize: '1.2rem', marginBottom: '2px', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))' }}>{item.icon}</span>
                 <span style={{ fontSize: '0.65rem', color: subTextColor, fontWeight: 'bold' }}>{item.label}</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: '900', color: textColor }}>{item.val}</span>
+                <span style={{ fontSize: '0.9rem', color: textColor, marginTop: '2px' }}>{item.val}</span>
               </div>
             ))}
           </div>
@@ -443,7 +505,8 @@ export default function Dashboard() {
                         <td style={{ padding: '15px', textAlign: 'center', color: '#3b82f6', fontWeight: 'bold' }}>{row.rain}%</td>
                         <td style={{ padding: '15px', textAlign: 'center' }}>
                           <span style={{ background: status.bg, color: status.color, padding: '6px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', border: `1px solid ${status.color}30` }}>
-                            {status.face} {status.text.replace('⭐', '').replace('⭐', '')}
+                            {/* ดึงเฉพาะข้อความจาก status ไม่เอา emoji */}
+                            {status.text.replace('⭐', '').replace('⭐', '')}
                           </span>
                         </td>
                         <td style={{ padding: '10px 15px' }}>
