@@ -9,7 +9,6 @@ import 'leaflet/dist/leaflet.css';
 
 const THAILAND_BOUNDS = [13.5, 101.5];
 
-// ฟังก์ชันหาพิกัดระยะห่าง (ใช้กับระบบ GPS)
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; 
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -25,7 +24,6 @@ const extractDistrict = (areaTH) => {
   return areaTH.split(' ')[0]; 
 };
 
-// ฟังก์ชันปรับสีตัวหนังสือให้อ่านง่าย
 const getReadableTextColor = (color, darkMode) => {
   if (!darkMode) {
     if (color === '#ffff00' || color === '#eab308') return '#ca8a04';
@@ -38,7 +36,6 @@ const getReadableTextColor = (color, darkMode) => {
   return color === '#94a3b8' ? (darkMode ? '#f8fafc' : '#0f172a') : color;
 };
 
-// ฟังก์ชันสี
 const getHeatColor = (val) => {
   if (val == null) return '#94a3b8';
   if (val >= 41) return '#ef4444'; if (val >= 32) return '#f97316'; if (val >= 27) return '#eab308'; return '#22c55e'; 
@@ -60,7 +57,18 @@ const getWindColor = (val) => {
   if (val >= 30) return '#831843'; if (val >= 15) return '#db2777'; if (val >= 5) return '#f472b6'; return '#fbcfe8'; 
 };
 
-// Mapping กลุ่มเขต กทม. 6 โซน
+// 🌟 พระเอกที่ทำให้จอขาวรอบที่แล้ว รอบนี้ฝังไว้แน่นๆ เลยครับ!
+const getColorByMode = (mode, val) => {
+  if (mode === 'pm25') return getPM25Color(val);
+  if (mode === 'heat') return getHeatColor(val);
+  if (mode === 'temp') return getTempColor(val);
+  if (mode === 'rain') return getRainColor(val);
+  if (mode === 'humidity') return getHumidityColor(val);
+  if (mode === 'wind') return getWindColor(val);
+  if (mode === 'fires') return '#ef4444';
+  return '#94a3b8';
+};
+
 const bkkZoneMap = {
   'พญาไท': 1, 'ดินแดง': 1, 'ดุสิต': 1, 'ห้วยขวาง': 1, 'วังทองหลาง': 1, 'ราชเทวี': 1, 'พระนคร': 1, 'ป้อมปราบศัตรูพ่าย': 1, 'สัมพันธวงศ์': 1, 
   'ปทุมวัน': 2, 'บางรัก': 2, 'สาทร': 2, 'บางคอแหลม': 2, 'ยานนาวา': 2, 'คลองเตย': 2, 'วัฒนา': 2, 'พระโขนง': 2, 'บางนา': 2, 'สวนหลวง': 2, 
@@ -104,7 +112,6 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 แก้ไขบั๊กจากรอบที่แล้ว: เพิ่ม type: 'leaflet' ให้ครบทุกโหมด แผนที่จะได้ไม่หาย!
   const modes = [
     { id: 'pm25', label: 'ฝุ่น PM2.5', icon: '😷', color: '#0ea5e9', unit: 'µg/m³', type: 'leaflet' },
     { id: 'heat', label: 'Heat Index', icon: '🥵', color: '#f97316', unit: '°C', type: 'leaflet' },
@@ -112,7 +119,7 @@ export default function MapPage() {
     { id: 'rain', label: 'โอกาสฝน', icon: '☔', color: '#3b82f6', unit: '%', type: 'leaflet' },
     { id: 'humidity', label: 'ความชื้น', icon: '💧', color: '#10b981', unit: '%', type: 'leaflet' },
     { id: 'wind', label: 'ความเร็วลม', icon: '🌬️', color: '#db2777', unit: 'km/h', type: 'leaflet' },
-    { id: 'fires', label: 'จุดความร้อน', icon: '🔥', color: '#ef4444', unit: '', type: 'leaflet' }, // ใช้ WMS บน Leaflet
+    { id: 'fires', label: 'จุดความร้อน', icon: '🔥', color: '#ef4444', unit: '', type: 'leaflet' }, // WMS โชว์ใน Leaflet
     { id: 'radar', label: 'เรดาร์ฝน', icon: '⛈️', color: '#8b5cf6', type: 'windy', layer: 'rain' }
   ];
 
@@ -121,7 +128,7 @@ export default function MapPage() {
   const isWindy = currentModeObj.type === 'windy';
 
   const rankingData = useMemo(() => {
-    // 🌟 ถ้ายกเลิกการนับ WMS จัดอันดับไม่ได้ ให้ Return [] เพื่อซ่อนข้อมูล
+    // โหมดจุดความร้อน WMS และ Windy จะไม่แสดงแถบจัดอันดับ
     if (isWindy || activeMode === 'fires') return [];
     
     const dataMap = new Map();
@@ -196,6 +203,7 @@ export default function MapPage() {
   const renderStations = [];
   const seenBkkZones = new Set();
 
+  // ป้องกันการโชว์หมุดเยอะเกินไปใน กทม. ยกเว้นโหมด PM2.5 ที่ซูมใกล้ๆ
   if (isLeaflet && activeMode !== 'fires') {
     safeStations.forEach(st => {
       if (extractProvince(st.areaTH) === 'กรุงเทพมหานคร') {
@@ -240,7 +248,7 @@ export default function MapPage() {
             <MapUpdater lat={parseFloat(selectedStation.lat)} lon={parseFloat(selectedStation.long)} />
           )}
 
-          {/* 🌟 แสดง WMS ฟรีของ GISTDA เมื่อเปิดโหมดจุดความร้อน */}
+          {/* 🌟 แสดง WMS ข้อมูลจุดความร้อนจริงจาก GISTDA */}
           {activeMode === 'fires' && (
             <WMSTileLayer 
               url="https://fire.gistda.or.th/cgi-bin/mapserv?map=/v3/hotspot/hotspot_all.map" 
@@ -341,14 +349,14 @@ export default function MapPage() {
         </MapContainer>
       </div>
 
-      {/* 🌟 แผนที่ Windy (แสดงเมื่อคลิกเรดาร์ฝน) */}
+      {/* 🌟 แผนที่ Windy (เฉพาะตอนกดเรดาร์ฝน) */}
       {isWindy && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2, background: mapBg }}>
           <iframe width="100%" height="100%" src={`https://embed.windy.com/embed2.html?lat=${windyLat}&lon=${windyLon}&zoom=${windyZoom}&level=surface&overlay=${currentModeObj.layer}&product=ecmwf&menu=&message=true&marker=true&calendar=now&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`} frameBorder="0" title="Windy Map"></iframe>
         </div>
       )}
 
-      {/* 🎛️ แผงควบคุมแถวเดียวด้านบน */}
+      {/* 🎛️ Top Bar */}
       <div style={{ position: 'absolute', top: isMobile ? 15 : 20, left: isMobile ? 15 : 20, right: isMobile ? 15 : 20, zIndex: 1000, pointerEvents: 'none' }}>
         <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', pointerEvents: 'auto', paddingBottom: '10px' }} className="hide-scrollbar">
           
@@ -373,12 +381,13 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* 🌟 ปุ่มควบคุมด้านขวา */}
+      {/* 🌟 ปุ่มนำทางขวา */}
       <div style={{ position: 'absolute', top: isMobile ? 80 : 80, right: isMobile ? 15 : 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={handleResetView} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 15px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: 'bold' }}>🇹🇭 ทั้งประเทศ</button>
           <button onClick={handleLocateUser} style={{ background: '#0ea5e9', color: '#fff', border: `1px solid #0284c7`, padding: '8px 15px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(14,165,233,0.3)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: 'bold' }}>🎯 ตำแหน่งฉัน</button>
         </div>
+        {/* ซ่อนปุ่มเปิดจัดอันดับตอนอยู่ในโหมดจุดความร้อน WMS หรือ Windy */}
         {isLeaflet && activeMode !== 'fires' && (
           <button onClick={() => setIsRankingOpen(!isRankingOpen)} style={{ background: isRankingOpen ? '#8b5cf6' : cardBg, color: isRankingOpen ? '#fff' : textColor, border: `1px solid ${borderColor}`, padding: '10px 15px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 'bold', transition: 'all 0.3s' }}>
             <span style={{ fontSize: '1.2rem' }}>📈</span> {isRankingOpen ? 'ซ่อนจัดอันดับ' : 'เปิดจัดอันดับ'}
@@ -386,14 +395,14 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* 🌟 ปุ่มเปลี่ยนหน้าตาแผนที่ */}
+      {/* 🌟 ปุ่มเปลี่ยนหน้าตาแผนที่ (ล่างขวา) */}
       <div style={{ position: 'absolute', bottom: '110px', right: isMobile ? 15 : 20, zIndex: 1000, display: isLeaflet ? 'flex' : 'none', flexDirection: 'column', gap: '8px' }}>
         <button onClick={() => setMapStyle('standard')} style={{ background: mapStyle==='standard'?'#e2e8f0':cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', width: '45px', height: '45px', fontSize: '1.3rem' }} title="แผนที่ปกติ">🗺️</button>
         <button onClick={() => setMapStyle('dark')} style={{ background: mapStyle==='dark'?'#e2e8f0':cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', width: '45px', height: '45px', fontSize: '1.3rem' }} title="โหมดมืด">🌙</button>
         <button onClick={() => setMapStyle('satellite')} style={{ background: mapStyle==='satellite'?'#e2e8f0':cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', width: '45px', height: '45px', fontSize: '1.3rem' }} title="ดาวเทียม">🛰️</button>
       </div>
 
-      {/* 🌟🌟 แถบจัดอันดับสถิติ (Leaderboard Panel) 🌟🌟 */}
+      {/* 🌟🌟 แถบจัดอันดับสถิติ 🌟🌟 */}
       <div style={{ 
         position: 'absolute', top: 0, bottom: 0, right: 0, width: isMobile ? '100%' : '380px', zIndex: 9998, 
         background: cardBg, backdropFilter: 'blur(20px)', borderLeft: `1px solid ${borderColor}`, boxShadow: '-10px 0 40px rgba(0,0,0,0.2)',
@@ -438,7 +447,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* 🌟 Legend กล่องอธิบายสี (ซ่อนในโหมดจุดความร้อน) */}
+      {/* 🌟 Legend */}
       <div style={{ position: 'absolute', bottom: '30px', left: isMobile ? '15px' : '30px', zIndex: 1000, background: cardBg, padding: '12px 20px', borderRadius: '16px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', display: (isLeaflet && activeMode !== 'fires') ? 'block' : 'none' }}>
         <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>ระดับสี ({currentModeObj.label})</div>
         <div style={{ display: 'flex', gap: '2px', height: '12px', width: '180px', borderRadius: '6px', overflow: 'hidden' }}>
