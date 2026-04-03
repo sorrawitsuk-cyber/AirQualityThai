@@ -6,7 +6,7 @@ import { WeatherContext } from '../context/WeatherContext';
 import { extractProvince, getPM25Color } from '../utils/helpers';
 import 'leaflet/dist/leaflet.css';
 
-// 🌟 ฟังก์ชันแยกอำเภอ
+// 🌟 ฟังก์ชันแยกอำเภอ/เขต
 const extractDistrict = (areaTH) => {
   if (!areaTH) return 'ทั่วไป';
   const match = areaTH.match(/(เขต|อ\.|อำเภอ)\s*([a-zA-Zก-ฮะ-์]+)/);
@@ -14,7 +14,7 @@ const extractDistrict = (areaTH) => {
   return areaTH.split(' ')[0]; 
 };
 
-// 🌟 ฟังก์ชันตัดคำชื่อสถานที่
+// 🌟 ฟังก์ชันตัดคำชื่อสถานที่ (ป้องกันจอขาว)
 const formatAreaName = (areaTH) => {
   return areaTH ? areaTH.split(',')[0].trim() : '';
 };
@@ -51,7 +51,6 @@ const bkkZoneMap = {
   'ภาษีเจริญ': 6, 'บางบอน': 6, 'หนองแขม': 6, 'บางขุนเทียน': 6, 'ทุ่งครุ': 6, 'ราษฎร์บูรณะ': 6, 'บางแค': 6 // ธนใต้
 };
 
-// ตัวจับระยะซูม
 function MapZoomListener({ setZoomLevel }) {
   const map = useMapEvents({ zoomend: () => setZoomLevel(map.getZoom()) });
   useEffect(() => { setZoomLevel(map.getZoom()); }, [map, setZoomLevel]);
@@ -60,7 +59,7 @@ function MapZoomListener({ setZoomLevel }) {
 
 function MapUpdater({ lat, lon }) {
   const map = useMap();
-  useEffect(() => { if (lat && lon && !isNaN(lat) && !isNaN(lon)) map.flyTo([lat, lon], 10, { animate: true }); }, [lat, lon, map]);
+  useEffect(() => { if (lat && lon && !isNaN(lat) && !isNaN(lon)) map.flyTo([lat, lon], 11, { animate: true }); }, [lat, lon, map]);
   return null;
 }
 
@@ -89,13 +88,12 @@ export default function MapPage() {
 
   useEffect(() => { if (selectedStation && isMobile) setIsMobileCardOpen(true); }, [selectedStation, isMobile]);
 
-  // ซูมไปยังจังหวัดที่เลือกจากตัวกรองแบบฉลาด
+  // ซูมไปยังจุดที่ดีที่สุดเมื่อเลือกจาก Dropdown
   useEffect(() => {
     if (safeStations.length > 0 && selectedProv) {
       let targets = safeStations.filter(s => extractProvince(s.areaTH) === selectedProv);
       if (selectedDistrict) targets = targets.filter(s => extractDistrict(s.areaTH) === selectedDistrict);
       if (targets.length > 0) {
-        // เลือกสถานีที่มีข้อมูลอ้างอิงเพื่อไม่ให้จอว่าง
         const bestTarget = targets.find(s => s.AQILast?.PM25?.value != null) || targets[0];
         setSelectedStation(bestTarget);
       }
@@ -127,24 +125,25 @@ export default function MapPage() {
     return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
   };
 
-  // 🌟 ฟิลเตอร์ กทม. 6 โซน (ลดความหนาแน่น)
+  // 🌟 ฟิลเตอร์ลดความหนาแน่น กทม. (ซูมออก < 8 โชว์แค่ 6 โซน / ซูมเข้า >= 8 โชว์หมด)
   const renderStations = [];
   const seenBkkZones = new Set();
 
   safeStations.forEach(st => {
-    if (activeMode === 'pm25') {
-      renderStations.push(st); // ฝุ่น โชว์ครบทุกจุด
-    } else {
-      if (extractProvince(st.areaTH) === 'กรุงเทพมหานคร') {
+    if (extractProvince(st.areaTH) === 'กรุงเทพมหานคร') {
+      if (activeMode === 'pm25' && zoomLevel >= 8) {
+        renderStations.push(st); // ฝุ่น + ซูมเข้า = โชว์ครบ
+      } else {
+        // ฝุ่นซูมออก หรือ โหมดอื่น = โชว์ 6 โซน
         const dist = extractDistrict(st.areaTH);
-        const zone = bkkZoneMap[dist] || 7; // ถ้าหาเขตไม่เจอ ให้เป็นโซน 7
+        const zone = bkkZoneMap[dist] || 7;
         if (!seenBkkZones.has(zone)) {
           seenBkkZones.add(zone);
-          renderStations.push(st); // เก็บตัวแทน 1 จุดต่อโซน
+          renderStations.push(st);
         }
-      } else {
-        renderStations.push(st); // ต่างจังหวัด โชว์ครบ
       }
+    } else {
+      renderStations.push(st); // ต่างจังหวัด โชว์ปกติ
     }
   });
 
@@ -178,8 +177,6 @@ export default function MapPage() {
             else if (activeMode === 'wind') { valToShow = tObj.windSpeed != null ? Math.round(tObj.windSpeed) : '-'; circleColor = getWindColor(tObj.windSpeed); windDir = tObj.windDir; }
 
             const isSelected = selectedStation?.stationID === st.stationID;
-            
-            // ซูม >= 8 ให้โชว์ตัวเลข
             const showText = zoomLevel >= 8;
             const size = showText ? 36 : (isSelected ? 24 : 14);
             const fontSize = String(valToShow).length > 2 ? '11px' : '13px';
@@ -195,25 +192,25 @@ export default function MapPage() {
                 const d = windDir.toUpperCase();
                 if (d==='N') arrowDeg=180; else if (d==='NE') arrowDeg=225; else if (d==='E') arrowDeg=270; else if (d==='SE') arrowDeg=315; else if (d==='S') arrowDeg=0; else if (d==='SW') arrowDeg=45; else if (d==='W') arrowDeg=90; else if (d==='NW') arrowDeg=135;
               }
-              const triSize = showText ? '8px' : '5px';
-              const triTop = showText ? '-12px' : '-8px';
+              const arrowSize = showText ? 42 : 28;
               
+              // 🌟 แก้ไขเงา: ลด opacity เงาลงเหลือ 0.3 เพื่อไม่ให้กองรวมกันเป็นหลุมดำ
               htmlContent = `
-                <div style="position: relative; width: 100%; height: 100%; transform: rotate(${arrowDeg}deg);">
-                   <div style="position: absolute; top: ${triTop}; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: ${triSize} solid transparent; border-right: ${triSize} solid transparent; border-bottom: ${showText?'14px':'10px'} solid ${circleColor};"></div>
-                   <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: ${circleColor}; border-radius: 50%; border: 2px solid #fff; transform: rotate(-${arrowDeg}deg); display: flex; align-items: center; justify-content: center; color: ${numColor}; font-weight: 900; font-size: ${fontSize}; box-shadow: 0 0 10px rgba(0,0,0,0.3);">
-                      ${showText ? valToShow : ''}
-                   </div>
+                <div style="position: relative; width: ${arrowSize}px; height: ${arrowSize}px; display: flex; align-items: center; justify-content: center; transform: rotate(${arrowDeg}deg);">
+                  <svg viewBox="0 0 24 24" width="100%" height="100%" style="position: absolute; top: 0; left: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));">
+                    <path d="M12 2 L22 20 L12 16 L2 20 Z" fill="${circleColor}" stroke="#fff" stroke-width="1.5" />
+                  </svg>
+                  ${showText ? `<span style="position: absolute; transform: rotate(-${arrowDeg}deg); color: #fff; font-weight: 900; font-size: ${fontSize}; z-index: 2; text-shadow: 0 1px 2px #000; margin-top: 2px;">${valToShow}</span>` : ''}
                 </div>
               `;
             } else {
-              // หมุดวงกลมปกติ
+              // 🌟 แก้ไขเงา: ถ้าซูมออก ให้เอา box-shadow ทิ้งไปเลย! จะได้คลีนๆ
               htmlContent = showText
-                ? `<div style="background-color: ${circleColor}; color: ${numColor}; width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: ${fontSize}; font-family: 'Kanit', sans-serif; border: 2px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.3);">${valToShow}</div>`
-                : `<div style="background-color: ${circleColor}; width: 100%; height: 100%; border-radius: 50%; border: ${isSelected?'3px':'2px'} solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`;
+                ? `<div style="background-color: ${circleColor}; color: ${numColor}; width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: ${fontSize}; font-family: 'Kanit', sans-serif; border: 2px solid #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">${valToShow}</div>`
+                : `<div style="background-color: ${circleColor}; width: 100%; height: 100%; border-radius: 50%; border: 1.5px solid #fff;"></div>`;
             }
 
-            const iconSize = activeMode === 'wind' ? (showText ? [40, 40] : [25, 25]) : [size, size];
+            const iconSize = activeMode === 'wind' ? (showText ? [42, 42] : [28, 28]) : [size, size];
             const dynamicIcon = L.divIcon({ html: htmlContent, className: 'custom-div-icon', iconSize: iconSize, iconAnchor: [iconSize[0]/2, iconSize[1]/2] });
 
             return (
@@ -236,21 +233,18 @@ export default function MapPage() {
           
           {/* กลุ่ม 1: ตัวกรองพิกัด */}
           <div style={{ display: 'flex', alignItems: 'center', background: cardBg, backdropFilter: 'blur(15px)', borderRadius: '50px', padding: '6px 8px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: `1px solid ${borderColor}`, flexShrink: 0 }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: subTextColor, margin: '0 8px 0 8px' }}>📍 พิกัด:</span>
-            
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: subTextColor, margin: '0 8px 0 8px' }}>📍 พื้นที่:</span>
             <select value={selectedProv} onChange={e => { setSelectedProv(e.target.value); setSelectedDistrict(''); }} style={{ background: innerCardBg, color: textColor, border: 'none', fontWeight: 'bold', fontSize: '0.85rem', outline: 'none', cursor: 'pointer', padding: '6px 12px', borderRadius: '50px', marginRight: '5px' }}>
               <option value="">เลือกจังหวัด</option>{allProvinces.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
-            
             <select value={selectedDistrict} onChange={e => setSelectedDistrict(e.target.value)} style={{ background: innerCardBg, color: textColor, border: 'none', fontWeight: 'bold', fontSize: '0.85rem', outline: 'none', cursor: 'pointer', padding: '6px 12px', borderRadius: '50px' }}>
-              <option value="">ทุกอำเภอ/เขต</option>{availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+              <option value="">ทุกเขต/อำเภอ</option>{availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
 
           {/* กลุ่ม 2: เปลี่ยนโหมดแผนที่ */}
           <div style={{ display: 'flex', alignItems: 'center', background: cardBg, backdropFilter: 'blur(15px)', borderRadius: '50px', padding: '6px 8px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: `1px solid ${borderColor}`, flexShrink: 0 }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: subTextColor, margin: '0 8px 0 8px' }}>🎛️ โหมด:</span>
-            
             {modes.map(mode => {
               const isActive = activeMode === mode.id;
               return (
@@ -262,19 +256,18 @@ export default function MapPage() {
               );
             })}
           </div>
-
         </div>
       </div>
 
-      {/* 🌟 ปุ่มเปลี่ยนหน้าตาแผนที่ (Basemap) */}
-      <div style={{ position: 'absolute', top: isMobile ? 80 : 80, right: isMobile ? 15 : 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <button onClick={() => setMapStyle('standard')} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', fontWeight: 'bold' }}>🗺️ ปกติ</button>
-        <button onClick={() => setMapStyle('dark')} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', fontWeight: 'bold' }}>🌙 มืด</button>
-        <button onClick={() => setMapStyle('satellite')} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', fontWeight: 'bold' }}>🛰️ ดาวเทียม</button>
+      {/* 🌟 ปุ่มเปลี่ยนหน้าตาแผนที่ (Basemap) ย้ายลงมาล่างขวาเพื่อไม่ให้ทับการ์ด */}
+      <div style={{ position: 'absolute', bottom: isMobile ? '160px' : '150px', right: isMobile ? 15 : 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button onClick={() => setMapStyle('standard')} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', fontSize: '1.2rem' }} title="แผนที่ปกติ">🗺️</button>
+        <button onClick={() => setMapStyle('dark')} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', fontSize: '1.2rem' }} title="โหมดมืด">🌙</button>
+        <button onClick={() => setMapStyle('satellite')} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', fontSize: '1.2rem' }} title="ดาวเทียม">🛰️</button>
       </div>
 
       {/* 🌟 Legend กล่องอธิบายสี */}
-      <div style={{ position: 'absolute', bottom: isMobile ? (isMobileCardOpen ? '380px' : '90px') : '30px', left: isMobile ? '15px' : '30px', zIndex: 1000, background: cardBg, padding: '12px 20px', borderRadius: '16px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', transition: 'bottom 0.3s' }}>
+      <div style={{ position: 'absolute', bottom: isMobile ? (isMobileCardOpen ? '420px' : '100px') : '30px', left: isMobile ? '15px' : '30px', zIndex: 1000, background: cardBg, padding: '12px 20px', borderRadius: '16px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', transition: 'bottom 0.3s' }}>
         <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>ระดับสี ({modes.find(m => m.id === activeMode)?.label})</div>
         <div style={{ display: 'flex', gap: '2px', height: '12px', width: '180px', borderRadius: '6px', overflow: 'hidden' }}>
           {activeMode === 'pm25' && <><div style={{flex:1, background:'#00e400'}}></div><div style={{flex:1, background:'#ffff00'}}></div><div style={{flex:1, background:'#ff7e00'}}></div><div style={{flex:1, background:'#ff0000'}}></div><div style={{flex:1, background:'#8f3f97'}}></div><div style={{flex:1, background:'#7e0023'}}></div></>}
@@ -293,25 +286,24 @@ export default function MapPage() {
       {isMobile && selectedStation && (
         <div style={{ position: 'absolute', bottom: isMobileCardOpen ? '320px' : '90px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, transition: 'bottom 0.3s' }}>
           <button onClick={() => setIsMobileCardOpen(!isMobileCardOpen)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '50px', padding: '12px 25px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 10px 25px rgba(14,165,233,0.4)' }}>
-            {isMobileCardOpen ? <><span style={{ fontSize: '1.2rem' }}>⬇️</span> ซ่อนข้อมูล</> : <><span style={{ fontSize: '1.2rem' }}>📊</span> ดูรายละเอียด</>}
+            {isMobileCardOpen ? <><span style={{ fontSize: '1.2rem' }}>⬇️</span> ซ่อนข้อมูล</> : <><span style={{ fontSize: '1.2rem' }}>📊</span> ดูรายละเอียดพื้นที่นี้</>}
           </button>
         </div>
       )}
 
-      {/* 📋 การ์ดแสดงข้อมูลสถานี (🌟 ซ่อนชื่อสถานี โชว์แค่อำเภอ/จังหวัด) */}
+      {/* 📋 การ์ดแสดงข้อมูล (กู้คืนมาแล้ว!) */}
       {selectedStation && (
         <div style={{ 
           position: 'absolute', zIndex: 1000, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           ...(isMobile 
             ? { bottom: isMobileCardOpen ? '0' : '-100%', left: 0, right: 0, borderTopLeftRadius: '30px', borderTopRightRadius: '30px', paddingBottom: '90px', maxHeight: '60vh' } 
-            : { top: '80px', right: '20px', width: '340px', borderRadius: '24px', maxHeight: 'calc(100vh - 100px)' }), 
+            : { top: '20px', right: '20px', width: '340px', borderRadius: '24px', maxHeight: 'calc(100vh - 40px)' }), // เปลี่ยนพิกัดในคอมให้มาอยู่ชิดขวาบน
           background: cardBg, backdropFilter: 'blur(20px)', border: `1px solid ${borderColor}`, padding: '25px 20px', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)', overflowY: 'auto'
         }} className="hide-scrollbar">
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
             <div>
               <div style={{ fontSize: '0.8rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '4px' }}>📍 {extractProvince(selectedStation.areaTH)}</div>
-              {/* ซ่อนชื่อเต็ม โชว์แค่เขต/อำเภอ */}
               <h3 style={{ margin: 0, fontSize: '1.3rem', color: textColor, lineHeight: 1.3 }}>เขตพื้นที่ {extractDistrict(selectedStation.areaTH)}</h3>
             </div>
             {!isMobile && <button onClick={() => setSelectedStation(null)} style={{ background: innerCardBg, border: 'none', width: '32px', height: '32px', borderRadius: '50%', color: subTextColor, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✖</button>}
