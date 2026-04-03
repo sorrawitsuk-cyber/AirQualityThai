@@ -8,7 +8,7 @@ export default function ClimatePage() {
   const [alertsLocationName, setAlertsLocationName] = useState('');
   const [activeStation, setActiveStation] = useState(null);
   
-  // 🌟 เลเยอร์แผนที่ Windy (เพิ่ม Radar และ Hotspot กลับมาแล้ว!)
+  // 🌟 ตั้งค่าเริ่มต้นเป็นเรดาร์ฝน
   const [windyLayer, setWindyLayer] = useState('rain');
 
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
@@ -64,6 +64,22 @@ export default function ClimatePage() {
   const lat = activeStation ? parseFloat(activeStation.lat) : 13.75;
   const lon = activeStation ? parseFloat(activeStation.long) : 100.50;
 
+  // 🌟 จัดเต็มเมนู Layer ของ Windy!
+  const windyModes = [
+    { id: 'rain', label: 'เรดาร์ฝน', icon: '⛈️' },
+    { id: 'pm2p5', label: 'ฝุ่น PM2.5', icon: '😷' },
+    { id: 'fires', label: 'จุดความร้อน', icon: '🔥' },
+    { id: 'temp', label: 'อุณหภูมิ', icon: '🌡️' },
+    { id: 'wind', label: 'ลม', icon: '🌬️' },
+    { id: 'gust', label: 'ลมกระโชก', icon: '💨' },
+    { id: 'clouds', label: 'เมฆ', icon: '☁️' },
+    { id: 'rh', label: 'ความชื้น', icon: '💧' },
+    { id: 'pressure', label: 'ความกดอากาศ', icon: '🔽' },
+    { id: 'visibility', label: 'ทัศนวิสัย', icon: '👁️' },
+    { id: 'uvindex', label: 'UV Index', icon: '☀️' },
+    { id: 'capes', label: 'พายุฟ้าคะนอง', icon: '⚡' }
+  ];
+
   return (
     <div style={{ height: '100%', width: '100%', padding: isMobile ? '12px' : '30px', paddingBottom: isMobile ? '100px' : '40px', display: 'flex', flexDirection: 'column', gap: isMobile ? '15px' : '20px', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', background: bgGradient, fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       
@@ -110,27 +126,43 @@ export default function ClimatePage() {
 
       <div style={{ background: cardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}`, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '15px' }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '10px' }}>
-          <h3 style={{ margin: 0, fontSize: '1.05rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>🛰️ เรดาร์ตรวจอากาศ (Windy)</h3>
+          <h3 style={{ margin: 0, fontSize: '1.05rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            🛰️ เรดาร์ตรวจอากาศ (Windy)
+          </h3>
           
-          <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', width: '100%', paddingBottom: '5px' }} className="hide-scrollbar">
-            {[
-              { id: 'rain', label: 'เรดาร์ฝน', icon: '⛈️' },
-              { id: 'fires', label: 'จุดความร้อน (Hotspot)', icon: '🔥' },
-              { id: 'wind', label: 'ลม', icon: '🌬️' },
-              { id: 'pm2p5', label: 'ฝุ่น', icon: '😷' },
-              { id: 'clouds', label: 'เมฆ', icon: '☁️' }
-            ].map(layer => (
+          {/* แถบเมนูแบบ Scroll ได้ (จัดเต็มทุกเลเยอร์) */}
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', width: '100%', paddingBottom: '8px' }} className="hide-scrollbar">
+            {windyModes.map(layer => (
               <button 
                 key={layer.id} onClick={() => setWindyLayer(layer.id)}
-                style={{ background: windyLayer === layer.id ? '#0ea5e9' : innerCardBg, color: windyLayer === layer.id ? '#fff' : subTextColor, border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }}>
-                {layer.icon} {layer.label}
+                style={{ 
+                  background: windyLayer === layer.id ? '#0ea5e9' : innerCardBg, 
+                  color: windyLayer === layer.id ? '#fff' : subTextColor, 
+                  border: `1px solid ${windyLayer === layer.id ? '#0ea5e9' : borderColor}`, 
+                  padding: '6px 14px', 
+                  borderRadius: '50px', 
+                  fontSize: '0.85rem', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer', 
+                  whiteSpace: 'nowrap', 
+                  transition: 'all 0.2s', 
+                  flexShrink: 0,
+                  boxShadow: windyLayer === layer.id ? '0 4px 10px rgba(14, 165, 233, 0.3)' : 'none'
+                }}>
+                <span style={{ fontSize: '1rem', marginRight: '4px' }}>{layer.icon}</span> {layer.label}
               </button>
             ))}
           </div>
         </div>
 
         <div style={{ height: isMobile ? '350px' : '450px', width: '100%', borderRadius: '14px', overflow: 'hidden', background: '#e2e8f0', position: 'relative' }}>
-          <iframe width="100%" height="100%" src={`https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=450&zoom=6&level=surface&overlay=${windyLayer}&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`} frameBorder="0" title="Windy Map"></iframe>
+          <iframe 
+            width="100%" 
+            height="100%" 
+            src={`https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=450&zoom=7&level=surface&overlay=${windyLayer}&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`} 
+            frameBorder="0" 
+            title="Windy Map">
+          </iframe>
         </div>
       </div>
     </div>
