@@ -15,11 +15,6 @@ const extractDistrict = (areaTH) => {
   return areaTH.split(' ')[0]; 
 };
 
-// ฟังก์ชันตัดคำชื่อสถานที่
-const formatAreaName = (areaTH) => {
-  return areaTH ? areaTH.split(',')[0].trim() : '';
-};
-
 // ฟังก์ชันปรับสีตัวหนังสือให้อ่านง่าย
 const getReadableTextColor = (color, darkMode) => {
   if (!darkMode) {
@@ -314,16 +309,14 @@ export default function MapPage() {
           <TileLayer url={getTileUrl()} />
           <MapZoomListener setZoomLevel={setZoomLevel} />
 
-          {/* จุดความร้อน */}
           {activeMode === 'fires' && hotspots.map(fire => (
-            <CircleMarker key={fire.id} center={[fire.lat, fire.long]} radius={4} pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.8, weight: 0 }}>
+            <Marker key={fire.id} position={[fire.lat, fire.long]} icon={L.divIcon({ html: `<div style="background: #ef4444; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 10px rgba(239,68,68,0.8);"></div>`, className: '', iconSize: [14, 14] })}>
               <Tooltip direction="top" offset={[0, -5]}>
                 <div style={{ fontFamily: 'Kanit', fontWeight: 'bold' }}>🔥 ความน่าจะเป็น: {fire.confidence}%<br/><span style={{fontSize:'0.75rem', color:'#64748b'}}>{fire.district}, {fire.province}</span></div>
               </Tooltip>
-            </CircleMarker>
+            </Marker>
           ))}
           
-          {/* สถานีปกติ */}
           {activeMode !== 'fires' && renderStations.map(st => {
             const lat = parseFloat(st.lat); const lon = parseFloat(st.long);
             if (isNaN(lat) || isNaN(lon)) return null;
@@ -416,7 +409,6 @@ export default function MapPage() {
         </MapContainer>
       </div>
 
-      {/* 🌟 แผนที่ Windy (แสดงผลตามโหมด) */}
       {isWindy && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2, background: mapBg }}>
           <iframe 
@@ -442,7 +434,7 @@ export default function MapPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', background: cardBg, backdropFilter: 'blur(15px)', borderRadius: '50px', padding: '6px 8px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: `1px solid ${borderColor}`, flexShrink: 0 }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: subTextColor, margin: '0 8px 0 8px' }}>🎛️ เลเยอร์:</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: subTextColor, margin: '0 8px 0 8px' }}>🎛️ โหมด:</span>
             {modes.map(mode => {
               const isActive = activeMode === mode.id;
               return (
@@ -457,7 +449,6 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* 🌟 ปุ่มควบคุมด้านขวา (นำทาง) */}
       <div style={{ position: 'absolute', top: isMobile ? 80 : 80, right: isMobile ? 15 : 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={handleResetView} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 15px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: 'bold' }}>
@@ -468,7 +459,6 @@ export default function MapPage() {
           </button>
         </div>
 
-        {/* ปุ่มแถบจัดอันดับ */}
         {isLeaflet && (
           <button 
             onClick={() => setIsRankingOpen(!isRankingOpen)} 
@@ -484,7 +474,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* 🌟🌟 แถบจัดอันดับสถิติ (Leaderboard Panel) พร้อมปุ่ม ✖ ที่กดได้ทั้งในคอมและมือถือ 🌟🌟 */}
+      {/* 🌟🌟 แถบจัดอันดับสถิติ (พร้อมป้ายบอกกราฟพยากรณ์ 7 วัน) 🌟🌟 */}
       <div style={{ 
         position: 'absolute', top: 0, bottom: 0, right: 0, width: isMobile ? '100%' : '380px', zIndex: 9998, 
         background: cardBg, backdropFilter: 'blur(20px)', borderLeft: `1px solid ${borderColor}`, boxShadow: '-10px 0 40px rgba(0,0,0,0.2)',
@@ -500,7 +490,6 @@ export default function MapPage() {
               {selectedProv ? `เรียงตามเขต/อำเภอ ใน${selectedProv}` : 'เรียงตามระดับจังหวัดทั่วประเทศ'}
             </p>
           </div>
-          {/* 🌟 แก้ไขตรงนี้: ให้ปุ่ม X โชว์ตลอด จะได้กดปิดในคอมได้ง่ายๆ */}
           <button onClick={() => setIsRankingOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', color: subTextColor, cursor: 'pointer' }}>✖</button>
         </div>
 
@@ -518,13 +507,19 @@ export default function MapPage() {
                     {item.value} <span style={{ fontSize: '0.7rem', color: subTextColor, fontWeight: 'normal' }}>{currentModeObj.unit}</span>
                   </div>
                 </div>
-                <div style={{ width: '80px', height: '40px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={item.trend}>
-                      <Line type="monotone" dataKey="val" stroke={rawColor} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                
+                {/* 🌟 กล่องกราฟพยากรณ์ พร้อมป้ายบอกชัดเจน */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)', padding: '5px', borderRadius: '10px', border: `1px solid ${borderColor}` }}>
+                  <span style={{ fontSize: '0.6rem', color: subTextColor, fontWeight: 'bold', marginBottom: '2px' }}>📉 พยากรณ์ 7 วัน</span>
+                  <div style={{ width: '70px', height: '25px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={item.trend}>
+                        <Line type="monotone" dataKey="val" stroke={rawColor} strokeWidth={2} dot={false} isAnimationActive={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
+
               </div>
             );
           }) : (
