@@ -1,6 +1,6 @@
 // src/pages/MapPage.jsx
 import React, { useContext, useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, CircleMarker, Tooltip, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Tooltip, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { WeatherContext } from '../context/WeatherContext';
@@ -15,6 +15,7 @@ const extractDistrict = (areaTH) => {
   return areaTH.split(' ')[0]; 
 };
 
+// ฟังก์ชันตัดคำชื่อสถานที่
 const formatAreaName = (areaTH) => {
   return areaTH ? areaTH.split(',')[0].trim() : '';
 };
@@ -65,7 +66,7 @@ const getColorByMode = (mode, val) => {
   if (mode === 'rain') return getRainColor(val);
   if (mode === 'humidity') return getHumidityColor(val);
   if (mode === 'wind') return getWindColor(val);
-  if (mode === 'fires') return val >= 50 ? '#991b1b' : val >= 20 ? '#ef4444' : '#f97316'; // สีของกราฟจุดความร้อน
+  if (mode === 'fires') return val >= 50 ? '#991b1b' : val >= 20 ? '#ef4444' : '#f97316'; 
   return '#94a3b8';
 };
 
@@ -78,7 +79,6 @@ const bkkZoneMap = {
   'ภาษีเจริญ': 6, 'บางบอน': 6, 'หนองแขม': 6, 'บางขุนเทียน': 6, 'ทุ่งครุ': 6, 'ราษฎร์บูรณะ': 6, 'บางแค': 6 
 };
 
-// ฟังก์ชันหาตำแหน่ง GPS
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; 
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -90,12 +90,6 @@ const getDistance = (lat1, lon1, lat2, lon2) => {
 function MapZoomListener({ setZoomLevel }) {
   const map = useMapEvents({ zoomend: () => setZoomLevel(map.getZoom()) });
   useEffect(() => { setZoomLevel(map.getZoom()); }, [map, setZoomLevel]);
-  return null;
-}
-
-function MapUpdater({ lat, lon }) {
-  const map = useMap();
-  useEffect(() => { if (lat && lon && !isNaN(lat) && !isNaN(lon)) map.flyTo([lat, lon], 11, { animate: true }); }, [lat, lon, map]);
   return null;
 }
 
@@ -113,7 +107,6 @@ export default function MapPage() {
   const [isRankingOpen, setIsRankingOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
-  // 🌟 State เก็บข้อมูลจุดความร้อนจำลอง (Mock Hotspots)
   const [hotspots, setHotspots] = useState([]);
 
   const safeStations = stations || [];
@@ -126,29 +119,27 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 สร้างจุดความร้อนจำลองแบบ Real-time ตามจังหวัดที่มี
   useEffect(() => {
     if (safeStations.length > 0 && hotspots.length === 0) {
       const generated = [];
       safeStations.forEach(st => {
-        // จำลองให้ภาคเหนือมีจุดความร้อนเยอะหน่อย (เช่น เชียงใหม่, เชียงราย)
         const prov = extractProvince(st.areaTH);
-        let maxFires = 2; // พื้นที่ปกติ
+        let maxFires = 2; 
         if (['เชียงใหม่', 'เชียงราย', 'แม่ฮ่องสอน', 'น่าน', 'พะเยา', 'ลำปาง', 'แพร่', 'ลำพูน', 'ตาก'].includes(prov)) {
           maxFires = 12; 
         } else if (prov === 'กรุงเทพมหานคร') {
-          maxFires = 0; // กทม แทบไม่มีจุดความร้อน
+          maxFires = 0; 
         }
 
         const fireCount = Math.floor(Math.random() * maxFires);
         for(let i=0; i<fireCount; i++) {
           generated.push({
             id: `${st.stationID}-fire-${i}`,
-            lat: parseFloat(st.lat) + (Math.random() * 0.3 - 0.15), // กระจายรัศมีรอบจุดตรวจวัด
+            lat: parseFloat(st.lat) + (Math.random() * 0.3 - 0.15), 
             long: parseFloat(st.long) + (Math.random() * 0.3 - 0.15),
             province: prov,
             district: extractDistrict(st.areaTH),
-            confidence: Math.floor(Math.random() * 50) + 50 // 50-100%
+            confidence: Math.floor(Math.random() * 50) + 50 
           });
         }
       });
@@ -205,7 +196,6 @@ export default function MapPage() {
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: darkMode ? '#0f172a' : '#f0f9ff', color: darkMode ? '#fff' : '#000' }}>กำลังโหลดแผนที่... ⏳</div>;
 
-  // 🌟 แก้โหมด 'fires' ให้เป็น type: 'leaflet' เพื่อวาดจุดไฟของเราเอง!
   const modes = [
     { id: 'pm25', label: 'ฝุ่น PM2.5', icon: '😷', color: '#0ea5e9', unit: 'µg/m³', type: 'leaflet' },
     { id: 'heat', label: 'Heat Index', icon: '🥵', color: '#f97316', unit: '°C', type: 'leaflet' },
@@ -213,7 +203,7 @@ export default function MapPage() {
     { id: 'rain', label: 'โอกาสฝน', icon: '☔', color: '#3b82f6', unit: '%', type: 'leaflet' },
     { id: 'humidity', label: 'ความชื้น', icon: '💧', color: '#10b981', unit: '%', type: 'leaflet' },
     { id: 'wind', label: 'ความเร็วลม', icon: '🌬️', color: '#db2777', unit: 'km/h', type: 'leaflet' },
-    { id: 'fires', label: 'จุดความร้อน', icon: '🔥', color: '#ef4444', unit: 'จุด', type: 'leaflet' }, // 👈 เปลี่ยนตรงนี้
+    { id: 'fires', label: 'จุดความร้อน', icon: '🔥', color: '#ef4444', unit: 'จุด', type: 'leaflet' }, 
     { id: 'radar', label: 'เรดาร์ฝน', icon: '⛈️', color: '#8b5cf6', type: 'windy', layer: 'rain' }
   ];
 
@@ -260,13 +250,11 @@ export default function MapPage() {
   const windyLon = (mapInstance && mapInstance.getCenter()) ? mapInstance.getCenter().lng : 101.5;
   const windyZoom = (mapInstance && mapInstance.getZoom()) ? mapInstance.getZoom() : 6;
 
-  // 🌟 ฟังก์ชันคำนวณ Ranking แยกตามโหมด
   const getRankingData = () => {
     if (isWindy) return []; 
     const dataMap = new Map();
 
     if (activeMode === 'fires') {
-      // 🌟 ถ้าโหมดจุดความร้อน ให้นับจำนวนจุด (Count) แทนค่าเฉลี่ย!
       hotspots.forEach(fire => {
         if (selectedProv && fire.province !== selectedProv) return;
         const key = selectedProv ? fire.district : fire.province;
@@ -279,7 +267,6 @@ export default function MapPage() {
       })).sort((a, b) => b.value - a.value);
 
     } else {
-      // โหมดอื่นๆ หาค่าเฉลี่ยปกติ
       safeStations.forEach(st => {
         const prov = extractProvince(st.areaTH);
         const dist = extractDistrict(st.areaTH);
@@ -327,7 +314,7 @@ export default function MapPage() {
           <TileLayer url={getTileUrl()} />
           <MapZoomListener setZoomLevel={setZoomLevel} />
 
-          {/* 🌟 แสดงจุดไฟป่า (Hotspots) ถ้าอยู่ในโหมด fires */}
+          {/* จุดความร้อน */}
           {activeMode === 'fires' && hotspots.map(fire => (
             <CircleMarker key={fire.id} center={[fire.lat, fire.long]} radius={4} pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.8, weight: 0 }}>
               <Tooltip direction="top" offset={[0, -5]}>
@@ -336,7 +323,7 @@ export default function MapPage() {
             </CircleMarker>
           ))}
           
-          {/* 🌟 แสดงสถานีปกติถ้าไม่ใช่โหมด fires */}
+          {/* สถานีปกติ */}
           {activeMode !== 'fires' && renderStations.map(st => {
             const lat = parseFloat(st.lat); const lon = parseFloat(st.long);
             if (isNaN(lat) || isNaN(lon)) return null;
@@ -429,7 +416,7 @@ export default function MapPage() {
         </MapContainer>
       </div>
 
-      {/* 🌟 แผนที่ Windy (แสดงเรดาร์ฝน) */}
+      {/* 🌟 แผนที่ Windy (แสดงผลตามโหมด) */}
       {isWindy && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2, background: mapBg }}>
           <iframe 
@@ -440,7 +427,7 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* 🎛️ แผงควบคุมแถวเดียว (ตัวกรอง + เลเยอร์) */}
+      {/* 🎛️ แผงควบคุมแถวเดียว */}
       <div style={{ position: 'absolute', top: isMobile ? 15 : 20, left: isMobile ? 15 : 20, right: isMobile ? 15 : 20, zIndex: 1000, pointerEvents: 'none' }}>
         <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', pointerEvents: 'auto', paddingBottom: '10px' }} className="hide-scrollbar">
           
@@ -470,9 +457,8 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* 🌟 ปุ่มควบคุมด้านขวา (Reset, GPS, จัดอันดับ & เลเยอร์แผนที่) */}
+      {/* 🌟 ปุ่มควบคุมด้านขวา (นำทาง) */}
       <div style={{ position: 'absolute', top: isMobile ? 80 : 80, right: isMobile ? 15 : 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
-        
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={handleResetView} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 15px', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: 'bold' }}>
             🇹🇭 ทั้งประเทศ
@@ -498,7 +484,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* 🌟🌟 แถบจัดอันดับสถิติ (Leaderboard Panel) 🌟🌟 */}
+      {/* 🌟🌟 แถบจัดอันดับสถิติ (Leaderboard Panel) พร้อมปุ่ม ✖ ที่กดได้ทั้งในคอมและมือถือ 🌟🌟 */}
       <div style={{ 
         position: 'absolute', top: 0, bottom: 0, right: 0, width: isMobile ? '100%' : '380px', zIndex: 9998, 
         background: cardBg, backdropFilter: 'blur(20px)', borderLeft: `1px solid ${borderColor}`, boxShadow: '-10px 0 40px rgba(0,0,0,0.2)',
@@ -514,7 +500,8 @@ export default function MapPage() {
               {selectedProv ? `เรียงตามเขต/อำเภอ ใน${selectedProv}` : 'เรียงตามระดับจังหวัดทั่วประเทศ'}
             </p>
           </div>
-          {isMobile && <button onClick={() => setIsRankingOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', color: subTextColor }}>✖</button>}
+          {/* 🌟 แก้ไขตรงนี้: ให้ปุ่ม X โชว์ตลอด จะได้กดปิดในคอมได้ง่ายๆ */}
+          <button onClick={() => setIsRankingOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', color: subTextColor, cursor: 'pointer' }}>✖</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '15px 20px' }} className="hide-scrollbar">
