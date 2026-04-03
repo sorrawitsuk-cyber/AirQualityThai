@@ -315,7 +315,7 @@ export default function MapPage() {
             <MapUpdater lat={parseFloat(selectedStation.lat)} lon={parseFloat(selectedStation.long)} />
           )}
 
-          {/* 🌟 แสดง WMS ข้อมูลจุดความร้อนจริงจาก GISTDA ทับบนแผนที่ */}
+          {/* 🌟 ปิด GISTDA WMS ชั่วคราวเพราะเซิร์ฟเวอร์ปลายทางใบรับรอง SSL พัง
           {activeMode === 'fires' && (
             <WMSTileLayer 
               url="https://fire.gistda.or.th/cgi-bin/mapserv?map=/v3/hotspot/hotspot_all.map" 
@@ -326,6 +326,7 @@ export default function MapPage() {
               opacity={0.8} 
             />
           )}
+          */}
 
           {/* 🌟 แสดงพิกัดไฟที่ดึงผ่าน API เพื่อซ้อน Tooltip ให้นับจำนวนได้ */}
           {activeMode === 'fires' && realHotspots.map((fire, i) => (
