@@ -1,6 +1,7 @@
 // src/context/WeatherContext.jsx
 import React, { createContext, useState, useEffect } from 'react';
 
+// พิกัด 77 จังหวัดทั่วไทย (ซ่อนไว้เพื่อความกระชับ ใช้ข้อมูลเดิมได้เลยครับ)
 const provinces77 = [
   { n: 'กรุงเทพมหานคร', lat: 13.75, lon: 100.51 }, { n: 'สมุทรปราการ', lat: 13.60, lon: 100.60 }, { n: 'นนทบุรี', lat: 13.86, lon: 100.52 }, { n: 'ปทุมธานี', lat: 14.02, lon: 100.53 }, { n: 'พระนครศรีอยุธยา', lat: 14.35, lon: 100.57 }, { n: 'อ่างทอง', lat: 14.59, lon: 100.45 }, { n: 'ลพบุรี', lat: 14.80, lon: 100.61 }, { n: 'สิงห์บุรี', lat: 14.89, lon: 100.40 }, { n: 'ชัยนาท', lat: 15.18, lon: 100.12 }, { n: 'สระบุรี', lat: 14.53, lon: 100.91 },
   { n: 'ชลบุรี', lat: 13.36, lon: 100.98 }, { n: 'ระยอง', lat: 12.68, lon: 101.27 }, { n: 'จันทบุรี', lat: 12.61, lon: 102.10 }, { n: 'ตราด', lat: 12.24, lon: 102.51 }, { n: 'ฉะเชิงเทรา', lat: 13.69, lon: 101.07 }, { n: 'ปราจีนบุรี', lat: 14.05, lon: 101.37 }, { n: 'นครนายก', lat: 14.20, lon: 101.21 }, { n: 'สระแก้ว', lat: 13.82, lon: 102.06 },
@@ -52,7 +53,8 @@ export const WeatherProvider = ({ children }) => {
   const fetchWeatherByCoords = async (lat, lon) => {
     setLoadingWeather(true);
     try {
-      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,uv_index&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,weathercode,apparent_temperature_max,precipitation_probability_max&timezone=Asia%2FBangkok`;
+      // 🌟 เพิ่มคีย์เวิร์ดขอดาวเทียม: visibility, surface_pressure, dew_point_2m, sunrise, sunset
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,uv_index,visibility,surface_pressure,dew_point_2m&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,weathercode,apparent_temperature_max,precipitation_probability_max,sunrise,sunset&timezone=Asia%2FBangkok`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5,us_aqi&hourly=pm2_5&timezone=Asia%2FBangkok`;
 
       const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
@@ -69,15 +71,25 @@ export const WeatherProvider = ({ children }) => {
 
       setWeatherData({
         current: {
-          temp: wData.current.temperature_2m, feelsLike: wData.current.apparent_temperature,
-          humidity: wData.current.relative_humidity_2m, windSpeed: wData.current.wind_speed_10m,
-          rain: wData.current.precipitation, uv: wData.current.uv_index,
-          rainProb: wData.daily.precipitation_probability_max[0] || 0, 
-          pm25: aData.current.pm2_5, aqi: aData.current.us_aqi
+          temp: wData.current?.temperature_2m || 0, 
+          feelsLike: wData.current?.apparent_temperature || 0,
+          humidity: wData.current?.relative_humidity_2m || 0, 
+          windSpeed: wData.current?.wind_speed_10m || 0,
+          rain: wData.current?.precipitation || 0, 
+          uv: wData.current?.uv_index || 0,
+          rainProb: wData.daily?.precipitation_probability_max?.[0] || 0, 
+          pm25: aData.current?.pm2_5 || 0, 
+          aqi: aData.current?.us_aqi || 0,
+          // ข้อมูลการบินและดาราศาสตร์
+          visibility: wData.current?.visibility || 0,
+          pressure: wData.current?.surface_pressure || 0,
+          dewPoint: wData.current?.dew_point_2m || 0,
+          sunrise: wData.daily?.sunrise?.[0] || '',
+          sunset: wData.daily?.sunset?.[0] || ''
         },
         hourly: {
           ...wData.hourly,
-          pm25: aData.hourly.pm2_5 // 🌟 ยัด PM2.5 แบบรายชั่วโมงส่งไปให้กราฟ!
+          pm25: aData.hourly?.pm2_5 || []
         }, 
         daily: { ...wData.daily, pm25_max: dailyPm25 },
         coords: { lat, lon }
