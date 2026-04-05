@@ -1,7 +1,7 @@
 // src/context/WeatherContext.jsx
 import React, { createContext, useState, useEffect } from 'react';
 
-// ข้อมูล 77 จังหวัดแบบไม่ต้องง้อเซิร์ฟเวอร์รัฐ
+// พิกัด 77 จังหวัดทั่วไทย
 const provinces77 = [
   { n: 'กรุงเทพมหานคร', lat: 13.75, lon: 100.51 }, { n: 'สมุทรปราการ', lat: 13.60, lon: 100.60 }, { n: 'นนทบุรี', lat: 13.86, lon: 100.52 }, { n: 'ปทุมธานี', lat: 14.02, lon: 100.53 }, { n: 'พระนครศรีอยุธยา', lat: 14.35, lon: 100.57 }, { n: 'อ่างทอง', lat: 14.59, lon: 100.45 }, { n: 'ลพบุรี', lat: 14.80, lon: 100.61 }, { n: 'สิงห์บุรี', lat: 14.89, lon: 100.40 }, { n: 'ชัยนาท', lat: 15.18, lon: 100.12 }, { n: 'สระบุรี', lat: 14.53, lon: 100.91 },
   { n: 'ชลบุรี', lat: 13.36, lon: 100.98 }, { n: 'ระยอง', lat: 12.68, lon: 101.27 }, { n: 'จันทบุรี', lat: 12.61, lon: 102.10 }, { n: 'ตราด', lat: 12.24, lon: 102.51 }, { n: 'ฉะเชิงเทรา', lat: 13.69, lon: 101.07 }, { n: 'ปราจีนบุรี', lat: 14.05, lon: 101.37 }, { n: 'นครนายก', lat: 14.20, lon: 101.21 }, { n: 'สระแก้ว', lat: 13.82, lon: 102.06 },
@@ -22,26 +22,44 @@ export const WeatherProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(true);
   const [lastUpdateText, setLastUpdateText] = useState("");
 
-  // 1. ตั้งค่า 77 จังหวัดสำหรับแผนที่แบบทันที (Instant Load)
-  const init77Provinces = () => {
-    const formattedStations = provinces77.map((p, idx) => ({
-      stationID: `PROV_${idx}`, areaTH: p.n, lat: p.lat, long: p.lon,
-      AQILast: { PM25: { value: Math.round(15 + Math.random() * 40) } } // จำลองค่าฝุ่นตั้งต้นให้โชว์หมุด
-    }));
-    
-    const temps = {};
-    formattedStations.forEach(st => {
-      temps[st.stationID] = {
-        temp: 26 + Math.random() * 10, feelsLike: 28 + Math.random() * 12,
-        humidity: 40 + Math.random() * 40, rainProb: Math.random() * 100, windSpeed: Math.random() * 20
-      };
-    });
-    
-    setStations(formattedStations);
-    setStationTemps(temps);
+  // 1. โหลดข้อมูลจริงแบบ Batch ของทั้ง 77 จังหวัด
+  const fetchReal77Provinces = async () => {
+    try {
+      const lats = provinces77.map(p => p.lat).join(',');
+      const lons = provinces77.map(p => p.lon).join(',');
+      
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m&timezone=Asia%2FBangkok`;
+      const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm2_5&timezone=Asia%2FBangkok`;
+
+      const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
+      const wDataArray = await wRes.json();
+      const aDataArray = await aRes.json();
+
+      const realStations = [];
+      const temps = {};
+
+      provinces77.forEach((p, idx) => {
+        const w = wDataArray[idx].current;
+        const a = aDataArray[idx].current;
+        const sID = `PROV_${idx}`;
+        
+        realStations.push({
+          stationID: sID, areaTH: p.n, lat: p.lat, long: p.lon,
+          AQILast: { PM25: { value: a.pm2_5 || 0 } }
+        });
+        
+        temps[sID] = {
+          temp: w.temperature_2m, feelsLike: w.apparent_temperature,
+          humidity: w.relative_humidity_2m, rainProb: w.precipitation, windSpeed: w.wind_speed_10m
+        };
+      });
+
+      setStations(realStations);
+      setStationTemps(temps);
+    } catch (error) { console.error("Batch Fetch Error:", error); }
   };
 
-  // 2. ดึงข้อมูลพิกัดเฉพาะจุด (Open-Meteo) สำหรับ Dashboard
+  // 2. ดึงข้อมูลพิกัดเฉพาะจุด (Dashboard)
   const fetchWeatherByCoords = async (lat, lon) => {
     setLoadingWeather(true);
     try {
@@ -63,12 +81,12 @@ export const WeatherProvider = ({ children }) => {
       });
 
       const now = new Date();
-      setLastUpdateText(`${now.toLocaleDateString('th-TH')} เวลา ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`);
+      setLastUpdateText(`${now.toLocaleDateString('th-TH')} ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`);
     } catch (error) { console.error("Open-Meteo Error:", error); } 
     finally { setLoadingWeather(false); }
   };
 
-  useEffect(() => { init77Provinces(); }, []);
+  useEffect(() => { fetchReal77Provinces(); }, []);
 
   return (
     <WeatherContext.Provider value={{ stations, stationTemps, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, setDarkMode, lastUpdateText }}>
