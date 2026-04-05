@@ -4,12 +4,11 @@ import { WeatherContext } from '../context/WeatherContext';
 import { AreaChart, Area, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis } from 'recharts';
 
 export default function Dashboard() {
-  const { weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
+  const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
-  const [locationName, setLocationName] = useState('กำลังหาตำแหน่ง...');
+  const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
   
-  // State สำหรับเก็บข้อมูล จังหวัด/อำเภอ
   const [geoData, setGeoData] = useState([]);
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedDist, setSelectedDist] = useState('');
@@ -21,15 +20,14 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 ดึงรายชื่อ 77 จังหวัด 928 อำเภอ มาใส่ Dropdown
+  // 🌟 โหลดฐานข้อมูล 928 อำเภอผ่าน CDN (เร็วปรู๊ดปร๊าด ไม่โดนบล็อก)
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/kongvut/thai-province-data/master/api_province_with_amphure_tambon.json')
+    fetch('https://cdn.jsdelivr.net/gh/kongvut/thai-province-data@master/api_province_with_amphure_tambon.json')
       .then(res => res.json())
       .then(data => setGeoData(data))
-      .catch(e => console.error('โหลดรายชื่อจังหวัดไม่สำเร็จ:', e));
+      .catch(e => console.error('โหลดรายชื่ออำเภอไม่สำเร็จ:', e));
   }, []);
 
-  // แปลงพิกัด GPS เป็นชื่อสถานที่
   const fetchLocationName = async (lat, lon) => {
     try {
       const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
@@ -56,26 +54,22 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // เมื่อเลือก Dropdown จังหวัด
   const handleProvChange = (e) => {
     const pName = e.target.value;
     setSelectedProv(pName); setSelectedDist('');
+    
+    // โชว์ข้อมูลจังหวัดไปก่อนเลย ไม่ต้องรออำเภอ
+    const fallbackProv = stations.find(s => s.areaTH === pName);
+    if (fallbackProv) { fetchWeatherByCoords(fallbackProv.lat, fallbackProv.long); setLocationName(pName); }
+
     const pObj = geoData.find(p => p.name_th === pName);
-    if (pObj) {
-      setAmphoesList(pObj.amphure);
-      setLocationName(pName);
-      // แอบดึงพิกัดจังหวัดนั้นมาโชว์
-      fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${pName}&count=1&language=th`)
-        .then(r => r.json()).then(d => { if(d.results) fetchWeatherByCoords(d.results[0].latitude, d.results[0].longitude); });
-    } else { setAmphoesList([]); }
+    if (pObj) { setAmphoesList(pObj.amphure); } else { setAmphoesList([]); }
   };
 
-  // เมื่อเลือก Dropdown อำเภอ
   const handleDistChange = (e) => {
     const dName = e.target.value;
     setSelectedDist(dName);
     setLocationName(`อ.${dName}, ${selectedProv}`);
-    // แอบเอาชื่ออำเภอ+จังหวัด ไปหาพิกัด Lat/Lon
     fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${dName} ${selectedProv}&count=1&language=th`)
       .then(r => r.json()).then(d => { if(d.results) fetchWeatherByCoords(d.results[0].latitude, d.results[0].longitude); });
   };
@@ -86,16 +80,15 @@ export default function Dashboard() {
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
-  if (loadingWeather || !weatherData) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background:appBg,color:textColor, fontSize:'1.2rem', fontWeight:'bold'}}>📍 กำลังโหลดสภาพอากาศล่าสุด... ⏳</div>;
+  if (loadingWeather || !weatherData) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background:appBg,color:textColor, fontWeight:'bold'}}>📍 กำลังโหลดสภาพอากาศล่าสุด... ⏳</div>;
 
   const { current, hourly, daily, coords } = weatherData;
   const aqiBg = current.pm25 > 75 ? '#ef4444' : current.pm25 > 37.5 ? '#f97316' : current.pm25 > 25 ? '#eab308' : '#22c55e';
-  const aqiText = current.pm25 > 75 ? 'เริ่มมีผลกระทบ' : current.pm25 > 37.5 ? 'ปานกลาง' : 'อากาศดี';
+  const aqiText = current.pm25 > 75 ? 'เริ่มมีผลกระทบ' : current.pm25 > 37.5 ? 'ปานกลาง' : 'คุณภาพอากาศดี';
   
   const isRaining = current.rain > 0; const isHot = current.feelsLike >= 38;
   const weatherIcon = isRaining ? '🌧️' : (isHot ? '☀️' : '🌤️');
   const weatherText = isRaining ? 'มีฝนตกในพื้นที่' : (isHot ? 'แดดร้อนจัด' : 'อากาศดี มีเมฆบางส่วน');
-  
   let bgGradient = darkMode ? 'linear-gradient(135deg, #1e3a8a, #0f172a)' : 'linear-gradient(135deg, #0ea5e9, #38bdf8)';
   if (isRaining) bgGradient = 'linear-gradient(135deg, #334155, #0f172a)'; else if (isHot) bgGradient = 'linear-gradient(135deg, #ea580c, #9a3412)';
 
@@ -104,23 +97,20 @@ export default function Dashboard() {
       <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
       <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '100px' }}>
 
-        {/* 🌟 Dropdown ค้นหาจังหวัด/อำเภอ */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: cardBg, padding: '15px 20px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '1.1rem', color: textColor, display: isMobile ? 'none' : 'block' }}>📍 ระบุพื้นที่:</span>
           
-          {geoData.length > 0 ? (
-            <>
-              <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
-                <option value="">-- เลือกจังหวัด --</option>
-                {geoData.map(p => <option key={p.id} value={p.name_th}>{p.name_th}</option>)}
-              </select>
+          {/* โชว์ Dropdown จังหวัดเสมอ โดยดึงจาก stations (77 จังหวัด) จะได้ไม่ต้องรอ */}
+          <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
+            <option value="">-- เลือก 77 จังหวัด --</option>
+            {stations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
+          </select>
 
-              <select value={selectedDist} onChange={handleDistChange} disabled={!selectedProv} style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: selectedProv ? 1 : 0.5 }}>
-                <option value="">-- เลือกอำเภอ --</option>
-                {amphoesList.map(a => <option key={a.id} value={a.name_th}>{a.name_th}</option>)}
-              </select>
-            </>
-          ) : <span style={{ color: subTextColor, fontSize: '0.9rem' }}>กำลังเตรียมรายชื่อ 928 อำเภอ...</span>}
+          {/* โชว์ Dropdown อำเภอเมื่อ geoData โหลดเสร็จแล้วเท่านั้น */}
+          <select value={selectedDist} onChange={handleDistChange} disabled={!selectedProv || geoData.length === 0} style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: (!selectedProv || geoData.length === 0) ? 0.5 : 1 }}>
+            <option value="">{geoData.length === 0 ? 'กำลังเตรียมข้อมูลอำเภอ...' : '-- เลือกอำเภอ --'}</option>
+            {amphoesList.map(a => <option key={a.id} value={a.name_th}>{a.name_th}</option>)}
+          </select>
         </div>
 
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px' }}>
@@ -128,9 +118,9 @@ export default function Dashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ fontSize: '1.6rem', fontWeight: '900', color: textColor }}>{locationName}</span>
-                <div style={{ fontSize: '0.8rem', color: '#0ea5e9', fontWeight: 'bold' }}>📡 GPS: {coords.lat.toFixed(4)}, {coords.lon.toFixed(4)}</div>
+                <div style={{ fontSize: '0.8rem', color: '#0ea5e9', fontWeight: 'bold' }}>📡 พิกัด: {coords.lat.toFixed(4)}, {coords.lon.toFixed(4)}</div>
               </div>
-              {!isMobile && <div style={{ color: subTextColor, fontSize: '0.8rem' }}>อัปเดต: {lastUpdateText}</div>}
+              {!isMobile && <div style={{ color: subTextColor, fontSize: '0.8rem' }}>อัปเดตเมื่อ: {lastUpdateText}</div>}
             </div>
 
             <div style={{ background: bgGradient, borderRadius: '30px', padding: '30px 20px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -147,7 +137,6 @@ export default function Dashboard() {
                </div>
             </div>
             
-            {/* กล่องคำแนะนำ AI แบบเป็นกันเอง */}
             <div style={{ background: cardBg, padding: '20px', borderRadius: '25px', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
               <span style={{ fontSize: '2.5rem' }}>💡</span>
               <div>

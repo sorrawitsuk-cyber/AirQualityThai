@@ -22,6 +22,13 @@ const getColorByMode = (mode, val) => {
   return '#94a3b8';
 };
 
+// 🌟 สร้างไอคอนปักหมุดแบบ Custom (แก้ปัญหาไอคอนพัง)
+const pinIcon = L.divIcon({
+  html: `<div style="font-size: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); transform: translate(-10px, -20px);">📍</div>`,
+  className: 'custom-pin-icon',
+  iconSize: [30, 30]
+});
+
 function LocationMarker({ onMapClick }) {
   useMapEvents({ click(e) { onMapClick(e.latlng.lat, e.latlng.lng); } });
   return null;
@@ -38,7 +45,7 @@ export default function MapPage() {
     { id: 'pm25', label: 'ฝุ่น PM2.5', icon: '😷', color: '#0ea5e9', unit: 'µg/m³', type: 'leaflet' },
     { id: 'heat', label: 'ดัชนีความร้อน', icon: '🥵', color: '#f97316', unit: '°C', type: 'leaflet' },
     { id: 'temp', label: 'อุณหภูมิ', icon: '🌡️', color: '#eab308', unit: '°C', type: 'leaflet' },
-    { id: 'rain', label: 'ปริมาณฝน', icon: '☔', color: '#3b82f6', unit: 'mm', type: 'leaflet' }, // เปลี่ยนจากโอกาสฝน เป็นปริมาณฝน mm เพื่อความสมจริง
+    { id: 'rain', label: 'ปริมาณฝน', icon: '☔', color: '#3b82f6', unit: 'mm', type: 'leaflet' },
     { id: 'humidity', label: 'ความชื้น', icon: '💧', color: '#10b981', unit: '%', type: 'leaflet' },
     { id: 'wind', label: 'ความเร็วลม', icon: '🌬️', color: '#db2777', unit: 'km/h', type: 'leaflet' },
     { id: 'radar', label: 'เรดาร์สภาพอากาศ', icon: '⛈️', color: '#8b5cf6', type: 'windy', layer: 'rain' }
@@ -58,7 +65,7 @@ export default function MapPage() {
     return stations.map(st => {
       const tObj = stationTemps[st.stationID] || {};
       let val = activeMode === 'pm25' ? Number(st.AQILast?.PM25?.value) : (activeMode === 'heat' ? tObj.feelsLike : (activeMode === 'temp' ? tObj.temp : (activeMode === 'rain' ? tObj.rainProb : (activeMode === 'humidity' ? tObj.humidity : tObj.windSpeed))));
-      return { name: st.areaTH, value: activeMode === 'rain' ? val.toFixed(1) : Math.round(val) };
+      return { name: st.areaTH, value: activeMode === 'rain' ? (val || 0).toFixed(1) : Math.round(val || 0) };
     }).sort((a, b) => parseFloat(b.value) - parseFloat(a.value));
   }, [activeMode, stations, stationTemps, isWindy]);
 
@@ -85,7 +92,7 @@ export default function MapPage() {
             if (activeMode === 'pm25') { valToShow = pmVal; circleColor = getPM25Color(pmVal); }
             else if (activeMode === 'heat') { valToShow = Math.round(tObj.feelsLike); circleColor = getHeatColor(tObj.feelsLike); }
             else if (activeMode === 'temp') { valToShow = Math.round(tObj.temp); circleColor = getTempColor(tObj.temp); }
-            else if (activeMode === 'rain') { valToShow = tObj.rainProb.toFixed(1); circleColor = getRainColor(tObj.rainProb); }
+            else if (activeMode === 'rain') { valToShow = (tObj.rainProb || 0).toFixed(1); circleColor = getRainColor(tObj.rainProb); }
             else if (activeMode === 'humidity') { valToShow = Math.round(tObj.humidity); circleColor = getHumidityColor(tObj.humidity); }
             else if (activeMode === 'wind') { valToShow = Math.round(tObj.windSpeed); circleColor = getWindColor(tObj.windSpeed); }
 
@@ -99,8 +106,9 @@ export default function MapPage() {
             );
           })}
 
+          {/* 🌟 วาดหมุดที่เราคลิกลงไป (ใช้ไอคอนใหม่ที่สวยๆ ไม่แตก) */}
           {clickPos && weatherData && (
-            <Marker position={[clickPos.lat, clickPos.lon]}>
+            <Marker position={[clickPos.lat, clickPos.lon]} icon={pinIcon}>
               <Popup closeButton={true} autoPan={true}>
                 <div style={{ padding: '10px', fontFamily: 'Kanit', minWidth: '150px' }}>
                   <h4 style={{ margin: '0 0 10px 0', color: '#0ea5e9' }}>📍 ผลวิเคราะห์พิกัดที่เลือก</h4>
@@ -124,7 +132,7 @@ export default function MapPage() {
 
       <div style={{ position: 'absolute', top: 20, left: 20, right: 20, zIndex: 1000, display: 'flex', gap: '15px', overflowX: 'auto' }} className="hide-scrollbar">
         <div style={{ display: 'flex', alignItems: 'center', background: cardBg, borderRadius: '50px', padding: '6px 8px', border: `1px solid ${borderColor}` }}>
-          <span style={{ fontSize: '1rem', fontWeight: 'bold', color: textColor, margin: '0 15px' }}>🇹🇭 ครอบคลุมฐานข้อมูล 77 จังหวัด</span>
+          <span style={{ fontSize: '1rem', fontWeight: 'bold', color: textColor, margin: '0 15px' }}>🇹🇭 ครอบคลุม 77 จังหวัด</span>
           {modes.map(mode => (
             <button key={mode.id} onClick={() => setActiveMode(mode.id)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 14px', borderRadius: '50px', border: 'none', background: activeMode === mode.id ? mode.color : 'transparent', color: activeMode === mode.id ? '#fff' : textColor, fontWeight: 'bold', cursor: 'pointer', marginRight: '4px' }}>
               <span>{mode.icon}</span>{mode.label}

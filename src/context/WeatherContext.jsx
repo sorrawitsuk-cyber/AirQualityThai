@@ -12,17 +12,21 @@ const provinces77 = [
   { n: 'นครศรีธรรมราช', lat: 8.43, lon: 99.96 }, { n: 'กระบี่', lat: 8.05, lon: 98.91 }, { n: 'พังงา', lat: 8.45, lon: 98.52 }, { n: 'ภูเก็ต', lat: 7.88, lon: 98.39 }, { n: 'สุราษฎร์ธานี', lat: 9.13, lon: 99.32 }, { n: 'ระนอง', lat: 9.96, lon: 98.63 }, { n: 'ชุมพร', lat: 10.49, lon: 99.18 }, { n: 'สงขลา', lat: 7.18, lon: 100.59 }, { n: 'สตูล', lat: 6.62, lon: 100.06 }, { n: 'ตรัง', lat: 7.55, lon: 99.61 }, { n: 'พัทลุง', lat: 7.61, lon: 100.07 }, { n: 'ปัตตานี', lat: 6.86, lon: 101.25 }, { n: 'ยะลา', lat: 6.54, lon: 101.28 }, { n: 'นราธิวาส', lat: 6.42, lon: 101.82 }
 ];
 
+// เตรียมข้อมูล 77 จังหวัดเริ่มต้น (กันหน้าจอดำ)
+const initialStations = provinces77.map((p, idx) => ({
+  stationID: `PROV_${idx}`, areaTH: p.n, lat: p.lat, long: p.lon, AQILast: { PM25: { value: 0 } }
+}));
+
 export const WeatherContext = createContext();
 
 export const WeatherProvider = ({ children }) => {
-  const [stations, setStations] = useState([]);
+  const [stations, setStations] = useState(initialStations); // ใส่ข้อมูลรอไว้เลย
   const [stationTemps, setStationTemps] = useState({});
   const [weatherData, setWeatherData] = useState(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [lastUpdateText, setLastUpdateText] = useState("");
 
-  // 1. โหลดข้อมูลจริงแบบ Batch ของทั้ง 77 จังหวัด
   const fetchReal77Provinces = async () => {
     try {
       const lats = provinces77.map(p => p.lat).join(',');
@@ -59,7 +63,6 @@ export const WeatherProvider = ({ children }) => {
     } catch (error) { console.error("Batch Fetch Error:", error); }
   };
 
-  // 2. ดึงข้อมูลพิกัดเฉพาะจุด (Dashboard)
   const fetchWeatherByCoords = async (lat, lon) => {
     setLoadingWeather(true);
     try {
