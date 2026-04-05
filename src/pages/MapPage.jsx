@@ -1,8 +1,7 @@
 // src/pages/MapPage.jsx
 import React, { useContext, useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Tooltip, Popup, WMSTileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Tooltip, Popup, WMSTileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { WeatherContext } from '../context/WeatherContext';
 import { extractProvince, getPM25Color } from '../utils/helpers';
 import 'leaflet/dist/leaflet.css';
@@ -36,12 +35,21 @@ function MapUpdater({ lat, lon }) {
   return null;
 }
 
+// 🌟 ฟังก์ชันจิ้มแผนที่
+function LocationMarker({ onMapClick }) {
+  useMapEvents({ click(e) { onMapClick(e.latlng.lat, e.latlng.lng); } });
+  return null;
+}
+
 export default function MapPage() {
-  const { stations, stationTemps, loading, darkMode } = useContext(WeatherContext);
+  // สังเกตว่าหน้านี้ไม่ต้องสน loadingWeather แต่จะสนแค่ว่า stations มาครบหรือยัง
+  const { stations, stationTemps, darkMode, fetchWeatherByCoords, weatherData } = useContext(WeatherContext);
+  
   const [activeMode, setActiveMode] = useState('pm25');
   const [isRankingOpen, setIsRankingOpen] = useState(false);
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedStation, setSelectedStation] = useState(null);
+  const [clickPos, setClickPos] = useState(null);
 
   const safeStations = stations || [];
   const provinces = useMemo(() => [...new Set(safeStations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')), [safeStations]);
@@ -59,8 +67,14 @@ export default function MapPage() {
   const currentModeObj = modes.find(m => m.id === activeMode) || modes[0];
   const isWindy = currentModeObj.type === 'windy';
 
+  const handleMapClick = (lat, lon) => {
+    if (isWindy) return; 
+    setClickPos({ lat, lon });
+    fetchWeatherByCoords(lat, lon); // จิ้มปุ๊บ ยิงไปขอข้อมูล Open-Meteo ทันที!
+  };
+
   const rankingData = useMemo(() => {
-    if (isWindy) return [];
+    if (isWindy || safeStations.length === 0) return [];
     const dataMap = new Map();
     safeStations.forEach(st => {
       const prov = extractProvince(st.areaTH);
@@ -73,10 +87,10 @@ export default function MapPage() {
         const entry = dataMap.get(key); entry.sum += val; entry.count += 1;
       }
     });
-    return Array.from(dataMap.values()).map(d => ({ name: d.name, value: Math.round(d.sum / d.count), trend: Array.from({length: 7}, () => ({ val: Math.max(0, (d.sum/d.count) + (Math.random() * 20 - 10)) })) })).sort((a, b) => b.value - a.value);
+    return Array.from(dataMap.values()).map(d => ({ name: d.name, value: Math.round(d.sum / d.count) })).sort((a, b) => b.value - a.value);
   }, [activeMode, safeStations, stationTemps, selectedProv, isWindy]);
 
-  if (loading) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background:darkMode?'#0f172a':'#f8fafc',color:darkMode?'#fff':'#000'}}>กำลังโหลดแผนที่...</div>;
+  if (safeStations.length === 0) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background:darkMode?'#0f172a':'#f8fafc',color:darkMode?'#fff':'#000'}}>กำลังเตรียมพิกัดหมุดแผนที่ทั่วประเทศ...</div>;
 
   const mapBg = darkMode ? '#0f172a' : '#f8fafc';
   const cardBg = darkMode ? 'rgba(30, 41, 59, 0.98)' : 'rgba(255, 255, 255, 0.98)';
@@ -90,8 +104,11 @@ export default function MapPage() {
         <MapContainer center={[13.75, 100.5]} zoom={6} style={{ height: '100%', width: '100%' }} zoomControl={false}>
           <TileLayer url={darkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"} />
           
+          <LocationMarker onMapClick={handleMapClick} />
+
           {selectedStation && <MapUpdater lat={parseFloat(selectedStation.lat)} lon={parseFloat(selectedStation.long)} />}
 
+          {/* โชว์หมุดสถานีเดิม */}
           {!isWindy && safeStations.map(st => {
             const lat = parseFloat(st.lat); const lon = parseFloat(st.long);
             if (isNaN(lat) || isNaN(lon)) return null;
@@ -116,6 +133,23 @@ export default function MapPage() {
               </Marker>
             );
           })}
+
+          {/* 🌟 โชว์หมุดที่เราจิ้มขึ้นมาใหม่ */}
+          {clickPos && weatherData && (
+            <Marker position={[clickPos.lat, clickPos.lon]}>
+              <Popup closeButton={true} autoPan={true}>
+                <div style={{ padding: '10px', fontFamily: 'Kanit', minWidth: '150px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#0ea5e9' }}>📍 ข้อมูลจุดที่คุณเลือก</h4>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>🌡️ {Math.round(weatherData.current.temp)}°C</div>
+                  <div style={{ fontSize: '0.9rem' }}>😷 PM2.5: <b>{weatherData.current.pm25}</b></div>
+                  <div style={{ fontSize: '0.9rem' }}>☔ ฝน: <b>{weatherData.current.rain} mm</b></div>
+                  <hr style={{ margin: '10px 0', opacity: 0.2 }} />
+                  <div style={{ fontSize: '0.7rem', color: '#666' }}>GPS: {clickPos.lat.toFixed(2)}, {clickPos.lon.toFixed(2)}</div>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+
         </MapContainer>
       </div>
 

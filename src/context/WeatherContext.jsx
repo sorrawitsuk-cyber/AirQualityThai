@@ -4,18 +4,19 @@ import React, { createContext, useState, useEffect } from 'react';
 export const WeatherContext = createContext();
 
 export const WeatherProvider = ({ children }) => {
-  // ข้อมูลสำหรับแผนที่และตัวกรอง (Air4Thai)
+  // ข้อมูลจาก Air4Thai (โหลดเบื้องหลัง)
   const [stations, setStations] = useState([]);
   const [stationTemps, setStationTemps] = useState({});
   
-  // ข้อมูลสำหรับ Dashboard (Open-Meteo)
+  // ข้อมูลหลักจาก Open-Meteo (โหลดด่วน)
   const [weatherData, setWeatherData] = useState(null);
   
-  const [loading, setLoading] = useState(true);
+  // สถานะการโหลดแยกกัน
+  const [loadingWeather, setLoadingWeather] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [lastUpdateText, setLastUpdateText] = useState("");
 
-  // 1. ดึงข้อมูลสถานีทั่วประเทศ (สำหรับ Map และ Dropdown)
+  // 1. ดึงข้อมูลสถานีทั่วประเทศ (ปล่อยโหลดเบื้องหลัง ไม่กระทบหน้าแรก)
   const fetchAir4Thai = async () => {
     try {
       const res = await fetch('https://air4thai.pcd.go.th/services/getNewAQI_JSON.php');
@@ -24,7 +25,6 @@ export const WeatherProvider = ({ children }) => {
       
       const temps = {};
       (data.stations || []).forEach(st => {
-        // จำลองข้อมูลสภาพอากาศให้สถานี เพราะ Air4Thai มีแต่ฝุ่น
         temps[st.stationID] = {
           temp: 26 + Math.random() * 8,
           feelsLike: 28 + Math.random() * 10,
@@ -37,9 +37,9 @@ export const WeatherProvider = ({ children }) => {
     } catch (e) { console.error("Air4Thai Error:", e); }
   };
 
-  // 2. ดึงข้อมูลพิกัดเฉพาะจุด (สำหรับ Dashboard)
+  // 2. ดึงข้อมูลพิกัดเฉพาะจุด (โหลดด่วนสำหรับ Dashboard)
   const fetchWeatherByCoords = async (lat, lon) => {
-    setLoading(true);
+    setLoadingWeather(true);
     try {
       const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,uv_index&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=Asia%2FBangkok`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5,us_aqi&timezone=Asia%2FBangkok`;
@@ -61,15 +61,16 @@ export const WeatherProvider = ({ children }) => {
       const now = new Date();
       setLastUpdateText(`${now.toLocaleDateString('th-TH')} เวลา ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`);
     } catch (error) { console.error("Open-Meteo Error:", error); } 
-    finally { setLoading(false); }
+    finally { setLoadingWeather(false); }
   };
 
+  // โหลด Air4Thai เบื้องหลังแค่ครั้งเดียวตอนเปิดแอป
   useEffect(() => {
     fetchAir4Thai();
   }, []);
 
   return (
-    <WeatherContext.Provider value={{ stations, stationTemps, weatherData, fetchWeatherByCoords, loading, darkMode, setDarkMode, lastUpdateText }}>
+    <WeatherContext.Provider value={{ stations, stationTemps, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, setDarkMode, lastUpdateText }}>
       {children}
     </WeatherContext.Provider>
   );

@@ -12,14 +12,14 @@ const extractDistrict = (areaTH) => {
 };
 
 export default function Dashboard() {
-  const { stations, weatherData, fetchWeatherByCoords, loading, darkMode, lastUpdateText } = useContext(WeatherContext);
+  // สังเกตว่าเราใช้ loadingWeather แทน loading เดิม เพื่อให้แยกโหลดกัน
+  const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
   
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
 
-  // ดึงรายชื่อจังหวัด/อำเภอทั้งหมด จากสถานีกลับมา!
   const provinces = useMemo(() => [...new Set(stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')), [stations]);
   const availableDistricts = useMemo(() => [...new Set(stations.filter(s => extractProvince(s.areaTH) === selectedProv).map(s => extractDistrict(s.areaTH)))].sort(), [stations, selectedProv]);
 
@@ -29,7 +29,6 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // แปลงพิกัด GPS เป็นชื่อเมือง (Reverse Geocoding)
   const fetchLocationName = async (lat, lon) => {
     try {
       const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
@@ -38,23 +37,27 @@ export default function Dashboard() {
     } catch (e) { setLocationName('ตำแหน่งของคุณ'); }
   };
 
+  // 🚀 โหลดด่วนทันใจ ไม่รอ Air4Thai!
   useEffect(() => {
-    if (!weatherData && stations.length > 0) {
+    if (!weatherData) {
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-          fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
-          fetchLocationName(pos.coords.latitude, pos.coords.longitude);
-        }, () => {
-          fetchWeatherByCoords(13.75, 100.5); setLocationName('กรุงเทพมหานคร');
-        });
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
+            fetchLocationName(pos.coords.latitude, pos.coords.longitude);
+          }, 
+          () => {
+            fetchWeatherByCoords(13.75, 100.5); setLocationName('กรุงเทพมหานคร');
+          },
+          { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 } // ให้ GPS ดึงพิกัดคร่าวๆ จะได้ไว
+        );
       } else {
         fetchWeatherByCoords(13.75, 100.5); setLocationName('กรุงเทพมหานคร');
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stations]);
+  }, []); // ลบสถานะที่ต้องรอออกไปเลย
 
-  // เมื่อเลือก Dropdown
   const handleFilterChange = (prov, dist) => {
     setSelectedProv(prov); setSelectedDistrict(dist);
     const target = stations.find(s => extractProvince(s.areaTH) === prov && (!dist || extractDistrict(s.areaTH) === dist));
@@ -64,7 +67,8 @@ export default function Dashboard() {
     }
   };
 
-  if (loading || !weatherData) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background: darkMode?'#020617':'#f1f5f9',color:darkMode?'#fff':'#000'}}>📍 กำลังโหลดข้อมูลสภาพอากาศ... ⏳</div>;
+  // เช็กแค่ loadingWeather เท่านั้น
+  if (loadingWeather || !weatherData) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background: darkMode?'#020617':'#f1f5f9',color:darkMode?'#fff':'#000'}}>📍 กำลังโหลดข้อมูลสภาพอากาศแบบด่วนจี๋... ⏳</div>;
 
   const { current, hourly, daily, coords } = weatherData;
   const aqiBg = current.pm25 > 75 ? '#ef4444' : current.pm25 > 37.5 ? '#f97316' : current.pm25 > 25 ? '#eab308' : '#22c55e';
@@ -85,20 +89,24 @@ export default function Dashboard() {
       <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
       <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '100px' }}>
 
-        {/* 🌟 ตัวกรองพิกัด กลับมาแล้ว! */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: cardBg, padding: '15px 20px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
           <span style={{ fontSize: '1.1rem', color: textColor, display: isMobile ? 'none' : 'block' }}>📍 ระบุพื้นที่:</span>
-          <select value={selectedProv} onChange={e => handleFilterChange(e.target.value, '')} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none' }}>
-            <option value="">ค้นหาจังหวัด...</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={selectedDistrict} onChange={e => handleFilterChange(selectedProv, e.target.value)} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none' }}>
-            <option value="">ทุกเขต/อำเภอ</option>{availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          {/* ซ่อน Dropdown ถ้าข้อมูล Air4Thai ยังโหลดมาไม่ถึง จะได้ไม่พัง */}
+          {stations.length > 0 ? (
+            <>
+              <select value={selectedProv} onChange={e => handleFilterChange(e.target.value, '')} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none' }}>
+                <option value="">ค้นหาจังหวัด...</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <select value={selectedDistrict} onChange={e => handleFilterChange(selectedProv, e.target.value)} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none' }}>
+                <option value="">ทุกเขต/อำเภอ</option>{availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </>
+          ) : (
+            <span style={{ color: subTextColor, fontSize: '0.9rem' }}>กำลังดึงรายชื่อพื้นที่ทั่วประเทศ...</span>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px' }}>
-          
-          {/* 📱 ฝั่งซ้าย: Hero Widget */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -123,7 +131,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 💻 ฝั่งขวา: Analytics กราฟไม่ตกขอบแล้ว! */}
           <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
             <div style={{ background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
                <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor }}>⏱️ แนวโน้มอุณหภูมิ 24 ชั่วโมง</h3>
@@ -157,7 +164,6 @@ export default function Dashboard() {
                </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
