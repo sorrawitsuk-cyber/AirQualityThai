@@ -14,14 +14,14 @@ export default function Dashboard() {
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedDist, setSelectedDist] = useState('');
   
-  // 🌟 State ควบคุมการซ่อน/แสดง ตัวกรองพื้นที่ (มือถือซ่อนเป็นค่าเริ่มต้น)
-  const [showFilter, setShowFilter] = useState(window.innerWidth >= 1024);
+  // ซ่อนตัวกรองเป็นค่าเริ่มต้น
+  const [showFilter, setShowFilter] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      if (!mobile) setShowFilter(true); // ถ้าจอใหญ่ให้แสดงฟิลเตอร์เสมอ
+      if (!mobile) setShowFilter(true);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -114,8 +114,7 @@ export default function Dashboard() {
     const prefix = (selectedProv === 'กรุงเทพมหานคร' || dName.startsWith('เขต') || dName.startsWith('อ.')) ? '' : 'อ.';
     setLocationName(`${prefix}${dName}, ${selectedProv}`);
     
-    // เมื่อผู้ใช้มือถือเลือกพื้นที่เสร็จ ให้พับเก็บกล่องค้นหาอัตโนมัติ
-    if (isMobile) setShowFilter(false);
+    if (isMobile) setShowFilter(false); // ซ่อนกล่องค้นหาเมื่อเลือกเสร็จบนมือถือ
     
     try {
       const query = `${dName} ${selectedProv} Thailand`;
@@ -199,38 +198,26 @@ export default function Dashboard() {
   };
 
   return (
+    // 🌟 แก้ปัญหาปัดลงสุดไม่ได้ โดยเพิ่ม paddingBottom ให้เยอะขึ้นเผื่อ Bottom Navigation
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .fade-in { animation: fadeIn 0.3s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }`}} />
       
-      <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: '15px', padding: isMobile ? '15px' : '30px', paddingBottom: '100px' }}>
+      <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '15px', padding: isMobile ? '12px' : '30px', paddingBottom: '160px' }}>
 
         {alertBanner && (
-            <div style={{ background: alertBanner.color, color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
+            <div style={{ background: alertBanner.color, color: '#fff', padding: '10px 15px', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', fontSize: '0.9rem' }}>
                 <span style={{ fontSize: '1.2rem' }}>{alertBanner.icon}</span> {alertBanner.text}
             </div>
         )}
 
-        {/* 🌟 1. ส่วนหัว: ดึงชื่อสถานที่ขึ้นมาบนสุด + ปุ่มค้นหาแบบใหม่ */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `1px solid ${borderColor}`, paddingBottom: '10px' }}>
-            <div>
-               <h2 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '900', color: textColor, lineHeight: 1.2 }}>{locationName}</h2>
-               <div style={{ fontSize: '0.8rem', color: subTextColor, marginTop: '4px' }}>📡 {coords?.lat?.toFixed(4)}, {coords?.lon?.toFixed(4)} {(!isMobile) && ` • อัปเดต: ${lastUpdateText}`}</div>
-            </div>
-            
-            <button onClick={() => setShowFilter(!showFilter)} style={{ background: showFilter ? '#0ea5e9' : cardBg, color: showFilter ? '#fff' : textColor, border: `1px solid ${showFilter ? '#0ea5e9' : borderColor}`, padding: '8px 15px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', flexShrink: 0 }}>
-              <span style={{ fontSize: '1.1rem' }}>{showFilter ? '✖️' : '🔍'}</span> 
-              {!isMobile && <span>{showFilter ? 'ปิด' : 'ค้นหาพื้นที่'}</span>}
-            </button>
-        </div>
-
-        {/* 🌟 2. กล่องตัวกรอง (พับเก็บได้บนมือถือ) */}
+        {/* 🌟 กล่องค้นหาจะโชว์ก็ต่อเมื่อกดปุ่มค้นหา (ช่วยประหยัดพื้นที่) */}
         {showFilter && (
-            <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '12px 15px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
-              <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '130px', background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
+            <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
+              <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '130px', background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '0.95rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
                 <option value="">-- เลือกจังหวัด --</option>
                 {sortedStations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
               </select>
-              <select value={selectedDist} onChange={handleDistChange} disabled={!selectedProv || geoData.length === 0 || geoError || currentAmphoes.length === 0} style={{ flex: 1, minWidth: '130px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: (!selectedProv || geoData.length === 0 || currentAmphoes.length === 0) ? 0.5 : 1 }}>
+              <select value={selectedDist} onChange={handleDistChange} disabled={!selectedProv || geoData.length === 0 || geoError || currentAmphoes.length === 0} style={{ flex: 1, minWidth: '130px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '0.95rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: (!selectedProv || geoData.length === 0 || currentAmphoes.length === 0) ? 0.5 : 1 }}>
                 <option value="">
                   {geoError ? '⚠️ โหลดไฟล์ล้มเหลว' : geoData.length === 0 ? 'กำลังดึงข้อมูล...' : (!selectedProv ? '-- เลือกอำเภอ --' : (currentAmphoes.length === 0 ? '⚠️ ไม่พบข้อมูล' : '-- เลือกอำเภอ --'))}
                 </option>
@@ -239,45 +226,64 @@ export default function Dashboard() {
             </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', marginTop: '5px' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '20px' }}>
           
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px', minWidth: 0 }}>
-            {/* 🌟 3. การ์ดอุณหภูมิหลัก (เอาชื่อสถานที่ออก เพราะย้ายไปข้างบนแล้ว) */}
-            <div style={{ background: bgGradient, borderRadius: '30px', padding: '30px 20px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'background 0.5s ease' }}>
-               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><span style={{ fontSize: '5.5rem', lineHeight: 1 }}>{weatherIcon}</span><span style={{ fontSize: '6.5rem', fontWeight: '900', lineHeight: 1 }}>{Math.round(current?.temp || 0)}°</span></div>
-               <div style={{ fontSize: '1.4rem', fontWeight: 'bold', marginTop: '10px' }}>{weatherText}</div>
-               <div style={{ fontSize: '1rem', opacity: 0.9 }}>รู้สึกเหมือน {Math.round(current?.feelsLike || 0)}°C</div>
-               <div style={{ marginTop: '20px', background: aqiBg, color: '#fff', padding: '6px 20px', borderRadius: '50px', fontWeight: '900', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>😷 PM2.5: {current?.pm25 || '-'} µg/m³ ({aqiText})</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
+            
+            {/* 🌟 รวบตึง: เอาชื่อสถานที่, อัปเดตล่าสุด, และปุ่มค้นหา เข้ามาไว้ในการ์ดอุณหภูมิเลย */}
+            <div style={{ background: bgGradient, borderRadius: isMobile ? '24px' : '30px', padding: isMobile ? '20px' : '30px 20px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', transition: 'background 0.5s ease', position: 'relative' }}>
+               
+               {/* ส่วนหัวของการ์ด */}
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '15px' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: isMobile ? '1.3rem' : '1.8rem', fontWeight: '900', lineHeight: 1.2 }}>{locationName}</h2>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '2px' }}>{coords?.lat?.toFixed(2)}, {coords?.lon?.toFixed(2)} • {lastUpdateText}</div>
+                  </div>
+                  {/* ปุ่มแว่นขยาย ซ่อน/โชว์ ฟิลเตอร์ */}
+                  <button onClick={() => setShowFilter(!showFilter)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', flexShrink: 0, backdropFilter: 'blur(5px)' }}>
+                     <span style={{ fontSize: '1.2rem' }}>{showFilter ? '✖️' : '🔍'}</span>
+                  </button>
+               </div>
+
+               {/* ส่วนกลางการ์ด */}
+               <div style={{ display: 'flex', alignItems: 'center', gap: '15px', alignSelf: 'center' }}>
+                  <span style={{ fontSize: isMobile ? '4.5rem' : '5.5rem', lineHeight: 1 }}>{weatherIcon}</span>
+                  <span style={{ fontSize: isMobile ? '5rem' : '6.5rem', fontWeight: '900', lineHeight: 1 }}>{Math.round(current?.temp || 0)}°</span>
+               </div>
+               <div style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 'bold', marginTop: '10px', alignSelf: 'center' }}>{weatherText}</div>
+               <div style={{ fontSize: '0.9rem', opacity: 0.9, alignSelf: 'center' }}>รู้สึกเหมือน {Math.round(current?.feelsLike || 0)}°C</div>
+               <div style={{ marginTop: '15px', background: aqiBg, color: '#fff', padding: '6px 20px', borderRadius: '50px', fontWeight: '900', fontSize: '0.85rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', alignSelf: 'center' }}>😷 PM2.5: {current?.pm25 || '-'} µg/m³ ({aqiText})</div>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ background: cardBg, padding: '12px 15px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
+            {/* 🌟 ย่อส่วน 4 กล่อง (Compact Grid) ให้กระชับขึ้น ไม่กินที่แนวตั้ง */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                     <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>👁️ ทัศนวิสัย</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{(current?.visibility / 1000).toFixed(1)} <span style={{fontSize:'0.7rem'}}>กม.</span></div>
-                    <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '2px' }}>{current?.visibility < 2000 ? 'มีหมอกหนา' : 'มองเห็นชัดเจน'}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{(current?.visibility / 1000).toFixed(1)} <span style={{fontSize:'0.75rem'}}>กม.</span></div>
+                    <div style={{ fontSize: '0.7rem', color: subTextColor }}>{current?.visibility < 2000 ? 'มีหมอกหนา' : 'เคลียร์'}</div>
                 </div>
-                <div style={{ background: cardBg, padding: '12px 15px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
+                <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                     <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>💧 จุดน้ำค้าง</div>
                     <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{Math.round(current?.dewPoint || 0)}°C</div>
-                    <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '2px' }}>{current?.dewPoint > 24 ? 'อากาศเหนียวตัว' : 'อากาศแห้งสบาย'}</div>
+                    <div style={{ fontSize: '0.7rem', color: subTextColor }}>{current?.dewPoint > 24 ? 'เหนียวตัว' : 'แห้งสบาย'}</div>
                 </div>
-                <div style={{ background: cardBg, padding: '12px 15px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
+                <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                     <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🧭 ความกดอากาศ</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{Math.round(current?.pressure || 0)} <span style={{fontSize:'0.7rem'}}>hPa</span></div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{Math.round(current?.pressure || 0)} <span style={{fontSize:'0.75rem'}}>hPa</span></div>
                 </div>
-                <div style={{ background: cardBg, padding: '12px 15px', borderRadius: '20px', border: `1px solid ${borderColor}` }}>
+                <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                     <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🌅 ดวงอาทิตย์</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: '900', color: textColor }}>ขึ้น {getSunTime(current?.sunrise)}</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: '900', color: textColor }}>ตก {getSunTime(current?.sunset)}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '900', color: textColor }}>ขึ้น {getSunTime(current?.sunrise)}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '900', color: textColor }}>ตก {getSunTime(current?.sunset)}</div>
                 </div>
             </div>
           </div>
 
-          <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '15px', minWidth: 0 }}>
-            <div style={{ background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
-               <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: textColor }}>⏱️ 24 ชั่วโมงข้างหน้า</h3>
+          <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
+            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}` }}>
+               <h3 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: textColor }}>⏱️ 24 ชั่วโมงข้างหน้า</h3>
                <div style={{ overflowX: 'auto', overflowY: 'hidden', paddingBottom: '5px' }} className="hide-scrollbar">
-                 <div style={{ width: '1400px', height: '220px' }}>
+                 <div style={{ width: '1400px', height: '200px' }}>
                    <ResponsiveContainer width="100%" height="100%">
                      <AreaChart data={chartData} margin={{ top: 20, right: 15, left: 15, bottom: 60 }}>
                        <defs><linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/><stop offset="95%" stopColor="#f97316" stopOpacity={0}/></linearGradient></defs>
@@ -291,20 +297,20 @@ export default function Dashboard() {
                </div>
             </div>
 
-            <div style={{ background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, flex: 1 }}>
-               <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor }}>📅 พยากรณ์ 7 วัน</h3>
+            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '25px', border: `1px solid ${borderColor}`, flex: 1 }}>
+               <h3 style={{ margin: '0 0 15px 0', fontSize: '0.95rem', color: textColor }}>📅 พยากรณ์ 7 วัน</h3>
                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {daily?.time?.map((t, idx) => (
                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', paddingBottom: idx !== 6 ? '12px' : '0', borderBottom: idx !== 6 ? `1px solid ${borderColor}` : 'none' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '50px 40px 1fr', alignItems: 'center' }}>
-                            <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
-                            <div style={{ fontSize: '1.3rem', textAlign: 'center' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '40px 40px 1fr', alignItems: 'center' }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
+                            <div style={{ fontSize: '1.2rem', textAlign: 'center' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                               <span style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', width: '25px', textAlign: 'right' }}>{Math.round(daily.temperature_2m_min[idx] || 0)}°</span>
-                               <div style={{ flex: 1, height: '5px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
+                               <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', width: '25px', textAlign: 'right' }}>{Math.round(daily.temperature_2m_min[idx] || 0)}°</span>
+                               <div style={{ flex: 1, height: '4px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
                                   <div style={{ position: 'absolute', left: '20%', right: '20%', top: 0, bottom: 0, background: 'linear-gradient(to right, #3b82f6, #f97316)' }}></div>
                                </div>
-                               <span style={{ fontSize: '0.9rem', color: textColor, fontWeight: '900', width: '25px' }}>{Math.round(daily.temperature_2m_max[idx] || 0)}°</span>
+                               <span style={{ fontSize: '0.85rem', color: textColor, fontWeight: '900', width: '25px' }}>{Math.round(daily.temperature_2m_max[idx] || 0)}°</span>
                             </div>
                         </div>
 
