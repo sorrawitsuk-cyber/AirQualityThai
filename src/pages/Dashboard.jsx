@@ -16,7 +16,7 @@ export default function Dashboard() {
   
   const [showFilter, setShowFilter] = useState(false);
 
-  // Drag to Scroll 24h
+  // 🌟 Drag to Scroll 24h
   const scrollRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -217,7 +217,7 @@ export default function Dashboard() {
       return new Date(dateStr).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
   };
 
-  // 🌟 ประมวลผลข้อความ Daily Briefing (Idea 2)
+  // 🌟 Logic สรุปสภาพอากาศรายวัน (Daily Briefing)
   const maxTemp = Math.round(daily?.temperature_2m_max[0] || 0);
   const dailyRainProb = daily?.precipitation_probability_max[0] || 0;
   let briefingText = `วันนี้สภาพอากาศโดยรวม${weatherText.replace('อากาศดี ', '')} อุณหภูมิสูงสุดจะอยู่ที่ ${maxTemp}°C `;
@@ -226,18 +226,36 @@ export default function Dashboard() {
   else if (current?.pm25 > 37.5) briefingText += `ค่าฝุ่น PM2.5 ค่อนข้างสูง แนะนำให้สวมหน้ากากอนามัยเมื่อออกนอกอาคารครับ 😷`;
   else briefingText += `อากาศเป็นใจ เหมาะสำหรับการทำกิจกรรมนอกบ้านหรือซักผ้าครับ ✨`;
 
+  // 🌟 Logic ดัชนีการใช้ชีวิตและการเกษตร
+  let exercise = { text: 'ดีเยี่ยม', color: '#22c55e', desc: 'อากาศดี ฝุ่นน้อย' };
+  if (current?.pm25 > 50 || current?.feelsLike > 39 || current?.rainProb > 60) exercise = { text: 'งดกิจกรรม', color: '#ef4444', desc: 'สภาพอากาศไม่เหมาะสม' };
+  else if (current?.pm25 > 25 || current?.feelsLike > 35) exercise = { text: 'พอใช้', color: '#f97316', desc: 'ควรลดเวลาอยู่กลางแจ้ง' };
+
+  let laundry = { text: 'ทำได้เลย', color: '#22c55e', desc: 'แดดดี ฝนไม่ตก' };
+  if (current?.rainProb > 50 || current?.rain > 0) laundry = { text: 'ไม่แนะนำ', color: '#ef4444', desc: 'มีความเสี่ยงฝนตก' };
+  else if (current?.rainProb > 20) laundry = { text: 'มีความเสี่ยง', color: '#eab308', desc: 'ควรจับตาดูเมฆฝน' };
+
+  let watering = { text: 'ควรรดน้ำ', color: '#3b82f6', desc: 'ดินอาจแห้ง ดินขาดน้ำ' };
+  if (current?.rainProb > 60 || current?.rain > 0) watering = { text: 'ไม่ต้องรด', color: '#94a3b8', desc: 'ฝนจะตกช่วยรดให้' };
+
+  let spray = { text: 'ฉีดพ่นได้', color: '#22c55e', desc: 'ลมสงบ น้ำยาไม่ปลิว' };
+  if (current?.windSpeed > 15) spray = { text: 'ลมแรงไป', color: '#ef4444', desc: 'น้ำยาอาจปลิวสูญเปล่า' };
+  else if (current?.rainProb > 40) spray = { text: 'เสี่ยงฝนชะล้าง', color: '#f97316', desc: 'ฝนอาจชะล้างน้ำยา' };
+
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .fade-in { animation: fadeIn 0.3s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }`}} />
       
       <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '15px', padding: isMobile ? '12px' : '30px', paddingBottom: '160px' }}>
 
+        {/* แบนเนอร์เตือนภัย */}
         {alertBanner && (
             <div style={{ background: alertBanner.color, color: '#fff', padding: '10px 15px', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', fontSize: '0.9rem' }}>
                 <span style={{ fontSize: '1.2rem' }}>{alertBanner.icon}</span> {alertBanner.text}
             </div>
         )}
 
+        {/* กล่องค้นหา (ซ่อน/แสดง) */}
         {showFilter && (
             <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
               <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '130px', background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '0.95rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
@@ -304,6 +322,8 @@ export default function Dashboard() {
 
           {/* คอลัมน์ขวา */}
           <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
+            
+            {/* กราฟ 24 ชั่วโมง */}
             <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}` }}>
                <h3 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: textColor }}>⏱️ 24 ชั่วโมงข้างหน้า</h3>
                <div 
@@ -337,6 +357,7 @@ export default function Dashboard() {
                </div>
             </div>
 
+            {/* พยากรณ์ 7 วัน */}
             <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '25px', border: `1px solid ${borderColor}`, flex: 1 }}>
                <h3 style={{ margin: '0 0 15px 0', fontSize: '0.95rem', color: textColor }}>📅 พยากรณ์ 7 วัน</h3>
                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -371,20 +392,19 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 🌟 Section 2: ส่วนเสริมด้านล่าง (Briefing, Gauges, Radar) */}
+        {/* 🌟 Section 2: ส่วนเสริมด้านล่างสุด (Briefing, UV, Lifestyle, Radar) */}
         
-        {/* ไอเดีย 2: Daily Briefing */}
-        <div style={{ background: cardBg, padding: '20px', borderRadius: isMobile ? '20px' : '25px', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-            <span style={{ fontSize: '2.5rem' }}>🤖</span>
-            <div>
-                <h4 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1rem' }}>สรุปสภาพอากาศวันนี้</h4>
-                <p style={{ margin: 0, color: subTextColor, fontSize: '0.9rem', lineHeight: 1.6 }}>{briefingText}</p>
-            </div>
-        </div>
-
-        {/* ไอเดีย 1: Gauges (UV & PM2.5) */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
-            {/* UV Gauge */}
+            {/* กล่องซ้าย: Daily Briefing (AI สรุปอากาศ) */}
+            <div style={{ background: cardBg, padding: '20px', borderRadius: isMobile ? '20px' : '25px', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+                <span style={{ fontSize: '2.5rem' }}>🤖</span>
+                <div>
+                    <h4 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1rem' }}>สรุปสภาพอากาศวันนี้</h4>
+                    <p style={{ margin: 0, color: subTextColor, fontSize: '0.9rem', lineHeight: 1.6 }}>{briefingText}</p>
+                </div>
+            </div>
+
+            {/* กล่องขวา: UV Gauge (เอา PM2.5 ออกตามคำขอ) */}
             <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
                     <span style={{ fontSize: '1.2rem' }}>☀️</span> รังสีอัลตราไวโอเลต (UV)
@@ -398,35 +418,55 @@ export default function Dashboard() {
                     <div style={{ position: 'absolute', top: '-4px', left: `${Math.min((current?.uv / 11) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
                 </div>
             </div>
-            
-            {/* PM2.5 Gauge */}
-            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
-                    <span style={{ fontSize: '1.2rem' }}>😷</span> คุณภาพอากาศ (PM2.5)
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>
-                    {current?.pm25 || 0} <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'normal' }}>µg/m³</span>
-                </div>
-                <div style={{ width: '100%', height: '8px', background: 'linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444, #7f1d1d)', borderRadius: '10px', marginTop: '15px', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: '-4px', left: `${Math.min((current?.pm25 / 100) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
-                </div>
+        </div>
+
+        {/* 🌟 ดัชนีการใช้ชีวิตและการเกษตร (Lifestyle & Agriculture Index) */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px' }}>
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>🏃‍♂️</div>
+                <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>ออกกำลังกาย</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: exercise.color }}>{exercise.text}</div>
+                <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: 'auto', paddingTop: '5px' }}>{exercise.desc}</div>
+            </div>
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>👕</div>
+                <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>ซักผ้า / ล้างรถ</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: laundry.color }}>{laundry.text}</div>
+                <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: 'auto', paddingTop: '5px' }}>{laundry.desc}</div>
+            </div>
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>💧</div>
+                <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>รดน้ำต้นไม้</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: watering.color }}>{watering.text}</div>
+                <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: 'auto', paddingTop: '5px' }}>{watering.desc}</div>
+            </div>
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>🚁</div>
+                <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>ฉีดพ่นยา/ปุ๋ย</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: spray.color }}>{spray.text}</div>
+                <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: 'auto', paddingTop: '5px' }}>{spray.desc}</div>
             </div>
         </div>
 
-        {/* ไอเดีย 3: Mini Radar Map (ซูมตรงเป๊ะตามพิกัดที่เลือก) */}
+        {/* 🌟 Mini Radar Map */}
         <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden' }}>
             <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ (เรอัลไทม์)
             </h3>
             <div style={{ width: '100%', height: isMobile ? '250px' : '350px', borderRadius: '12px', overflow: 'hidden' }}>
                 <iframe 
-                    width="100%" 
-                    height="100%" 
+                    width="100%" height="100%" 
                     src={`https://embed.windy.com/embed2.html?lat=${coords?.lat || 13.75}&lon=${coords?.lon || 100.5}&zoom=8&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=true`} 
-                    frameBorder="0"
-                    title="Radar Map"
+                    frameBorder="0" title="Radar Map"
                 ></iframe>
             </div>
+        </div>
+
+        {/* 🌟 Footer */}
+        <div style={{ textAlign: 'center', marginTop: '10px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7 }}>
+           <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>อุตุนิยมวิทยาโดย Open-Meteo API • พิกัดโดย OpenStreetMap</div>
+           <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px' }}>อัปเดตข้อมูลล่าสุด: {lastUpdateText}</div>
+           <div style={{ fontSize: '0.75rem', color: '#0ea5e9', marginTop: '8px', fontWeight: 'bold' }}>เวอร์ชัน 2.0 (Super Local Update)</div>
         </div>
 
       </div>
