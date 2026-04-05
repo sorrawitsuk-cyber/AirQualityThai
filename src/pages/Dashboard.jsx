@@ -1,26 +1,19 @@
 // src/pages/Dashboard.jsx
-import React, { useContext, useState, useEffect, useMemo } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
-import { extractProvince } from '../utils/helpers';
 import { AreaChart, Area, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis } from 'recharts';
 
-const extractDistrict = (areaTH) => {
-  if (!areaTH) return 'ทั่วไป';
-  const match = areaTH.match(/(เขต|อ\.|อำเภอ)\s*([a-zA-Zก-ฮะ-์]+)/);
-  if (match) return match[2];
-  return areaTH.split(' ')[0]; 
-};
-
 export default function Dashboard() {
-  const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
+  const { weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
   
-  const [selectedProv, setSelectedProv] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
-
-  const provinces = useMemo(() => [...new Set(stations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th')), [stations]);
-  const availableDistricts = useMemo(() => [...new Set(stations.filter(s => extractProvince(s.areaTH) === selectedProv).map(s => extractDistrict(s.areaTH)))].sort(), [stations, selectedProv]);
+  
+  // State สำหรับเก็บ 77 จังหวัด 928 อำเภอ
+  const [geoData, setGeoData] = useState([]);
+  const [selectedProv, setSelectedProv] = useState('');
+  const [selectedDist, setSelectedDist] = useState('');
+  const [amphoesList, setAmphoesList] = useState([]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -28,11 +21,19 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 🌟 ดึงข้อมูลรายชื่อจังหวัด/อำเภอทั้งหมดของประเทศไทยจาก GitHub
+  useEffect(() => {
+    fetch('https://raw.githubusercontent.com/kongvut/thai-province-data/master/api_province_with_amphure_tambon.json')
+      .then(res => res.json())
+      .then(data => setGeoData(data))
+      .catch(e => console.error('Failed to load Thai geography:', e));
+  }, []);
+
   const fetchLocationName = async (lat, lon) => {
     try {
       const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
       const data = await res.json();
-      setLocationName(data.locality || data.city || data.principalSubdivision || 'ตำแหน่งของคุณ');
+      setLocationName(data.locality || data.city || 'ตำแหน่งของคุณ');
     } catch (e) { setLocationName('ตำแหน่งของคุณ'); }
   };
 
@@ -44,9 +45,7 @@ export default function Dashboard() {
             fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
             fetchLocationName(pos.coords.latitude, pos.coords.longitude);
           }, 
-          () => {
-            fetchWeatherByCoords(13.75, 100.5); setLocationName('กรุงเทพมหานคร');
-          },
+          () => { fetchWeatherByCoords(13.75, 100.5); setLocationName('กรุงเทพมหานคร'); },
           { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
         );
       } else {
@@ -56,25 +55,36 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleFilterChange = (prov, dist) => {
-    setSelectedProv(prov); setSelectedDistrict(dist);
-    const target = stations.find(s => extractProvince(s.areaTH) === prov && (!dist || extractDistrict(s.areaTH) === dist));
-    if (target) {
-      fetchWeatherByCoords(parseFloat(target.lat), parseFloat(target.long));
-      setLocationName(`${dist ? 'เขต/อำเภอ ' + dist : prov}`);
-    }
+  // เมื่อเปลี่ยนจังหวัด
+  const handleProvChange = (e) => {
+    const pName = e.target.value;
+    setSelectedProv(pName); setSelectedDist('');
+    const pObj = geoData.find(p => p.name_th === pName);
+    if (pObj) {
+      setAmphoesList(pObj.amphure);
+      setLocationName(pName);
+      // ยิง Geocoding เพื่อหาพิกัดกลางจังหวัด
+      fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${pName}&count=1&language=th`)
+        .then(r => r.json()).then(d => { if(d.results) fetchWeatherByCoords(d.results[0].latitude, d.results[0].longitude); });
+    } else { setAmphoesList([]); }
   };
 
-  // 🌟 แก้บั๊กจอขาว: ประกาศตัวแปรสีให้ครบถ้วนตรงนี้!
+  // เมื่อเปลี่ยนอำเภอ (Smart Geocoding ดึงพิกัดอำเภอแบบเป๊ะๆ)
+  const handleDistChange = (e) => {
+    const dName = e.target.value;
+    setSelectedDist(dName);
+    setLocationName(`อ.${dName}, ${selectedProv}`);
+    fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${dName}&count=1&language=th`)
+      .then(r => r.json()).then(d => { if(d.results) fetchWeatherByCoords(d.results[0].latitude, d.results[0].longitude); });
+  };
+
   const appBg = darkMode ? '#020617' : '#f8fafc'; 
   const cardBg = darkMode ? '#0f172a' : '#ffffff';
   const textColor = darkMode ? '#f8fafc' : '#0f172a'; 
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
-  const subTextColor = darkMode ? '#94a3b8' : '#64748b'; // <--- ตัวการที่ทำให้จอขาว คืนชีพแล้ว!
+  const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
-  if (loadingWeather || !weatherData) {
-    return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background: appBg, color: textColor}}>📍 กำลังโหลดข้อมูลสภาพอากาศแบบด่วนจี๋... ⏳</div>;
-  }
+  if (loadingWeather || !weatherData) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background:appBg,color:textColor}}>📍 กำลังโหลดข้อมูลสภาพอากาศแบบด่วนจี๋... ⏳</div>;
 
   const { current, hourly, daily, coords } = weatherData;
   const aqiBg = current.pm25 > 75 ? '#ef4444' : current.pm25 > 37.5 ? '#f97316' : current.pm25 > 25 ? '#eab308' : '#22c55e';
@@ -83,7 +93,6 @@ export default function Dashboard() {
   const isRaining = current.rain > 0; const isHot = current.feelsLike >= 38;
   const weatherIcon = isRaining ? '🌧️' : (isHot ? '☀️' : '🌤️');
   const weatherText = isRaining ? 'มีโอกาสฝนตก' : (isHot ? 'แดดจัดและร้อนมาก' : 'ท้องฟ้าโปร่ง มีเมฆบางส่วน');
-
   let bgGradient = darkMode ? 'linear-gradient(135deg, #1e3a8a, #0f172a)' : 'linear-gradient(135deg, #0ea5e9, #38bdf8)';
   if (isRaining) bgGradient = 'linear-gradient(135deg, #334155, #0f172a)'; else if (isHot) bgGradient = 'linear-gradient(135deg, #ea580c, #9a3412)';
 
@@ -94,18 +103,16 @@ export default function Dashboard() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: cardBg, padding: '15px 20px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
           <span style={{ fontSize: '1.1rem', color: textColor, display: isMobile ? 'none' : 'block' }}>📍 ระบุพื้นที่:</span>
-          {stations.length > 0 ? (
+          {geoData.length > 0 ? (
             <>
-              <select value={selectedProv} onChange={e => handleFilterChange(e.target.value, '')} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none' }}>
-                <option value="">ค้นหาจังหวัด...</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
+              <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none' }}>
+                <option value="">ค้นหาจังหวัด...</option>{geoData.map(p => <option key={p.id} value={p.name_th}>{p.name_th}</option>)}
               </select>
-              <select value={selectedDistrict} onChange={e => handleFilterChange(selectedProv, e.target.value)} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none' }}>
-                <option value="">ทุกเขต/อำเภอ</option>{availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+              <select value={selectedDist} onChange={handleDistChange} disabled={!selectedProv} style={{ flex: 1, background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', opacity: selectedProv ? 1 : 0.5 }}>
+                <option value="">เลือกอำเภอ</option>{amphoesList.map(a => <option key={a.id} value={a.name_th}>{a.name_th}</option>)}
               </select>
             </>
-          ) : (
-            <span style={{ color: subTextColor, fontSize: '0.9rem' }}>กำลังดึงรายชื่อพื้นที่... (อาจจะล่าช้าหากเซิร์ฟเวอร์รัฐบาลขัดข้อง)</span>
-          )}
+          ) : <span style={{ color: subTextColor, fontSize: '0.9rem' }}>กำลังเตรียมรายชื่อ 928 อำเภอ...</span>}
         </div>
 
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px' }}>

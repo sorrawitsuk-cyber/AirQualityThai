@@ -1,6 +1,17 @@
 // src/context/WeatherContext.jsx
 import React, { createContext, useState, useEffect } from 'react';
 
+// ข้อมูล 77 จังหวัดแบบไม่ต้องง้อเซิร์ฟเวอร์รัฐ
+const provinces77 = [
+  { n: 'กรุงเทพมหานคร', lat: 13.75, lon: 100.51 }, { n: 'สมุทรปราการ', lat: 13.60, lon: 100.60 }, { n: 'นนทบุรี', lat: 13.86, lon: 100.52 }, { n: 'ปทุมธานี', lat: 14.02, lon: 100.53 }, { n: 'พระนครศรีอยุธยา', lat: 14.35, lon: 100.57 }, { n: 'อ่างทอง', lat: 14.59, lon: 100.45 }, { n: 'ลพบุรี', lat: 14.80, lon: 100.61 }, { n: 'สิงห์บุรี', lat: 14.89, lon: 100.40 }, { n: 'ชัยนาท', lat: 15.18, lon: 100.12 }, { n: 'สระบุรี', lat: 14.53, lon: 100.91 },
+  { n: 'ชลบุรี', lat: 13.36, lon: 100.98 }, { n: 'ระยอง', lat: 12.68, lon: 101.27 }, { n: 'จันทบุรี', lat: 12.61, lon: 102.10 }, { n: 'ตราด', lat: 12.24, lon: 102.51 }, { n: 'ฉะเชิงเทรา', lat: 13.69, lon: 101.07 }, { n: 'ปราจีนบุรี', lat: 14.05, lon: 101.37 }, { n: 'นครนายก', lat: 14.20, lon: 101.21 }, { n: 'สระแก้ว', lat: 13.82, lon: 102.06 },
+  { n: 'นครราชสีมา', lat: 14.97, lon: 102.10 }, { n: 'บุรีรัมย์', lat: 14.99, lon: 103.10 }, { n: 'สุรินทร์', lat: 14.88, lon: 103.49 }, { n: 'ศรีสะเกษ', lat: 15.11, lon: 104.32 }, { n: 'อุบลราชธานี', lat: 15.24, lon: 104.84 }, { n: 'ยโสธร', lat: 15.79, lon: 104.14 }, { n: 'ชัยภูมิ', lat: 15.80, lon: 102.03 }, { n: 'อำนาจเจริญ', lat: 15.86, lon: 104.62 }, { n: 'บึงกาฬ', lat: 18.36, lon: 103.65 }, { n: 'หนองบัวลำภู', lat: 17.20, lon: 102.44 }, { n: 'ขอนแก่น', lat: 16.43, lon: 102.83 }, { n: 'อุดรธานี', lat: 17.41, lon: 102.78 }, { n: 'เลย', lat: 17.48, lon: 101.72 }, { n: 'หนองคาย', lat: 17.87, lon: 102.74 }, { n: 'มหาสารคาม', lat: 16.18, lon: 103.30 }, { n: 'ร้อยเอ็ด', lat: 16.05, lon: 103.65 }, { n: 'กาฬสินธุ์', lat: 16.43, lon: 103.50 }, { n: 'สกลนคร', lat: 17.16, lon: 104.14 }, { n: 'นครพนม', lat: 17.40, lon: 104.78 }, { n: 'มุกดาหาร', lat: 16.54, lon: 104.72 },
+  { n: 'เชียงใหม่', lat: 18.78, lon: 98.98 }, { n: 'ลำพูน', lat: 18.57, lon: 99.01 }, { n: 'ลำปาง', lat: 18.28, lon: 99.49 }, { n: 'อุตรดิตถ์', lat: 17.62, lon: 100.09 }, { n: 'แพร่', lat: 18.14, lon: 100.14 }, { n: 'น่าน', lat: 18.78, lon: 100.77 }, { n: 'พะเยา', lat: 19.16, lon: 99.90 }, { n: 'เชียงราย', lat: 19.91, lon: 99.83 }, { n: 'แม่ฮ่องสอน', lat: 19.30, lon: 97.96 },
+  { n: 'นครสวรรค์', lat: 15.70, lon: 100.13 }, { n: 'อุทัยธานี', lat: 15.38, lon: 100.02 }, { n: 'กำแพงเพชร', lat: 16.48, lon: 99.52 }, { n: 'ตาก', lat: 16.88, lon: 99.12 }, { n: 'สุโขทัย', lat: 17.00, lon: 99.82 }, { n: 'พิษณุโลก', lat: 16.82, lon: 100.26 }, { n: 'พิจิตร', lat: 16.44, lon: 100.34 }, { n: 'เพชรบูรณ์', lat: 16.41, lon: 101.15 },
+  { n: 'ราชบุรี', lat: 13.52, lon: 99.81 }, { n: 'กาญจนบุรี', lat: 14.00, lon: 99.53 }, { n: 'สุพรรณบุรี', lat: 14.47, lon: 100.11 }, { n: 'นครปฐม', lat: 13.81, lon: 100.04 }, { n: 'สมุทรสาคร', lat: 13.54, lon: 100.27 }, { n: 'สมุทรสงคราม', lat: 13.41, lon: 99.99 }, { n: 'เพชรบุรี', lat: 13.11, lon: 99.94 }, { n: 'ประจวบคีรีขันธ์', lat: 11.81, lon: 99.79 },
+  { n: 'นครศรีธรรมราช', lat: 8.43, lon: 99.96 }, { n: 'กระบี่', lat: 8.05, lon: 98.91 }, { n: 'พังงา', lat: 8.45, lon: 98.52 }, { n: 'ภูเก็ต', lat: 7.88, lon: 98.39 }, { n: 'สุราษฎร์ธานี', lat: 9.13, lon: 99.32 }, { n: 'ระนอง', lat: 9.96, lon: 98.63 }, { n: 'ชุมพร', lat: 10.49, lon: 99.18 }, { n: 'สงขลา', lat: 7.18, lon: 100.59 }, { n: 'สตูล', lat: 6.62, lon: 100.06 }, { n: 'ตรัง', lat: 7.55, lon: 99.61 }, { n: 'พัทลุง', lat: 7.61, lon: 100.07 }, { n: 'ปัตตานี', lat: 6.86, lon: 101.25 }, { n: 'ยะลา', lat: 6.54, lon: 101.28 }, { n: 'นราธิวาส', lat: 6.42, lon: 101.82 }
+];
+
 export const WeatherContext = createContext();
 
 export const WeatherProvider = ({ children }) => {
@@ -11,49 +22,26 @@ export const WeatherProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(true);
   const [lastUpdateText, setLastUpdateText] = useState("");
 
-  // 1. ดึงข้อมูลสถานีทั่วประเทศ
-  const fetchAir4Thai = async () => {
-    try {
-      const res = await fetch('https://air4thai.pcd.go.th/services/getNewAQI_JSON.php');
-      const data = await res.json();
-      setStations(data.stations || []);
-      
-      const temps = {};
-      (data.stations || []).forEach(st => {
-        temps[st.stationID] = {
-          temp: 26 + Math.random() * 8, feelsLike: 28 + Math.random() * 10,
-          humidity: 40 + Math.random() * 40, rainProb: Math.random() * 100, windSpeed: Math.random() * 20
-        };
-      });
-      setStationTemps(temps);
-    } catch (e) { 
-      console.error("⚠️ Air4Thai Server Down! Switching to Fallback Mode..."); 
-      
-      // 🌟 แผนสำรอง: ถ้าเว็บรัฐพัง เสกข้อมูลพิกัดเมืองหลักๆ ให้แอปทำงานต่อได้ ไม่ให้จอขาว!
-      const fallbackStations = [
-        { stationID: 'FB1', areaTH: 'อ.เมือง กรุงเทพมหานคร', lat: '13.7563', long: '100.5018', AQILast: { PM25: { value: 25 } } },
-        { stationID: 'FB2', areaTH: 'อ.เมือง เชียงใหม่', lat: '18.7883', long: '98.9853', AQILast: { PM25: { value: 45 } } },
-        { stationID: 'FB3', areaTH: 'อ.เมือง ภูเก็ต', lat: '7.8804', long: '98.3923', AQILast: { PM25: { value: 15 } } },
-        { stationID: 'FB4', areaTH: 'อ.เมือง ขอนแก่น', lat: '16.4322', long: '102.8236', AQILast: { PM25: { value: 22 } } },
-        { stationID: 'FB5', areaTH: 'อ.เมือง ชลบุรี', lat: '13.3611', long: '100.9847', AQILast: { PM25: { value: 30 } } },
-        { stationID: 'FB6', areaTH: 'อ.เมือง นครราชสีมา', lat: '14.9799', long: '102.0978', AQILast: { PM25: { value: 28 } } },
-        { stationID: 'FB7', areaTH: 'อ.หาดใหญ่ สงขลา', lat: '7.0055', long: '100.4746', AQILast: { PM25: { value: 18 } } },
-        { stationID: 'FB8', areaTH: 'อ.เมือง นนทบุรี', lat: '13.8591', long: '100.5217', AQILast: { PM25: { value: 24 } } }
-      ];
-      setStations(fallbackStations);
-
-      const temps = {};
-      fallbackStations.forEach(st => {
-        temps[st.stationID] = {
-          temp: 26 + Math.random() * 8, feelsLike: 28 + Math.random() * 10,
-          humidity: 40 + Math.random() * 40, rainProb: Math.random() * 100, windSpeed: Math.random() * 20
-        };
-      });
-      setStationTemps(temps);
-    }
+  // 1. ตั้งค่า 77 จังหวัดสำหรับแผนที่แบบทันที (Instant Load)
+  const init77Provinces = () => {
+    const formattedStations = provinces77.map((p, idx) => ({
+      stationID: `PROV_${idx}`, areaTH: p.n, lat: p.lat, long: p.lon,
+      AQILast: { PM25: { value: Math.round(15 + Math.random() * 40) } } // จำลองค่าฝุ่นตั้งต้นให้โชว์หมุด
+    }));
+    
+    const temps = {};
+    formattedStations.forEach(st => {
+      temps[st.stationID] = {
+        temp: 26 + Math.random() * 10, feelsLike: 28 + Math.random() * 12,
+        humidity: 40 + Math.random() * 40, rainProb: Math.random() * 100, windSpeed: Math.random() * 20
+      };
+    });
+    
+    setStations(formattedStations);
+    setStationTemps(temps);
   };
 
-  // 2. ดึงข้อมูลพิกัดเฉพาะจุด
+  // 2. ดึงข้อมูลพิกัดเฉพาะจุด (Open-Meteo) สำหรับ Dashboard
   const fetchWeatherByCoords = async (lat, lon) => {
     setLoadingWeather(true);
     try {
@@ -80,7 +68,7 @@ export const WeatherProvider = ({ children }) => {
     finally { setLoadingWeather(false); }
   };
 
-  useEffect(() => { fetchAir4Thai(); }, []);
+  useEffect(() => { init77Provinces(); }, []);
 
   return (
     <WeatherContext.Provider value={{ stations, stationTemps, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, setDarkMode, lastUpdateText }}>
