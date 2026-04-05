@@ -20,36 +20,48 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 1. ดึงฐานข้อมูลจากไฟล์ในเครื่อง (ไม่สนเน็ตบล็อก ไม่สนเว็บล่ม)
+  // 🌟 1. ดึงไฟล์ JSON แบบป้องกันโครงสร้างไฟล์ผิดเพี้ยน
   useEffect(() => {
     fetch('/thai_geo.json')
       .then(res => {
         if (!res.ok) throw new Error('ไม่พบไฟล์');
         return res.json();
       })
-      .then(data => setGeoData(data))
+      .then(data => {
+        // เผื่อไฟล์ JSON ถูกหุ้มด้วย Object เช่น { "data": [...] }
+        const actualData = Array.isArray(data) ? data : (data.data || data.RECORDS || data.records || Object.values(data)[0] || []);
+        setGeoData(actualData);
+      })
       .catch(e => {
         console.error('Error loading geo data:', e);
         setGeoError(true);
       });
   }, []);
 
-  // 🌟 2. เรียงลำดับ 77 จังหวัด ก-ฮ
   const sortedStations = useMemo(() => {
     return [...stations].sort((a, b) => a.areaTH.localeCompare(b.areaTH, 'th'));
   }, [stations]);
 
-  // 🌟 3. อัปเกรดให้รองรับไฟล์เวอร์ชันใหม่ V2 (เปลี่ยน amphure เป็น district)
+  // 🌟 2. สแกนหาอำเภอแบบอัจฉริยะ (ไม่ว่าไฟล์จะใช้คำศัพท์อะไรก็หาเจอ!)
   const currentAmphoes = useMemo(() => {
     if (!geoData || geoData.length === 0 || !selectedProv) return [];
     
-    // หาจังหวัดที่ผู้ใช้เลือก
-    const pObj = geoData.find(p => p.name_th === selectedProv || (p.name_th && p.name_th.includes(selectedProv)));
-    
+    // ค้นหาจังหวัดแบบยืดหยุ่น (เผื่อ JSON มีคำว่า 'จังหวัด' นำหน้า)
+    const cleanProv = selectedProv.replace('จังหวัด', '').trim();
+    const pObj = geoData.find(p => {
+      const pName = String(p.name_th || p.nameTh || p.name || p.province || p.province_name || '').replace('จังหวัด', '').trim();
+      return pName === cleanProv || pName.includes(cleanProv) || cleanProv.includes(pName);
+    });
+
     if (pObj) {
-      // รองรับทั้งไฟล์เวอร์ชันใหม่ (district) และเวอร์ชันเก่า (amphure)
-      const distArray = pObj.district || pObj.amphure || [];
-      return [...distArray].sort((a, b) => a.name_th.localeCompare(b.name_th, 'th'));
+      // สแกนหา Array ของอำเภอ ไม่ว่าจะตั้งชื่อคีย์ว่าอะไร
+      const distArray = pObj.amphure || pObj.amphures || pObj.district || pObj.districts || pObj.amphoe || pObj.amphoes || pObj.amphur || [];
+      
+      // ดึงชื่ออำเภอออกมา และเรียง ก-ฮ
+      return [...distArray].map(a => {
+        const distName = String(a.name_th || a.nameTh || a.name || a.amphoe || a.district_name || a.amphur_name || '').trim();
+        return { id: a.id || a.code || Math.random(), name: distName };
+      }).filter(a => a.name !== "").sort((a, b) => a.name.localeCompare(b.name, 'th'));
     }
     return [];
   }, [geoData, selectedProv]);
@@ -136,18 +148,20 @@ export default function Dashboard() {
             {sortedStations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
           </select>
 
+          {/* 🌟 Dropdown อำเภอแบบฉลาดสุดๆ จะมีข้อความบอกชัดเจนถ้าหาไม่เจอ */}
           <select 
             value={selectedDist} 
             onChange={handleDistChange} 
-            disabled={!selectedProv || geoData.length === 0 || geoError} 
-            style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: (!selectedProv || geoData.length === 0) ? 0.5 : 1 }}
+            disabled={!selectedProv || geoData.length === 0 || geoError || currentAmphoes.length === 0} 
+            style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: (!selectedProv || geoData.length === 0 || currentAmphoes.length === 0) ? 0.5 : 1 }}
           >
             <option value="">
-              {geoError ? '⚠️ โหลดฐานข้อมูลไม่สำเร็จ (เช็กไฟล์ใน public)' : 
+              {geoError ? '⚠️ โหลดไฟล์ไม่สำเร็จ' : 
                geoData.length === 0 ? 'กำลังเตรียมข้อมูลอำเภอ...' : 
-               '-- เลือกอำเภอ --'}
+               (!selectedProv ? '-- เลือกอำเภอ --' :
+               (currentAmphoes.length === 0 ? '⚠️ ไม่พบข้อมูลอำเภอในไฟล์นี้' : '-- เลือกอำเภอ --'))}
             </option>
-            {currentAmphoes.map(a => <option key={a.id} value={a.name_th}>{a.name_th}</option>)}
+            {currentAmphoes.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
           </select>
         </div>
 
