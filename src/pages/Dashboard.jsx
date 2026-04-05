@@ -20,7 +20,6 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ดึงไฟล์ JSON 
   useEffect(() => {
     fetch('/thai_geo.json')
       .then(res => {
@@ -41,10 +40,8 @@ export default function Dashboard() {
     return [...stations].sort((a, b) => a.areaTH.localeCompare(b.areaTH, 'th'));
   }, [stations]);
 
-  // สแกนหาอำเภอ
   const currentAmphoes = useMemo(() => {
     if (!geoData || geoData.length === 0 || !selectedProv) return [];
-    
     const cleanProv = selectedProv.replace('จังหวัด', '').trim();
     const pObj = geoData.find(p => {
       const pName = String(p.name_th || p.nameTh || p.name || p.province || p.province_name || '').replace('จังหวัด', '').trim();
@@ -99,12 +96,10 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 อัปเกรดระบบค้นหาพิกัดอำเภอ (OpenStreetMap)
   const handleDistChange = async (e) => {
     const dName = e.target.value;
     setSelectedDist(dName);
 
-    // ถ้าผู้ใช้กดกลับมาที่ "-- เลือกอำเภอ --" ให้กลับไปใช้พิกัดจังหวัด
     if (!dName) {
       const fallbackProv = stations.find(s => s.areaTH === selectedProv);
       if (fallbackProv) { 
@@ -114,10 +109,10 @@ export default function Dashboard() {
       return;
     }
 
-    setLocationName(`อ.${dName}, ${selectedProv}`);
+    const prefix = (selectedProv === 'กรุงเทพมหานคร' || dName.startsWith('เขต') || dName.startsWith('อ.')) ? '' : 'อ.';
+    setLocationName(`${prefix}${dName}, ${selectedProv}`);
     
     try {
-      // 1. ใช้ OpenStreetMap (แม่นยำระดับตำบล/อำเภอของไทย)
       const query = `${dName} ${selectedProv} Thailand`;
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
       const data = await res.json();
@@ -125,16 +120,13 @@ export default function Dashboard() {
       if (data && data.length > 0) {
         fetchWeatherByCoords(parseFloat(data[0].lat), parseFloat(data[0].lon));
       } else {
-        // 2. แผนสำรอง ถ้า OSM พลาด ให้กลับไปใช้ Open-Meteo
         const res2 = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(dName)}&count=1`);
         const data2 = await res2.json();
         if (data2.results && data2.length > 0) {
           fetchWeatherByCoords(data2.results[0].latitude, data2.results[0].longitude);
         }
       }
-    } catch (err) {
-      console.error("Geocoding failed", err);
-    }
+    } catch (err) { console.error("Geocoding failed", err); }
   };
 
   const appBg = darkMode ? '#020617' : '#f8fafc'; 
@@ -149,9 +141,10 @@ export default function Dashboard() {
   const aqiBg = current.pm25 > 75 ? '#ef4444' : current.pm25 > 37.5 ? '#f97316' : current.pm25 > 25 ? '#eab308' : '#22c55e';
   const aqiText = current.pm25 > 75 ? 'เริ่มมีผลกระทบ' : current.pm25 > 37.5 ? 'ปานกลาง' : 'คุณภาพอากาศดี';
   
-  const isRaining = current.rain > 0; const isHot = current.feelsLike >= 38;
+  const isRaining = current.rainProb > 30; // ใช้ % โอกาสฝนเป็นเกณฑ์ตัดสินใจโชว์อนิเมชั่นฝน
+  const isHot = current.feelsLike >= 38;
   const weatherIcon = isRaining ? '🌧️' : (isHot ? '☀️' : '🌤️');
-  const weatherText = isRaining ? 'มีฝนตกในพื้นที่' : (isHot ? 'แดดร้อนจัด' : 'อากาศดี มีเมฆบางส่วน');
+  const weatherText = isRaining ? 'มีโอกาสเกิดฝนตก' : (isHot ? 'แดดร้อนจัด' : 'อากาศดี มีเมฆบางส่วน');
   
   let bgGradient = darkMode ? 'linear-gradient(135deg, #1e3a8a, #0f172a)' : 'linear-gradient(135deg, #0ea5e9, #38bdf8)';
   if (isRaining) bgGradient = 'linear-gradient(135deg, #334155, #0f172a)'; else if (isHot) bgGradient = 'linear-gradient(135deg, #ea580c, #9a3412)';
@@ -163,23 +156,13 @@ export default function Dashboard() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: cardBg, padding: '15px 20px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '1.1rem', color: textColor, display: isMobile ? 'none' : 'block' }}>📍 ระบุพื้นที่:</span>
-          
           <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
             <option value="">-- เลือก 77 จังหวัด --</option>
             {sortedStations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
           </select>
-
-          <select 
-            value={selectedDist} 
-            onChange={handleDistChange} 
-            disabled={!selectedProv || geoData.length === 0 || geoError || currentAmphoes.length === 0} 
-            style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: (!selectedProv || geoData.length === 0 || currentAmphoes.length === 0) ? 0.5 : 1 }}
-          >
+          <select value={selectedDist} onChange={handleDistChange} disabled={!selectedProv || geoData.length === 0 || geoError || currentAmphoes.length === 0} style={{ flex: 1, minWidth: '150px', background: darkMode?'#1e293b':'#f1f5f9', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '1rem', padding: '10px 15px', borderRadius: '12px', outline: 'none', cursor: 'pointer', opacity: (!selectedProv || geoData.length === 0 || currentAmphoes.length === 0) ? 0.5 : 1 }}>
             <option value="">
-              {geoError ? '⚠️ โหลดไฟล์ไม่สำเร็จ' : 
-               geoData.length === 0 ? 'กำลังเตรียมข้อมูลอำเภอ...' : 
-               (!selectedProv ? '-- เลือกอำเภอ --' :
-               (currentAmphoes.length === 0 ? '⚠️ ไม่พบข้อมูลอำเภอ' : '-- เลือกอำเภอ --'))}
+              {geoError ? '⚠️ โหลดไฟล์ไม่สำเร็จ' : geoData.length === 0 ? 'กำลังเตรียมข้อมูลอำเภอ...' : (!selectedProv ? '-- เลือกอำเภอ --' : (currentAmphoes.length === 0 ? '⚠️ ไม่พบข้อมูลอำเภอ' : '-- เลือกอำเภอ --'))}
             </option>
             {currentAmphoes.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
           </select>
@@ -202,7 +185,8 @@ export default function Dashboard() {
                <div style={{ marginTop: '20px', background: aqiBg, color: '#fff', padding: '8px 25px', borderRadius: '50px', fontWeight: '900', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>😷 ฝุ่น PM2.5: {current.pm25 || '-'} µg/m³ ({aqiText})</div>
 
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', width: '100%', marginTop: '30px', background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(10px)', borderRadius: '20px', padding: '15px 10px' }}>
-                  <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>☔</div><div style={{fontSize:'0.7rem'}}>ปริมาณฝน</div><b>{current.rain} mm</b></div>
+                  {/* 🌟 เปลี่ยนช่องแรกเป็น โอกาสฝนตก (%) */}
+                  <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>☔</div><div style={{fontSize:'0.7rem'}}>โอกาสฝนตก</div><b>{current.rainProb}%</b></div>
                   <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>💧</div><div style={{fontSize:'0.7rem'}}>ความชื้น</div><b>{current.humidity}%</b></div>
                   <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>🌬️</div><div style={{fontSize:'0.7rem'}}>ลม</div><b>{current.windSpeed} km/h</b></div>
                   <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>☀️</div><div style={{fontSize:'0.7rem'}}>UV Index</div><b>{current.uv}</b></div>
@@ -237,19 +221,40 @@ export default function Dashboard() {
             </div>
 
             <div style={{ background: cardBg, borderRadius: '25px', padding: '25px', border: `1px solid ${borderColor}`, flex: 1 }}>
-               <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: textColor }}>📅 พยากรณ์อากาศล่วงหน้า 7 วัน</h3>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+               <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: textColor }}>📅 พยากรณ์อากาศล่วงหน้า 7 วัน (ฉบับละเอียด)</h3>
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {daily.time.map((t, idx) => (
-                     <div key={idx} style={{ display: 'grid', gridTemplateColumns: '50px 50px 1fr', alignItems: 'center', paddingBottom: idx !== 6 ? '15px' : '0', borderBottom: idx !== 6 ? `1px solid ${borderColor}` : 'none' }}>
-                        <div style={{ fontSize: '1rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
-                        <div style={{ fontSize: '1.5rem', textAlign: 'center' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                           <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'bold', width: '30px', textAlign: 'right' }}>{Math.round(daily.temperature_2m_min[idx])}°</span>
-                           <div style={{ flex: 1, height: '6px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
-                              <div style={{ position: 'absolute', left: '20%', right: '20%', top: 0, bottom: 0, background: 'linear-gradient(to right, #3b82f6, #f97316)' }}></div>
-                           </div>
-                           <span style={{ fontSize: '1rem', color: textColor, fontWeight: '900', width: '30px' }}>{Math.round(daily.temperature_2m_max[idx])}°</span>
+                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', paddingBottom: idx !== 6 ? '15px' : '0', borderBottom: idx !== 6 ? `1px solid ${borderColor}` : 'none' }}>
+                        
+                        {/* ส่วนที่ 1: อุณหภูมิหลัก */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '50px 50px 1fr', alignItems: 'center' }}>
+                            <div style={{ fontSize: '1rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
+                            <div style={{ fontSize: '1.5rem', textAlign: 'center' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                               <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'bold', width: '30px', textAlign: 'right' }}>{Math.round(daily.temperature_2m_min[idx])}°</span>
+                               <div style={{ flex: 1, height: '6px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
+                                  <div style={{ position: 'absolute', left: '20%', right: '20%', top: 0, bottom: 0, background: 'linear-gradient(to right, #3b82f6, #f97316)' }}></div>
+                               </div>
+                               <span style={{ fontSize: '1rem', color: textColor, fontWeight: '900', width: '30px' }}>{Math.round(daily.temperature_2m_max[idx])}°</span>
+                            </div>
                         </div>
+
+                        {/* 🌟 ส่วนที่ 2: แคปซูลข้อมูลเสริม (Rain %, Heat Index, PM2.5) */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '8px 12px', borderRadius: '12px', fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }} title="โอกาสฝนตก">
+                              <span style={{fontSize:'1.1rem'}}>☔</span> {daily.precipitation_probability_max[idx]}%
+                           </div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }} title="ดัชนีความร้อนสูงสุด">
+                              <span style={{fontSize:'1.1rem'}}>🥵</span> {Math.round(daily.apparent_temperature_max[idx])}°
+                           </div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }} title="ค่าฝุ่น PM2.5 สูงสุด">
+                              <span style={{fontSize:'1.1rem'}}>😷</span> 
+                              <span style={{ color: daily.pm25_max[idx] > 37.5 ? '#ef4444' : (daily.pm25_max[idx] > 25 ? '#f97316' : '#22c55e') }}>
+                                {daily.pm25_max[idx]} <span style={{fontSize:'0.65rem'}}>µg/m³</span>
+                              </span>
+                           </div>
+                        </div>
+
                      </div>
                   ))}
                </div>
