@@ -16,7 +16,6 @@ export default function Dashboard() {
   
   const [showFilter, setShowFilter] = useState(false);
 
-  // 🌟 Drag to Scroll 24h
   const scrollRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -159,7 +158,6 @@ export default function Dashboard() {
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
-  // กันจอขาวด้วย Optional Chaining ครอบจักรวาล
   if (loadingWeather || !weatherData) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background:appBg,color:textColor, fontWeight:'bold', fontSize:'1.2rem'}}>📍 โหลดข้อมูลแป๊บนึงนะคะ... ⏳</div>;
 
   const { current, hourly, daily, coords } = weatherData;
@@ -245,17 +243,16 @@ export default function Dashboard() {
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .fade-in { animation: fadeIn 0.3s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }`}} />
       
-      {/* 🌟 เปลี่ยน Padding Bottom เป็นค่าปกติ แล้วไปดันด้วยกล่องล่องหนแทนด้านล่างสุด */}
       <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '15px', padding: isMobile ? '15px' : '30px', paddingBottom: '30px' }}>
 
         {alertBanner && (
-            <div style={{ background: alertBanner.color, color: '#fff', padding: '10px 15px', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', fontSize: '0.9rem' }}>
+            <div style={{ background: alertBanner.color, color: '#fff', padding: '10px 15px', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', fontSize: '0.9rem', flexShrink: 0 }}>
                 <span style={{ fontSize: '1.2rem' }}>{alertBanner.icon}</span> {alertBanner.text}
             </div>
         )}
 
         {showFilter && (
-            <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
+            <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap', flexShrink: 0 }}>
               <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '130px', background: darkMode?'#1e293b':'#f1f5f9', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '0.95rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
                 <option value="">-- เลือกจังหวัด --</option>
                 {sortedStations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
@@ -269,11 +266,10 @@ export default function Dashboard() {
             </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '20px' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '20px', flexShrink: 0 }}>
           
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
-            
-            <div style={{ background: bgGradient, borderRadius: isMobile ? '24px' : '30px', padding: isMobile ? '20px' : '30px 20px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', transition: 'background 0.5s ease', position: 'relative' }}>
+            <div style={{ background: bgGradient, borderRadius: isMobile ? '24px' : '30px', padding: isMobile ? '20px' : '30px 20px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', transition: 'background 0.5s ease', position: 'relative', flexShrink: 0 }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '15px' }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: isMobile ? '1.3rem' : '1.8rem', fontWeight: '900', lineHeight: 1.2 }}>{locationName}</h2>
@@ -293,7 +289,7 @@ export default function Dashboard() {
                <div style={{ marginTop: '15px', background: aqiBg, color: '#fff', padding: '6px 20px', borderRadius: '50px', fontWeight: '900', fontSize: '0.85rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', alignSelf: 'center' }}>😷 PM2.5: {current?.pm25 || '-'} µg/m³ ({aqiText})</div>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', flexShrink: 0 }}>
                 <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                     <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>👁️ ทัศนวิสัย</div>
                     <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{(current?.visibility / 1000).toFixed(1)} <span style={{fontSize:'0.75rem'}}>กม.</span></div>
@@ -316,8 +312,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
-            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}` }}>
+          <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0, flexShrink: 0 }}>
+            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, flexShrink: 0 }}>
                <h3 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: textColor }}>⏱️ 24 ชั่วโมงข้างหน้า</h3>
                <div 
                   ref={scrollRef}
@@ -350,7 +346,7 @@ export default function Dashboard() {
                </div>
             </div>
 
-            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '25px', border: `1px solid ${borderColor}`, flex: 1 }}>
+            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '25px', border: `1px solid ${borderColor}`, flex: 1, flexShrink: 0 }}>
                <h3 style={{ margin: '0 0 15px 0', fontSize: '0.95rem', color: textColor }}>📅 พยากรณ์ 7 วัน</h3>
                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {daily?.time?.map((t, idx) => (
@@ -384,7 +380,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', flexShrink: 0 }}>
             <div style={{ background: cardBg, padding: '20px', borderRadius: isMobile ? '20px' : '25px', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
                 <span style={{ fontSize: '2.5rem' }}>🤖</span>
                 <div>
@@ -408,7 +404,7 @@ export default function Dashboard() {
             </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', flexShrink: 0 }}>
             <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>🏃‍♂️</div>
                 <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>ออกกำลังกาย</div>
@@ -435,12 +431,13 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* 🌟 เปลี่ยนคำว่า (เรอัลไทม์) ออกแล้ว */}
-        <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden' }}>
+        {/* 🌟 กล่องเรดาร์ (ใส่ flexShrink: 0 และ minHeight ยันไว้ไม่ให้เบราว์เซอร์บีบจนแบน) */}
+        <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0 }}>
             <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ
             </h3>
-            <div style={{ width: '100%', height: isMobile ? '250px' : '350px', borderRadius: '12px', overflow: 'hidden' }}>
+            {/* 🌟 บังคับ minHeight ให้กล่อง Iframe เสมอ */}
+            <div style={{ width: '100%', height: isMobile ? '250px' : '350px', minHeight: isMobile ? '250px' : '350px', borderRadius: '12px', overflow: 'hidden' }}>
                 <iframe 
                     width="100%" height="100%" 
                     src={`https://embed.windy.com/embed2.html?lat=${coords?.lat || 13.75}&lon=${coords?.lon || 100.5}&zoom=8&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=true`} 
@@ -449,14 +446,14 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* Footer (ลบคำว่าเวอร์ชัน 2.0 ออกแล้ว) */}
-        <div style={{ textAlign: 'center', marginTop: '10px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7 }}>
+        {/* 🌟 Footer */}
+        <div style={{ textAlign: 'center', marginTop: '10px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7, flexShrink: 0 }}>
            <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>อุตุนิยมวิทยาโดย Open-Meteo API • พิกัดโดย OpenStreetMap</div>
            <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px' }}>อัปเดตข้อมูลล่าสุด: {lastUpdateText}</div>
         </div>
 
-        {/* 🌟 กล่องล่องหน (Spacer Trick): ช่วยดันขอบจอด้านล่างสุด ให้พ้น Bottom Navigation ของมือถือ */}
-        <div style={{ height: isMobile ? '100px' : '50px', flexShrink: 0, width: '100%' }}></div>
+        {/* 🌟 กล่องดันขอบล่าง (Spacer) กว้าง 150px เพื่อให้ชัวร์ว่าพ้นแถบเมนู */}
+        <div style={{ height: '150px', flexShrink: 0, width: '100%' }}></div>
 
       </div>
     </div>
