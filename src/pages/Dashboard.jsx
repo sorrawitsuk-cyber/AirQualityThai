@@ -24,13 +24,13 @@ export default function Dashboard() {
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
-    setStartX(e.pageX - scrollRef.current.offsetLeft);
-    setScrollLeft(scrollRef.current.scrollLeft);
+    setStartX(e.pageX - scrollRef.current?.offsetLeft);
+    setScrollLeft(scrollRef.current?.scrollLeft);
   };
   const handleMouseLeave = () => setIsDragging(false);
   const handleMouseUp = () => setIsDragging(false);
   const handleMouseMove = (e) => {
-    if (!isDragging) return;
+    if (!isDragging || !scrollRef.current) return;
     e.preventDefault();
     const x = e.pageX - scrollRef.current.offsetLeft;
     const walk = (x - startX) * 2;
@@ -86,7 +86,7 @@ export default function Dashboard() {
     try {
       const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
       const data = await res.json();
-      setLocationName(data.locality || data.city || 'ตำแหน่งปัจจุบัน');
+      setLocationName(data?.locality || data?.city || 'ตำแหน่งปัจจุบัน');
     } catch (e) { setLocationName('ตำแหน่งปัจจุบัน'); }
   };
 
@@ -146,7 +146,7 @@ export default function Dashboard() {
       } else {
         const res2 = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(dName)}&count=1`);
         const data2 = await res2.json();
-        if (data2.results && data2.length > 0) {
+        if (data2?.results && data2.results.length > 0) {
           fetchWeatherByCoords(data2.results[0].latitude, data2.results[0].longitude);
         }
       }
@@ -159,6 +159,7 @@ export default function Dashboard() {
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
+  // กันจอขาวด้วย Optional Chaining ครอบจักรวาล
   if (loadingWeather || !weatherData) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100%',background:appBg,color:textColor, fontWeight:'bold', fontSize:'1.2rem'}}>📍 โหลดข้อมูลแป๊บนึงนะคะ... ⏳</div>;
 
   const { current, hourly, daily, coords } = weatherData;
@@ -189,9 +190,9 @@ export default function Dashboard() {
     const rIdx = startIdx + i;
     return {
       time: new Date(t).getHours().toString().padStart(2, '0') + ':00',
-      temp: Math.round(hourly.temperature_2m[rIdx] || 0),
-      rain: hourly.precipitation_probability[rIdx] || 0,
-      pm25: Math.round(hourly.pm25[rIdx] || 0)
+      temp: Math.round(hourly?.temperature_2m?.[rIdx] || 0),
+      rain: hourly?.precipitation_probability?.[rIdx] || 0,
+      pm25: Math.round(hourly?.pm25?.[rIdx] || 0)
     };
   });
 
@@ -217,8 +218,8 @@ export default function Dashboard() {
       return new Date(dateStr).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
   };
 
-  const maxTemp = Math.round(daily?.temperature_2m_max[0] || 0);
-  const dailyRainProb = daily?.precipitation_probability_max[0] || 0;
+  const maxTemp = Math.round(daily?.temperature_2m_max?.[0] || 0);
+  const dailyRainProb = daily?.precipitation_probability_max?.[0] || 0;
   let briefingText = `วันนี้สภาพอากาศโดยรวม${weatherText.replace('อากาศดี ', '')} อุณหภูมิสูงสุดจะอยู่ที่ ${maxTemp}°C `;
   if (dailyRainProb > 40) briefingText += `และมีโอกาสเกิดฝนตก ${dailyRainProb}% แนะนำให้พกร่มหรืออุปกรณ์กันฝนก่อนออกจากบ้านครับ ☔`;
   else if (maxTemp >= 38) briefingText += `อากาศค่อนข้างร้อนจัด ควรดื่มน้ำบ่อยๆ และหลีกเลี่ยงการทำกิจกรรมกลางแจ้งเป็นเวลานานครับ 🥤`;
@@ -244,8 +245,8 @@ export default function Dashboard() {
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .fade-in { animation: fadeIn 0.3s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }`}} />
       
-      {/* 🌟 ดันขอบล่างให้กว้างขึ้น เพื่อป้องกันการโดนบดบังจากเมนูมือถือ */}
-      <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '15px', padding: isMobile ? '15px' : '30px', paddingBottom: isMobile ? '200px' : '120px' }}>
+      {/* 🌟 เปลี่ยน Padding Bottom เป็นค่าปกติ แล้วไปดันด้วยกล่องล่องหนแทนด้านล่างสุด */}
+      <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '15px', padding: isMobile ? '15px' : '30px', paddingBottom: '30px' }}>
 
         {alertBanner && (
             <div style={{ background: alertBanner.color, color: '#fff', padding: '10px 15px', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', fontSize: '0.9rem' }}>
@@ -358,21 +359,21 @@ export default function Dashboard() {
                             <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
                             <div style={{ fontSize: '1.2rem', textAlign: 'center' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                               <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', width: '25px', textAlign: 'right' }}>{Math.round(daily.temperature_2m_min[idx] || 0)}°</span>
+                               <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', width: '25px', textAlign: 'right' }}>{Math.round(daily?.temperature_2m_min?.[idx] || 0)}°</span>
                                <div style={{ flex: 1, height: '4px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
                                   <div style={{ position: 'absolute', left: '20%', right: '20%', top: 0, bottom: 0, background: 'linear-gradient(to right, #3b82f6, #f97316)' }}></div>
                                </div>
-                               <span style={{ fontSize: '0.85rem', color: textColor, fontWeight: '900', width: '25px' }}>{Math.round(daily.temperature_2m_max[idx] || 0)}°</span>
+                               <span style={{ fontSize: '0.85rem', color: textColor, fontWeight: '900', width: '25px' }}>{Math.round(daily?.temperature_2m_max?.[idx] || 0)}°</span>
                             </div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '6px 10px', borderRadius: '10px', fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>
-                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>☔</span> {daily.precipitation_probability_max[idx]}%</div>
-                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>🥵</span> {Math.round(daily.apparent_temperature_max[idx] || 0)}°</div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>☔</span> {daily?.precipitation_probability_max?.[idx] || 0}%</div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>🥵</span> {Math.round(daily?.apparent_temperature_max?.[idx] || 0)}°</div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{fontSize:'0.9rem'}}>😷</span> 
-                              <span style={{ color: daily.pm25_max[idx] > 37.5 ? '#ef4444' : (daily.pm25_max[idx] > 25 ? '#f97316' : '#22c55e') }}>
-                                {daily.pm25_max[idx]} <span style={{fontSize:'0.6rem'}}>µg/m³</span>
+                              <span style={{ color: daily?.pm25_max?.[idx] > 37.5 ? '#ef4444' : (daily?.pm25_max?.[idx] > 25 ? '#f97316' : '#22c55e') }}>
+                                {daily?.pm25_max?.[idx] || 0} <span style={{fontSize:'0.6rem'}}>µg/m³</span>
                               </span>
                            </div>
                         </div>
@@ -402,7 +403,7 @@ export default function Dashboard() {
                     </span>
                 </div>
                 <div style={{ width: '100%', height: '8px', background: 'linear-gradient(to right, #22c55e, #eab308, #ea580c, #ef4444, #a855f7)', borderRadius: '10px', marginTop: '15px', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: '-4px', left: `${Math.min((current?.uv / 11) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
+                    <div style={{ position: 'absolute', top: '-4px', left: `${Math.min(((current?.uv || 0) / 11) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
                 </div>
             </div>
         </div>
@@ -434,9 +435,10 @@ export default function Dashboard() {
             </div>
         </div>
 
+        {/* 🌟 เปลี่ยนคำว่า (เรอัลไทม์) ออกแล้ว */}
         <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden' }}>
             <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ (เรอัลไทม์)
+                <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ
             </h3>
             <div style={{ width: '100%', height: isMobile ? '250px' : '350px', borderRadius: '12px', overflow: 'hidden' }}>
                 <iframe 
@@ -447,11 +449,14 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* 🌟 Footer ที่คลีนขึ้น (ลบเวอร์ชัน 2.0 ออกแล้ว) */}
-        <div style={{ textAlign: 'center', marginTop: '20px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7 }}>
+        {/* Footer (ลบคำว่าเวอร์ชัน 2.0 ออกแล้ว) */}
+        <div style={{ textAlign: 'center', marginTop: '10px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7 }}>
            <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>อุตุนิยมวิทยาโดย Open-Meteo API • พิกัดโดย OpenStreetMap</div>
            <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px' }}>อัปเดตข้อมูลล่าสุด: {lastUpdateText}</div>
         </div>
+
+        {/* 🌟 กล่องล่องหน (Spacer Trick): ช่วยดันขอบจอด้านล่างสุด ให้พ้น Bottom Navigation ของมือถือ */}
+        <div style={{ height: isMobile ? '100px' : '50px', flexShrink: 0, width: '100%' }}></div>
 
       </div>
     </div>
