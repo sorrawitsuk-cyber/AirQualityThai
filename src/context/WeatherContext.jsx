@@ -42,7 +42,6 @@ export const WeatherProvider = ({ children }) => {
         const w = wDataArray[idx].current;
         const a = aDataArray[idx].current;
         const sID = `PROV_${idx}`;
-        
         realStations.push({ stationID: sID, areaTH: p.n, lat: p.lat, long: p.lon, AQILast: { PM25: { value: a.pm2_5 || 0 } } });
         temps[sID] = { temp: w.temperature_2m, feelsLike: w.apparent_temperature, humidity: w.relative_humidity_2m, rainProb: w.precipitation, windSpeed: w.wind_speed_10m };
       });
@@ -53,16 +52,13 @@ export const WeatherProvider = ({ children }) => {
   const fetchWeatherByCoords = async (lat, lon) => {
     setLoadingWeather(true);
     try {
-      // 🌟 อัปเกรด API ดึง % ฝนตก และ Heat Index (apparent_temperature_max)
       const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,uv_index&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,weathercode,apparent_temperature_max,precipitation_probability_max&timezone=Asia%2FBangkok`;
-      // 🌟 ดึง PM2.5 แบบรายชั่วโมง เพื่อเอาไปหาค่าสูงสุดในแต่ละวัน
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5,us_aqi&hourly=pm2_5&timezone=Asia%2FBangkok`;
 
       const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
       const wData = await wRes.json();
       const aData = await aRes.json();
 
-      // คำนวณหา PM2.5 ล่วงหน้า 7 วัน (หาค่าพีคสุดของแต่ละวัน)
       const dailyPm25 = [];
       if (aData.hourly && aData.hourly.pm2_5) {
         for (let i = 0; i < 7; i++) {
@@ -76,11 +72,14 @@ export const WeatherProvider = ({ children }) => {
           temp: wData.current.temperature_2m, feelsLike: wData.current.apparent_temperature,
           humidity: wData.current.relative_humidity_2m, windSpeed: wData.current.wind_speed_10m,
           rain: wData.current.precipitation, uv: wData.current.uv_index,
-          rainProb: wData.daily.precipitation_probability_max[0] || 0, // % ฝนตกวันนี้
+          rainProb: wData.daily.precipitation_probability_max[0] || 0, 
           pm25: aData.current.pm2_5, aqi: aData.current.us_aqi
         },
-        hourly: wData.hourly, 
-        daily: { ...wData.daily, pm25_max: dailyPm25 }, // ส่งข้อมูลเข้ากล่องพยากรณ์ 7 วัน
+        hourly: {
+          ...wData.hourly,
+          pm25: aData.hourly.pm2_5 // 🌟 ยัด PM2.5 แบบรายชั่วโมงส่งไปให้กราฟ!
+        }, 
+        daily: { ...wData.daily, pm25_max: dailyPm25 },
         coords: { lat, lon }
       });
 

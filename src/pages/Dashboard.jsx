@@ -1,7 +1,8 @@
 // src/pages/Dashboard.jsx
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
-import { AreaChart, Area, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis } from 'recharts';
+// 🌟 อย่าลืมนำเข้า LabelList!
+import { AreaChart, Area, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, LabelList } from 'recharts';
 
 export default function Dashboard() {
   const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
@@ -141,13 +142,46 @@ export default function Dashboard() {
   const aqiBg = current.pm25 > 75 ? '#ef4444' : current.pm25 > 37.5 ? '#f97316' : current.pm25 > 25 ? '#eab308' : '#22c55e';
   const aqiText = current.pm25 > 75 ? 'เริ่มมีผลกระทบ' : current.pm25 > 37.5 ? 'ปานกลาง' : 'คุณภาพอากาศดี';
   
-  const isRaining = current.rainProb > 30; // ใช้ % โอกาสฝนเป็นเกณฑ์ตัดสินใจโชว์อนิเมชั่นฝน
+  const isRaining = current.rainProb > 30;
   const isHot = current.feelsLike >= 38;
   const weatherIcon = isRaining ? '🌧️' : (isHot ? '☀️' : '🌤️');
   const weatherText = isRaining ? 'มีโอกาสเกิดฝนตก' : (isHot ? 'แดดร้อนจัด' : 'อากาศดี มีเมฆบางส่วน');
   
   let bgGradient = darkMode ? 'linear-gradient(135deg, #1e3a8a, #0f172a)' : 'linear-gradient(135deg, #0ea5e9, #38bdf8)';
   if (isRaining) bgGradient = 'linear-gradient(135deg, #334155, #0f172a)'; else if (isHot) bgGradient = 'linear-gradient(135deg, #ea580c, #9a3412)';
+
+  // 🌟 ประมวลผลข้อมูล 24 ชั่วโมงล่วงหน้า เพื่อยัดลงกราฟ
+  const nowMs = Date.now();
+  const startIdx = hourly.time.findIndex(t => new Date(t).getTime() >= nowMs - 3600000);
+  const sIdx = startIdx >= 0 ? startIdx : 0;
+  
+  const chartData = hourly.time.slice(sIdx, sIdx + 24).map((t, i) => {
+    const rIdx = sIdx + i;
+    return {
+      time: new Date(t).getHours().toString().padStart(2, '0') + ':00',
+      temp: Math.round(hourly.temperature_2m[rIdx]),
+      rain: hourly.precipitation_probability[rIdx] || 0,
+      pm25: Math.round(hourly.pm25[rIdx] || 0)
+    };
+  });
+
+  // 🌟 กล่องข้อมูลใต้กราฟ (เวลา / ฝน / ฝุ่น)
+  const CustomXAxisTick = ({ x, y, payload }) => {
+    const item = chartData[payload.index];
+    if (!item) return null;
+    const pmColor = item.pm25 > 37.5 ? '#ef4444' : (item.pm25 > 25 ? '#f97316' : '#22c55e');
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <foreignObject x={-30} y={10} width={60} height={80}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '0.75rem', fontWeight: 'bold', fontFamily: 'Kanit' }}>
+            <span style={{ color: subTextColor }}>{item.time}</span>
+            <span style={{ color: '#3b82f6', marginTop: '4px' }}>☔ {item.rain}%</span>
+            <span style={{ color: pmColor, marginTop: '2px' }}>😷 {item.pm25}</span>
+          </div>
+        </foreignObject>
+      </g>
+    );
+  };
 
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
@@ -185,7 +219,6 @@ export default function Dashboard() {
                <div style={{ marginTop: '20px', background: aqiBg, color: '#fff', padding: '8px 25px', borderRadius: '50px', fontWeight: '900', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>😷 ฝุ่น PM2.5: {current.pm25 || '-'} µg/m³ ({aqiText})</div>
 
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', width: '100%', marginTop: '30px', background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(10px)', borderRadius: '20px', padding: '15px 10px' }}>
-                  {/* 🌟 เปลี่ยนช่องแรกเป็น โอกาสฝนตก (%) */}
                   <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>☔</div><div style={{fontSize:'0.7rem'}}>โอกาสฝนตก</div><b>{current.rainProb}%</b></div>
                   <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>💧</div><div style={{fontSize:'0.7rem'}}>ความชื้น</div><b>{current.humidity}%</b></div>
                   <div style={{ textAlign: 'center' }}><div style={{fontSize:'1.2rem'}}>🌬️</div><div style={{fontSize:'0.7rem'}}>ลม</div><b>{current.windSpeed} km/h</b></div>
@@ -207,26 +240,37 @@ export default function Dashboard() {
           </div>
 
           <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+            {/* 🌟 กราฟ 24 ชม. แบบปัดเลื่อนซ้ายขวาได้ */}
             <div style={{ background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
-               <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor }}>⏱️ แนวโน้มอุณหภูมิวันนี้ (24 ชั่วโมง)</h3>
-               <div style={{ height: '140px', width: '100%' }}>
-                 <ResponsiveContainer width="100%" height="100%">
-                   <AreaChart data={hourly.time.slice(0, 24).map((t, i) => ({ time: t.split('T')[1], temp: Math.round(hourly.temperature_2m[i]) }))}>
-                     <defs><linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/><stop offset="95%" stopColor="#f97316" stopOpacity={0}/></linearGradient></defs>
-                     <RechartsTooltip contentStyle={{ background: cardBg, borderRadius: '10px', color: textColor }} />
-                     <Area type="monotone" dataKey="temp" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorTemp)" />
-                   </AreaChart>
-                 </ResponsiveContainer>
+               <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor }}>⏱️ พยากรณ์ล่วงหน้า 24 ชั่วโมง</h3>
+               
+               <div style={{ overflowX: 'auto', overflowY: 'hidden', paddingBottom: '5px' }} className="hide-scrollbar">
+                 <div style={{ width: '1400px', height: '220px' }}>
+                   <ResponsiveContainer width="100%" height="100%">
+                     <AreaChart data={chartData} margin={{ top: 20, right: 15, left: 15, bottom: 60 }}>
+                       <defs>
+                         <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                           <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                         </linearGradient>
+                       </defs>
+                       <XAxis dataKey="time" axisLine={false} tickLine={false} interval={0} tick={<CustomXAxisTick />} />
+                       <Area type="monotone" dataKey="temp" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorTemp)">
+                         {/* แปะอุณหภูมิไว้บนเส้นกราฟ */}
+                         <LabelList dataKey="temp" position="top" offset={10} style={{ fill: textColor, fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'Kanit' }} formatter={(val) => `${val}°`} />
+                       </Area>
+                     </AreaChart>
+                   </ResponsiveContainer>
+                 </div>
                </div>
             </div>
 
             <div style={{ background: cardBg, borderRadius: '25px', padding: '25px', border: `1px solid ${borderColor}`, flex: 1 }}>
                <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: textColor }}>📅 พยากรณ์อากาศล่วงหน้า 7 วัน (ฉบับละเอียด)</h3>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   {daily.time.map((t, idx) => (
                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', paddingBottom: idx !== 6 ? '15px' : '0', borderBottom: idx !== 6 ? `1px solid ${borderColor}` : 'none' }}>
                         
-                        {/* ส่วนที่ 1: อุณหภูมิหลัก */}
                         <div style={{ display: 'grid', gridTemplateColumns: '50px 50px 1fr', alignItems: 'center' }}>
                             <div style={{ fontSize: '1rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
                             <div style={{ fontSize: '1.5rem', textAlign: 'center' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
@@ -239,7 +283,6 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* 🌟 ส่วนที่ 2: แคปซูลข้อมูลเสริม (Rain %, Heat Index, PM2.5) */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '8px 12px', borderRadius: '12px', fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }} title="โอกาสฝนตก">
                               <span style={{fontSize:'1.1rem'}}>☔</span> {daily.precipitation_probability_max[idx]}%
