@@ -1,7 +1,7 @@
 // src/pages/Dashboard.jsx
 import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
-import { AreaChart, Area, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, LabelList } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, XAxis, LabelList } from 'recharts';
 
 export default function Dashboard() {
   const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
@@ -16,7 +16,7 @@ export default function Dashboard() {
   
   const [showFilter, setShowFilter] = useState(false);
 
-  // 🌟 State สำหรับระบบ "คลิกแล้วลาก (Drag to Scroll)" ในคอมพิวเตอร์
+  // Drag to Scroll 24h
   const scrollRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -33,7 +33,7 @@ export default function Dashboard() {
     if (!isDragging) return;
     e.preventDefault();
     const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 2; // เลื่อนไวขึ้น 2 เท่า
+    const walk = (x - startX) * 2;
     scrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
@@ -217,6 +217,15 @@ export default function Dashboard() {
       return new Date(dateStr).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
   };
 
+  // 🌟 ประมวลผลข้อความ Daily Briefing (Idea 2)
+  const maxTemp = Math.round(daily?.temperature_2m_max[0] || 0);
+  const dailyRainProb = daily?.precipitation_probability_max[0] || 0;
+  let briefingText = `วันนี้สภาพอากาศโดยรวม${weatherText.replace('อากาศดี ', '')} อุณหภูมิสูงสุดจะอยู่ที่ ${maxTemp}°C `;
+  if (dailyRainProb > 40) briefingText += `และมีโอกาสเกิดฝนตก ${dailyRainProb}% แนะนำให้พกร่มหรืออุปกรณ์กันฝนก่อนออกจากบ้านครับ ☔`;
+  else if (maxTemp >= 38) briefingText += `อากาศค่อนข้างร้อนจัด ควรดื่มน้ำบ่อยๆ และหลีกเลี่ยงการทำกิจกรรมกลางแจ้งเป็นเวลานานครับ 🥤`;
+  else if (current?.pm25 > 37.5) briefingText += `ค่าฝุ่น PM2.5 ค่อนข้างสูง แนะนำให้สวมหน้ากากอนามัยเมื่อออกนอกอาคารครับ 😷`;
+  else briefingText += `อากาศเป็นใจ เหมาะสำหรับการทำกิจกรรมนอกบ้านหรือซักผ้าครับ ✨`;
+
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .fade-in { animation: fadeIn 0.3s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }`}} />
@@ -244,12 +253,13 @@ export default function Dashboard() {
             </div>
         )}
 
+        {/* 🌟 Section 1: ข้อมูลหลักด้านบน (ซ้าย-ขวา) */}
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '20px' }}>
           
+          {/* คอลัมน์ซ้าย */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
             
             <div style={{ background: bgGradient, borderRadius: isMobile ? '24px' : '30px', padding: isMobile ? '20px' : '30px 20px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', transition: 'background 0.5s ease', position: 'relative' }}>
-               
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '15px' }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: isMobile ? '1.3rem' : '1.8rem', fontWeight: '900', lineHeight: 1.2 }}>{locationName}</h2>
@@ -292,17 +302,13 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* คอลัมน์ขวา */}
           <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
             <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}` }}>
                <h3 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: textColor }}>⏱️ 24 ชั่วโมงข้างหน้า</h3>
-               
-               {/* 🌟 กล่องจำลองระบบเลื่อนซ้ายขวาด้วยเมาส์ (Drag to Scroll) */}
                <div 
                   ref={scrollRef}
-                  onMouseDown={handleMouseDown}
-                  onMouseLeave={handleMouseLeave}
-                  onMouseUp={handleMouseUp}
-                  onMouseMove={handleMouseMove}
+                  onMouseDown={handleMouseDown} onMouseLeave={handleMouseLeave} onMouseUp={handleMouseUp} onMouseMove={handleMouseMove}
                   style={{ overflowX: 'auto', overflowY: 'hidden', paddingBottom: '5px', cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }} 
                   className="hide-scrollbar"
                >
@@ -310,13 +316,11 @@ export default function Dashboard() {
                    <ResponsiveContainer width="100%" height="100%">
                      <AreaChart data={chartData} margin={{ top: 20, right: 15, left: 15, bottom: 60 }}>
                        <defs>
-                         {/* 🌟 อัปเกรด 1: ไล่สีพื้นหลัง (Gradient Fill) แดง -> ส้ม -> ฟ้า */}
                          <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
-                           <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8}/>  {/* แดงร้อน */}
-                           <stop offset="50%" stopColor="#f97316" stopOpacity={0.4}/> {/* ส้มอุ่น */}
-                           <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/> {/* ฟ้าเย็น */}
+                           <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8}/>
+                           <stop offset="50%" stopColor="#f97316" stopOpacity={0.4}/>
+                           <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
                          </linearGradient>
-                         {/* 🌟 อัปเกรด 2: ไล่สีเส้นกราฟ (Gradient Stroke) */}
                          <linearGradient id="lineTemp" x1="0" y1="0" x2="0" y2="1">
                            <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
                            <stop offset="50%" stopColor="#f97316" stopOpacity={1}/>
@@ -366,6 +370,65 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* 🌟 Section 2: ส่วนเสริมด้านล่าง (Briefing, Gauges, Radar) */}
+        
+        {/* ไอเดีย 2: Daily Briefing */}
+        <div style={{ background: cardBg, padding: '20px', borderRadius: isMobile ? '20px' : '25px', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+            <span style={{ fontSize: '2.5rem' }}>🤖</span>
+            <div>
+                <h4 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1rem' }}>สรุปสภาพอากาศวันนี้</h4>
+                <p style={{ margin: 0, color: subTextColor, fontSize: '0.9rem', lineHeight: 1.6 }}>{briefingText}</p>
+            </div>
+        </div>
+
+        {/* ไอเดีย 1: Gauges (UV & PM2.5) */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
+            {/* UV Gauge */}
+            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>☀️</span> รังสีอัลตราไวโอเลต (UV)
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>
+                    {current?.uv || 0} <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'normal' }}>
+                        {current?.uv > 8 ? 'สูงมาก' : current?.uv > 5 ? 'สูง' : 'ปานกลาง'}
+                    </span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'linear-gradient(to right, #22c55e, #eab308, #ea580c, #ef4444, #a855f7)', borderRadius: '10px', marginTop: '15px', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: '-4px', left: `${Math.min((current?.uv / 11) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
+                </div>
+            </div>
+            
+            {/* PM2.5 Gauge */}
+            <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>😷</span> คุณภาพอากาศ (PM2.5)
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>
+                    {current?.pm25 || 0} <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'normal' }}>µg/m³</span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444, #7f1d1d)', borderRadius: '10px', marginTop: '15px', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: '-4px', left: `${Math.min((current?.pm25 / 100) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
+                </div>
+            </div>
+        </div>
+
+        {/* ไอเดีย 3: Mini Radar Map (ซูมตรงเป๊ะตามพิกัดที่เลือก) */}
+        <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden' }}>
+            <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ (เรอัลไทม์)
+            </h3>
+            <div style={{ width: '100%', height: isMobile ? '250px' : '350px', borderRadius: '12px', overflow: 'hidden' }}>
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src={`https://embed.windy.com/embed2.html?lat=${coords?.lat || 13.75}&lon=${coords?.lon || 100.5}&zoom=8&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=true`} 
+                    frameBorder="0"
+                    title="Radar Map"
+                ></iframe>
+            </div>
+        </div>
+
       </div>
     </div>
   );
