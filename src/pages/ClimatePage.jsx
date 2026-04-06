@@ -65,18 +65,72 @@ export default function AlertsPage() {
     };
   }, [stations, stationTemps]);
 
+  // 🌟 Pro Data: ใส่ครบทั้ง 77 จังหวัด และจัดระบบคำนวณผลรวมอัตโนมัติ
   const mockGistdaHotspots = useMemo(() => [
-    { region: 'ภาคเหนือ', count: 452, color: '#ef4444', trend: 'up', provinces: [{name: 'เชียงใหม่', count: 150}, {name: 'แม่ฮ่องสอน', count: 120}, {name: 'ตาก', count: 100}, {name: 'เชียงราย', count: 82}] },
-    { region: 'ภาคตะวันตก', count: 142, color: '#f97316', trend: 'up', provinces: [{name: 'กาญจนบุรี', count: 80}, {name: 'ราชบุรี', count: 40}, {name: 'เพชรบุรี', count: 22}] },
-    { region: 'ภาคตะวันออกเฉียงเหนือ', count: 128, color: '#f97316', trend: 'down', provinces: [{name: 'เลย', count: 50}, {name: 'ชัยภูมิ', count: 45}, {name: 'หนองคาย', count: 33}] },
-    { region: 'ภาคกลาง', count: 85, color: '#eab308', trend: 'down', provinces: [{name: 'นครสวรรค์', count: 40}, {name: 'อุทัยธานี', count: 25}, {name: 'ลพบุรี', count: 20}] },
-    { region: 'ภาคตะวันออก', count: 12, color: '#22c55e', trend: 'down', provinces: [{name: 'ปราจีนบุรี', count: 8}, {name: 'สระแก้ว', count: 4}] },
-    { region: 'ภาคใต้', count: 5, color: '#22c55e', trend: 'down', provinces: [{name: 'สุราษฎร์ธานี', count: 3}, {name: 'นครศรีธรรมราช', count: 2}] }
-  ], []);
+    { 
+      region: 'ภาคเหนือ', color: '#ef4444', trend: 'up', 
+      provinces: [
+        {name: 'เชียงใหม่', count: 145}, {name: 'แม่ฮ่องสอน', count: 122}, {name: 'เชียงราย', count: 85}, 
+        {name: 'ลำปาง', count: 54}, {name: 'น่าน', count: 48}, {name: 'พะเยา', count: 32}, 
+        {name: 'แพร่', count: 27}, {name: 'อุตรดิตถ์', count: 21}, {name: 'ลำพูน', count: 18}
+      ] 
+    },
+    { 
+      region: 'ภาคตะวันตก', color: '#f97316', trend: 'up', 
+      provinces: [
+        {name: 'กาญจนบุรี', count: 110}, {name: 'ตาก', count: 95}, {name: 'ราชบุรี', count: 25}, 
+        {name: 'เพชรบุรี', count: 12}, {name: 'ประจวบคีรีขันธ์', count: 8}
+      ] 
+    },
+    { 
+      region: 'ภาคตะวันออกเฉียงเหนือ', color: '#f97316', trend: 'down', 
+      provinces: [
+        {name: 'เลย', count: 45}, {name: 'ชัยภูมิ', count: 38}, {name: 'นครราชสีมา', count: 32}, 
+        {name: 'อุดรธานี', count: 28}, {name: 'หนองบัวลำภู', count: 22}, {name: 'ขอนแก่น', count: 20}, 
+        {name: 'สกลนคร', count: 18}, {name: 'มุกดาหาร', count: 15}, {name: 'กาฬสินธุ์', count: 14}, 
+        {name: 'หนองคาย', count: 12}, {name: 'นครพนม', count: 10}, {name: 'บึงกาฬ', count: 9}, 
+        {name: 'ร้อยเอ็ด', count: 8}, {name: 'มหาสารคาม', count: 7}, {name: 'บุรีรัมย์', count: 6}, 
+        {name: 'สุรินทร์', count: 5}, {name: 'ศรีสะเกษ', count: 5}, {name: 'อุบลราชธานี', count: 4}, 
+        {name: 'ยโสธร', count: 3}, {name: 'อำนาจเจริญ', count: 2}
+      ] 
+    },
+    { 
+      region: 'ภาคกลาง', color: '#eab308', trend: 'down', 
+      provinces: [
+        {name: 'นครสวรรค์', count: 35}, {name: 'เพชรบูรณ์', count: 32}, {name: 'อุทัยธานี', count: 28}, 
+        {name: 'พิษณุโลก', count: 25}, {name: 'กำแพงเพชร', count: 22}, {name: 'สุโขทัย', count: 18}, 
+        {name: 'พิจิตร', count: 15}, {name: 'ลพบุรี', count: 12}, {name: 'สระบุรี', count: 10}, 
+        {name: 'สุพรรณบุรี', count: 8}, {name: 'ชัยนาท', count: 6}, {name: 'นครนายก', count: 5}, 
+        {name: 'สิงห์บุรี', count: 4}, {name: 'อ่างทอง', count: 3}, {name: 'พระนครศรีอยุธยา', count: 2}, 
+        {name: 'นครปฐม', count: 2}, {name: 'ปทุมธานี', count: 1}, {name: 'นนทบุรี', count: 1}, 
+        {name: 'กรุงเทพมหานคร', count: 0}, {name: 'สมุทรปราการ', count: 0}, {name: 'สมุทรสาคร', count: 0}, {name: 'สมุทรสงคราม', count: 0}
+      ] 
+    },
+    { 
+      region: 'ภาคตะวันออก', color: '#22c55e', trend: 'down', 
+      provinces: [
+        {name: 'ปราจีนบุรี', count: 12}, {name: 'สระแก้ว', count: 10}, {name: 'ฉะเชิงเทรา', count: 5}, 
+        {name: 'จันทบุรี', count: 4}, {name: 'ชลบุรี', count: 2}, {name: 'ระยอง', count: 1}, {name: 'ตราด', count: 0}
+      ] 
+    },
+    { 
+      region: 'ภาคใต้', color: '#22c55e', trend: 'down', 
+      provinces: [
+        {name: 'สุราษฎร์ธานี', count: 4}, {name: 'นครศรีธรรมราช', count: 3}, {name: 'ชุมพร', count: 2}, 
+        {name: 'พังงา', count: 1}, {name: 'กระบี่', count: 1}, {name: 'ระนอง', count: 0}, 
+        {name: 'ภูเก็ต', count: 0}, {name: 'ตรัง', count: 0}, {name: 'พัทลุง', count: 0}, 
+        {name: 'สงขลา', count: 0}, {name: 'สตูล', count: 0}, {name: 'ปัตตานี', count: 0}, 
+        {name: 'ยะลา', count: 0}, {name: 'นราธิวาส', count: 0}
+      ] 
+    }
+  ].map(region => ({
+      ...region,
+      // 🌟 ให้ระบบบวกเลขรวมของทุกจังหวัดในภาคเองอัตโนมัติ
+      count: region.provinces.reduce((sum, p) => sum + p.count, 0)
+  })), []);
 
   const totalHotspots = useMemo(() => mockGistdaHotspots.reduce((sum, item) => sum + item.count, 0), [mockGistdaHotspots]);
 
-  // 🌟 ข้อมูลจำลองสถิติเมื่อวาน (Yesterday's Records)
   const yesterdayRecords = useMemo(() => [
     { id: 'pm25', title: 'ฝุ่น PM2.5 สูงสุด', value: '124 µg/m³', loc: 'อ.เชียงดาว, จ.เชียงใหม่', color: '#ef4444', icon: '😷', bgLight: '#fef2f2', borderDark: '#7f1d1d' },
     { id: 'heat', title: 'ดัชนีความร้อนสูงสุด', value: '42.1 °C', loc: 'อ.เมือง, จ.ตาก', color: '#ea580c', icon: '🔥', bgLight: '#fff7ed', borderDark: '#7c2d12' },
@@ -146,7 +200,6 @@ export default function AlertsPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1.2fr', gap: '20px' }}>
             
-            {/* 📰 ข่าวอุตุนิยมวิทยา (แบบการ์ดสถิติ) */}
             <div style={{ background: cardBg, padding: '25px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                     <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -167,9 +220,7 @@ export default function AlertsPage() {
                     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{ fontSize: '0.85rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '-5px' }}>อัปเดตล่าสุด: {lastUpdateText}</div>
                         
-                        {/* 🌟 การ์ดสถิติปัจจุบัน (Nowcast Cards) */}
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-                            {/* การ์ดความร้อน */}
                             <div style={{ background: darkMode ? '#1e293b' : '#fff7ed', border: `1px solid ${darkMode ? '#7c2d12' : '#fed7aa'}`, padding: '15px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ fontSize: '2rem', flexShrink: 0 }}>🔥</div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -178,7 +229,6 @@ export default function AlertsPage() {
                                     <span style={{ fontSize: '0.8rem', color: textColor }}>📍 จ.{nationalSummary.maxFeelsLike.prov}</span>
                                 </div>
                             </div>
-                            {/* การ์ดฝุ่น */}
                             <div style={{ background: darkMode ? '#1e293b' : '#fef2f2', border: `1px solid ${darkMode ? '#7f1d1d' : '#fecaca'}`, padding: '15px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ fontSize: '2rem', flexShrink: 0 }}>😷</div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -187,7 +237,6 @@ export default function AlertsPage() {
                                     <span style={{ fontSize: '0.8rem', color: textColor }}>📍 จ.{nationalSummary.maxPm25.prov}</span>
                                 </div>
                             </div>
-                            {/* การ์ดฝน */}
                             <div style={{ background: darkMode ? '#1e293b' : '#eff6ff', border: `1px solid ${darkMode ? '#1e3a8a' : '#bfdbfe'}`, padding: '15px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ fontSize: '2rem', flexShrink: 0 }}>⛈️</div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -196,7 +245,6 @@ export default function AlertsPage() {
                                     <span style={{ fontSize: '0.8rem', color: textColor }}>📍 จ.{nationalSummary.maxRain.prov}</span>
                                 </div>
                             </div>
-                            {/* การ์ด UV */}
                             <div style={{ background: darkMode ? '#1e293b' : '#faf5ff', border: `1px solid ${darkMode ? '#4c1d95' : '#e9d5ff'}`, padding: '15px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ fontSize: '2rem', flexShrink: 0 }}>☀️</div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -225,7 +273,6 @@ export default function AlertsPage() {
                     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{ fontSize: '0.85rem', color: '#8b5cf6', fontWeight: 'bold', marginBottom: '-5px' }}>สถิติประเทศประจำวันที่: {yesterdayFullStr}</div>
                         
-                        {/* 🌟 การ์ดสถิติเมื่อวาน (Yesterday's Cards) */}
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                             {yesterdayRecords.map((rec, idx) => (
                                 <div key={idx} style={{ background: darkMode ? '#1e293b' : rec.bgLight, border: `1px solid ${darkMode ? rec.borderDark : 'transparent'}`, padding: '15px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -246,7 +293,7 @@ export default function AlertsPage() {
                 )}
             </div>
 
-            {/* 🛰️ ระบบเฝ้าระวังจุดความร้อน */}
+            {/* 🛰️ ศูนย์ควบคุมไฟป่า */}
             <div style={{ background: cardBg, padding: '25px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                     <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -270,7 +317,7 @@ export default function AlertsPage() {
                             <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>ยอดรวม {totalHotspots} จุด</span>
                         </div>
                         
-                        <div className="hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '350px', paddingRight: '5px' }}>
+                        <div className="hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '420px', paddingRight: '5px' }}>
                             {mockGistdaHotspots.map((hs, idx) => {
                                 const isExpanded = expandedRegion === hs.region;
                                 return (
@@ -284,15 +331,18 @@ export default function AlertsPage() {
                                             </div>
                                         </div>
                                         
+                                        {/* 🌟 แสดงแบบ 2 คอลัมน์ถ้าหน้าจอกว้าง (Grid Layout) */}
                                         {isExpanded && (
                                             <div style={{ padding: '0 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: '8px', animation: 'fadeIn 0.2s ease-out' }}>
                                                 <div style={{ height: '1px', background: borderColor, marginBottom: '4px' }}></div>
-                                                {hs.provinces.map((prov, i) => (
-                                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: subTextColor }}>
-                                                        <span>จ.{prov.name}</span>
-                                                        <span style={{ fontWeight: 'bold', color: textColor }}>{prov.count} จุด</span>
-                                                    </div>
-                                                ))}
+                                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                                                    {hs.provinces.map((prov, i) => (
+                                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: subTextColor, padding: '4px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#fff', borderRadius: '6px', border: `1px solid ${borderColor}` }}>
+                                                            <span>จ.{prov.name}</span>
+                                                            <span style={{ fontWeight: 'bold', color: prov.count > 0 ? textColor : subTextColor }}>{prov.count} จุด</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
