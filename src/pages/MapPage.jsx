@@ -31,7 +31,7 @@ const provMap = {
   "Phatthalung": "พัทลุง", "Pattani": "ปัตตานี", "Yala": "ยะลา", "Narathiwat": "นราธิวาส"
 };
 
-// 🌟 เกณฑ์อัปเกรดใหม่ (ฝน, ความชื้น, UV)
+// 🌟 เกณฑ์แบ่งระดับความเสี่ยง
 const legendConfigs = {
   pm25: [
     { c: '#ef4444', t: '> 75 (มีผลกระทบต่อสุขภาพ)' },
@@ -58,10 +58,10 @@ const legendConfigs = {
     { c: '#1e3a8a', t: '> 70% (ฝนตกหนัก)' },
     { c: '#3b82f6', t: '41 - 70% (ฝนตกปานกลาง)' },
     { c: '#60a5fa', t: '11 - 40% (ฝนเล็กน้อย)' },
-    { c: '#94a3b8', t: '0 - 10% (ฝนน้อยมาก)' } // เปลี่ยนคำตามรีเควส
+    { c: '#94a3b8', t: '0 - 10% (ฝนน้อยมาก)' }
   ],
   humidity: [
-    { c: '#1e3a8a', t: '> 80% (ชื้นมาก / อึดอัด)' }, // เกณฑ์ความชื้นใหม่
+    { c: '#1e3a8a', t: '> 80% (ชื้นมาก / อึดอัด)' },
     { c: '#3b82f6', t: '61 - 80% (ชื้น)' },
     { c: '#60a5fa', t: '31 - 60% (สบายตัว)' },
     { c: '#94a3b8', t: '0 - 30% (แห้งมาก)' }
@@ -72,7 +72,7 @@ const legendConfigs = {
     { c: '#eab308', t: '11 - 20 km/h (ลมปานกลาง)' },
     { c: '#22c55e', t: '0 - 10 km/h (ลมสงบ)' }
   ],
-  uv: [ // 🌟 เพิ่มโหมด UV
+  uv: [ 
     { c: '#a855f7', t: '> 10 (อันตรายสุด)' },
     { c: '#ef4444', t: '8 - 10 (สูงมาก)' },
     { c: '#ea580c', t: '6 - 7 (สูง)' },
@@ -81,7 +81,6 @@ const legendConfigs = {
   ]
 };
 
-// Component จัดการการบินไปยังพิกัด (FlyTo)
 function MapChangeView({ center, zoom }) {
   const map = useMap();
   useEffect(() => {
@@ -106,7 +105,6 @@ export default function MapPage() {
   
   const [selectedProvForecast, setSelectedProvForecast] = useState(null);
   
-  // 🌟 ฟีเจอร์ใหม่: Basemap และ การล็อกเป้า GPS
   const [basemapStyle, setBasemapStyle] = useState('default'); 
   const [flyToPos, setFlyToPos] = useState(null);
 
@@ -132,7 +130,6 @@ export default function MapPage() {
       .catch(e => console.error(e));
   }, []);
 
-  // 🌟 เพิ่ม UV เข้าไปในเมนู
   const modes = [
     { id: 'pm25', name: '😷 ฝุ่น PM2.5', unit: 'µg/m³' },
     { id: 'heat', name: '🥵 ดัชนีความร้อน', unit: '°C' },
@@ -158,7 +155,6 @@ export default function MapPage() {
     }
   };
 
-  // 🌟 สีเกณฑ์ต่างๆ (อัปเดต UV และ ความชื้น)
   const getColor = (val, mode) => {
     if (val === null || val === undefined) return darkMode ? '#334155' : '#cbd5e1';
     if (mode === 'pm25') return val > 75 ? '#ef4444' : val > 37.5 ? '#f97316' : val > 25 ? '#eab308' : val > 15 ? '#22c55e' : '#0ea5e9';
@@ -177,14 +173,14 @@ export default function MapPage() {
       .sort((a, b) => b.val - a.val); 
   }, [stations, stationTemps, activeMode, darkMode]);
 
-  // 🌟 ฟังก์ชันดึงพยากรณ์ 7 วันที่ "มีกันชน (Safe Fallback)" กันจอขาว
+  // 🌟 ฟังก์ชันแก้บั๊ก! ถอด pm25_max ออกจาก URL เพื่อไม่ให้ API พัง
   const fetchForecast = async (station) => {
     setSelectedProvForecast({ loading: true, name: station.areaTH, daily: null, error: false });
     try {
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.long}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,pm25_max&timezone=Asia/Bangkok`);
+      // เอา &daily=...,pm25_max ออกแล้ว เหลือแต่ค่าสภาพอากาศพื้นฐาน
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.long}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=Asia/Bangkok`);
       const data = await res.json();
       
-      // กันพังถ้าเน็ตหลุดหรือข้อมูลแหว่ง
       if (!data || !data.daily || !data.daily.time) throw new Error("Data incomplete");
       
       setSelectedProvForecast(prev => ({ ...prev, loading: false, daily: data.daily }));
@@ -227,14 +223,12 @@ export default function MapPage() {
     });
   };
 
-  // 🌟 สร้างไอคอน (เพิ่มลูกศรลม หมุนตามองศาจริง)
   const createLabelIcon = (station, val) => {
     const name = station.areaTH;
     let windHtml = '';
     
     if (activeMode === 'wind') {
-        const windDir = stationTemps[station.stationID]?.windDirection || 0; // ดึงองศาลม
-        // หมุนลูกศรตามทิศลม
+        const windDir = stationTemps[station.stationID]?.windDirection || 0; 
         windHtml = `<div style="font-size: 1.4em; transform: rotate(${windDir}deg); margin-bottom: -3px; color: #1e293b; text-shadow: 0 0 2px #fff;">↑</div>`;
     }
 
@@ -250,7 +244,6 @@ export default function MapPage() {
     });
   };
 
-  // 🌟 ฟังก์ชันหา GPS ของฉัน
   const handleLocateMe = () => {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -280,7 +273,7 @@ export default function MapPage() {
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '10px' : '20px' }}>
       
-      {/* 🌟 Modal 7 วัน (ป้องกันจอขาว 100%) */}
+      {/* 🌟 Modal 7 วัน */}
       {selectedProvForecast && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedProvForecast(null)}>
             <div style={{ background: cardBg, padding: '20px', borderRadius: '25px', width: '100%', maxWidth: '400px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
@@ -316,7 +309,6 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* แถบเลือกโหมด */}
       <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '15px', background: cardBg, borderRadius: '20px', marginBottom: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', flexShrink: 0 }} className="hide-scrollbar">
         <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
         {modes.map(m => (
@@ -356,15 +348,12 @@ export default function MapPage() {
                 })}
             </MapContainer>
 
-            {/* 🌟 เครื่องมือเสริม (Slider, Basemap, GPS) อยู่ขวาบน เหนือ Legend */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 
-                {/* 1. ปุ่ม GPS ของฉัน */}
                 <button onClick={handleLocateMe} style={{ background: '#0ea5e9', color: '#fff', border: 'none', padding: '10px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                     📍 ตำแหน่งฉัน
                 </button>
 
-                {/* 2. เปลี่ยนแผนที่ */}
                 <div style={{ background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(5px)', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '5px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: subTextColor }}>รูปแบบแผนที่</span>
                     <select value={basemapStyle} onChange={(e) => setBasemapStyle(e.target.value)} style={{ background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', padding: '5px 10px', borderRadius: '8px', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
@@ -374,7 +363,6 @@ export default function MapPage() {
                     </select>
                 </div>
 
-                {/* 3. แถบความโปร่งใส */}
                 <div style={{ background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(5px)', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '5px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: subTextColor }}>ความทึบของสี</span>
                     <input type="range" min="0.1" max="1" step="0.05" value={polyOpacity} onChange={(e) => setPolyOpacity(parseFloat(e.target.value))} style={{ width: '100px', cursor: 'pointer', accentColor: '#0ea5e9' }} />
