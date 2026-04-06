@@ -5,7 +5,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { WeatherContext } from '../context/WeatherContext';
 
-// 🌟 ดิกชันนารีแปลชื่อจังหวัด (อังกฤษ -> ไทย)
 const provMap = {
   "Bangkok Metropolis": "กรุงเทพมหานคร", "Bangkok": "กรุงเทพมหานคร", 
   "Samut Prakan": "สมุทรปราการ", "Nonthaburi": "นนทบุรี", "Pathum Thani": "ปทุมธานี",
@@ -31,13 +30,14 @@ const provMap = {
   "Phatthalung": "พัทลุง", "Pattani": "ปัตตานี", "Yala": "ยะลา", "Narathiwat": "นราธิวาส"
 };
 
-// 🌟 เกณฑ์แบ่งสีคำอธิบาย (Legend)
+// 🌟 อัปเกรดคำอธิบายสี (Legend) ตามมาตรฐานกรมควบคุมมลพิษล่าสุด
 const legendConfigs = {
   pm25: [
     { c: '#ef4444', t: '> 75 (มีผลกระทบต่อสุขภาพ)' },
-    { c: '#f97316', t: '38 - 75 (เริ่มมีผลกระทบ)' },
-    { c: '#eab308', t: '26 - 37 (ปานกลาง)' },
-    { c: '#22c55e', t: '0 - 25 (คุณภาพอากาศดี)' }
+    { c: '#f97316', t: '37.6 - 75 (เริ่มมีผลกระทบ)' },
+    { c: '#eab308', t: '25.1 - 37.5 (ปานกลาง)' },
+    { c: '#22c55e', t: '15.1 - 25.0 (คุณภาพอากาศดี)' },
+    { c: '#0ea5e9', t: '0 - 15.0 (คุณภาพอากาศดีมาก)' }
   ],
   temp: [
     { c: '#ef4444', t: '> 39°C (ร้อนจัด)' },
@@ -73,7 +73,6 @@ const legendConfigs = {
   ]
 };
 
-// 🌟 ตัวดักจับ Event การซูมแผนที่
 function MapZoomListener({ setMapZoom }) {
   useMapEvents({
     zoomend: (e) => {
@@ -89,9 +88,11 @@ export default function MapPage() {
   const [activeMode, setActiveMode] = useState('pm25');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   
-  // 🌟 State สำหรับฟีเจอร์ใหม่
   const [mapZoom, setMapZoom] = useState(window.innerWidth < 1024 ? 5 : 6);
-  const [polyOpacity, setPolyOpacity] = useState(0.75); // ปรับความโปร่งใส
+  const [polyOpacity, setPolyOpacity] = useState(0.75);
+  
+  // 🌟 State สำหรับเปิด Modal พยากรณ์ 7 วัน เมื่อกดที่แผนที่
+  const [selectedProvForecast, setSelectedProvForecast] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -132,27 +133,35 @@ export default function MapPage() {
     }
   };
 
+  // 🌟 อัปเกรดเกณฑ์สีแผนที่ PM2.5 5 ระดับ
   const getColor = (val, mode) => {
     if (val === null || val === undefined) return darkMode ? '#334155' : '#cbd5e1';
-    if (mode === 'pm25') return val > 75 ? '#ef4444' : val > 37.5 ? '#f97316' : val > 25 ? '#eab308' : '#22c55e';
+    if (mode === 'pm25') return val > 75 ? '#ef4444' : val > 37.5 ? '#f97316' : val > 25 ? '#eab308' : val > 15 ? '#22c55e' : '#0ea5e9';
     if (mode === 'temp' || mode === 'heat') return val > 39 ? '#ef4444' : val > 34 ? '#f97316' : val > 28 ? '#eab308' : val > 22 ? '#22c55e' : '#3b82f6';
     if (mode === 'rain' || mode === 'humidity') return val > 70 ? '#1e3a8a' : val > 40 ? '#3b82f6' : val > 10 ? '#60a5fa' : '#94a3b8';
     if (mode === 'wind') return val > 40 ? '#ef4444' : val > 20 ? '#f97316' : val > 10 ? '#eab308' : '#22c55e';
     return darkMode ? '#334155' : '#cbd5e1';
   };
 
-  // 🌟 ประมวลผลข้อมูลจัดอันดับ Sidebar
   const rankedStations = useMemo(() => {
     return stations
-      .map(st => {
-        const val = getVal(st);
-        return { ...st, val: val, color: getColor(val, activeMode) };
-      })
+      .map(st => ({ ...st, val: getVal(st), color: getColor(getVal(st), activeMode) }))
       .filter(st => st.val !== null && st.val !== undefined)
-      .sort((a, b) => b.val - a.val); // เรียงจากมากไปน้อย
+      .sort((a, b) => b.val - a.val); 
   }, [stations, stationTemps, activeMode, darkMode]);
 
-  // กำหนดสไตล์ Polygon
+  // 🌟 ฟังก์ชันดึงข้อมูลพยากรณ์ 7 วัน เมื่อผู้ใช้กดที่แผนที่
+  const fetchForecast = async (station) => {
+    setSelectedProvForecast({ loading: true, name: station.areaTH });
+    try {
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.long}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,pm25_max&timezone=Asia/Bangkok`);
+      const data = await res.json();
+      setSelectedProvForecast(prev => ({ ...prev, loading: false, daily: data.daily }));
+    } catch (e) {
+      setSelectedProvForecast(prev => ({ ...prev, loading: false, error: true }));
+    }
+  };
+
   const styleGeoJSON = (feature) => {
     const props = Object.values(feature.properties || {}).map(v => String(v).trim());
     let thaiNameFromMap = "";
@@ -167,16 +176,27 @@ export default function MapPage() {
     const val = getVal(station);
     const color = station ? getColor(val, activeMode) : (darkMode ? '#334155' : '#cbd5e1');
 
-    return {
-        fillColor: color,
-        weight: 1.5, 
-        opacity: 1,
-        color: '#ffffff', 
-        fillOpacity: polyOpacity // 🌟 ใช้ State ความโปร่งใส
-    };
+    return { fillColor: color, weight: 1.5, opacity: 1, color: '#ffffff', fillOpacity: polyOpacity };
   };
 
-  // 🌟 สร้างไอคอน (โชว์ทั้งชื่อและตัวเลขเมื่อซูมเข้า)
+  // 🌟 ฝัง Event Click ลงไปที่รูป Polygon ของแต่ละจังหวัด
+  const onEachFeature = (feature, layer) => {
+    layer.on({
+        click: () => {
+            const props = Object.values(feature.properties || {}).map(v => String(v).trim());
+            let thaiNameFromMap = "";
+            for (let p of props) {
+                if (provMap[p]) { thaiNameFromMap = provMap[p]; break; }
+            }
+            const station = stations.find(s => {
+                const cleanName = s.areaTH.replace('จังหวัด', '').trim();
+                return cleanName === thaiNameFromMap || props.includes(cleanName) || props.some(p => p.includes(cleanName));
+            });
+            if (station) fetchForecast(station);
+        }
+    });
+  };
+
   const createLabelIcon = (name, val) => {
     return L.divIcon({
         className: 'custom-text-icon',
@@ -212,7 +232,39 @@ export default function MapPage() {
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '10px' : '20px' }}>
       
-      {/* Tab Bar เลือกโหมด */}
+      {/* 🌟 Modal พยากรณ์ 7 วันลอยเหนือแผนที่ */}
+      {selectedProvForecast && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedProvForecast(null)}>
+            <div style={{ background: cardBg, padding: '20px', borderRadius: '25px', width: '100%', maxWidth: '400px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 40px rgba(0,0,0,0.3)', animation: 'fadeIn 0.2s ease-out' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, color: textColor, fontSize: '1.2rem' }}>📍 พยากรณ์ 7 วัน <br/><span style={{ fontSize: '0.9rem', color: '#0ea5e9' }}>จ.{selectedProvForecast.name.replace('จังหวัด', '')}</span></h3>
+                    <button onClick={() => setSelectedProvForecast(null)} style={{ background: darkMode ? '#1e293b' : '#f1f5f9', border: 'none', borderRadius: '50%', width: '30px', height: '30px', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                </div>
+                
+                {selectedProvForecast.loading ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: subTextColor }}>กำลังโหลดข้อมูลพยากรณ์... ⏳</div>
+                ) : selectedProvForecast.error ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: '#ef4444' }}>❌ เกิดข้อผิดพลาดในการโหลดข้อมูล</div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '5px' }} className="hide-scrollbar">
+                        {selectedProvForecast.daily?.time?.map((t, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
+                                <div style={{ width: '40px', fontSize: '0.85rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
+                                <div style={{ fontSize: '1.2rem' }}>{selectedProvForecast.daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
+                                <div style={{ fontSize: '0.8rem', color: subTextColor, width: '45px', textAlign: 'center' }}>☔ {selectedProvForecast.daily.precipitation_probability_max[idx]}%</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <span style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: 'bold' }}>{Math.round(selectedProvForecast.daily.temperature_2m_min[idx])}°</span>
+                                    <span style={{ fontSize: '0.85rem', color: subTextColor }}>-</span>
+                                    <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 'bold' }}>{Math.round(selectedProvForecast.daily.temperature_2m_max[idx])}°</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '15px', background: cardBg, borderRadius: '20px', marginBottom: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', flexShrink: 0 }} className="hide-scrollbar">
         <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
         {modes.map(m => (
@@ -232,20 +284,17 @@ export default function MapPage() {
         ))}
       </div>
 
-      {/* 🌟 Layout หลัก: แผนที่ ซ้าย / Sidebar ขวา */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, gap: '15px', overflow: 'hidden' }}>
           
-          {/* ส่วนของแผนที่ */}
           <div style={{ flex: 1, borderRadius: '25px', overflow: 'hidden', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.15)', position: 'relative', minHeight: isMobile ? '500px' : 'auto' }}>
             
-            <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 5 : 6} style={{ height: '100%', width: '100%', background: darkMode ? '#020617' : '#f8fafc' }} zoomControl={false}>
+            <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 5 : 6} style={{ height: '100%', width: '100%', background: darkMode ? '#020617' : '#f8fafc', cursor: 'pointer' }} zoomControl={false}>
                 <TileLayer url={mapUrl} attribution='&copy; OpenStreetMap & CartoDB' />
                 <MapZoomListener setMapZoom={setMapZoom} />
 
-                {/* วาดพื้นที่ GeoJSON พร้อมบังคับรีเรนเดอร์เมื่อเปลี่ยนโหมดหรือความโปร่งใส */}
-                {geoData && <GeoJSON key={`${activeMode}-${polyOpacity}`} data={geoData} style={styleGeoJSON} />}
+                {/* 🌟 แนบ Event Click ให้ Polygon นำไปเปิด Modal 7 วัน */}
+                {geoData && <GeoJSON key={`${activeMode}-${polyOpacity}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
 
-                {/* 🌟 ซ่อนตัวเลขถ้าซูมออกเกินไป ป้องกันแผนที่รก (กำหนดให้โชว์เมื่อ zoom >= 7) */}
                 {mapZoom >= 7 && stations.map(st => {
                     const val = getVal(st);
                     if (val === null || (val === 0 && activeMode === 'rain')) return null; 
@@ -255,7 +304,6 @@ export default function MapPage() {
                 })}
             </MapContainer>
 
-            {/* 🌟 แถบปรับความโปร่งใส (Opacity Slider) ลอยอยู่ขวาบน */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000, background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(5px)', padding: '10px 15px', borderRadius: '16px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '5px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor }}>ความทึบของสีแผนที่</span>
                 <input 
@@ -266,7 +314,6 @@ export default function MapPage() {
                 />
             </div>
 
-            {/* 🌟 กล่องคำอธิบายเกณฑ์สี (Legend) ลอยอยู่ขวาล่าง */}
             <div style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000, background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(5px)', padding: '15px', borderRadius: '16px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
                 <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: textColor, marginBottom: '8px', borderBottom: `1px solid ${borderColor}`, paddingBottom: '5px' }}>เกณฑ์การประเมิน</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -280,33 +327,33 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* 🌟 Sidebar จัดอันดับข้อมูล (Ranking List) */}
-          <div style={{ width: isMobile ? '100%' : '320px', background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
-             <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🏆</span> จัดอันดับ 77 จังหวัด
-             </h3>
-             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }} className="hide-scrollbar">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                   {rankedStations.map((st, idx) => (
-                      <div key={st.stationID} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px' }}>
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', width: '20px' }}>{idx + 1}.</span>
-                            <span style={{ fontSize: '0.95rem', color: textColor, fontWeight: 'bold' }}>{st.areaTH.replace('จังหวัด', '')}</span>
-                         </div>
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.95rem', fontWeight: '900', color: textColor }}>{st.val} <span style={{ fontSize: '0.7rem', color: subTextColor }}>{activeUnit}</span></span>
-                            {/* จุดสีบอกระดับความเสี่ยง */}
-                            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: st.color }}></span>
-                         </div>
-                      </div>
-                   ))}
-                </div>
-             </div>
-          </div>
+          {/* 🌟 ซ่อน Sidebar บนมือถือ เพื่อไม่ให้รก */}
+          {!isMobile && (
+              <div style={{ width: '320px', background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
+                 <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🏆</span> จัดอันดับ 77 จังหวัด
+                 </h3>
+                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }} className="hide-scrollbar">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                       {rankedStations.map((st, idx) => (
+                          <div key={st.stationID} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px' }}>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'bold', width: '20px' }}>{idx + 1}.</span>
+                                <span style={{ fontSize: '0.95rem', color: textColor, fontWeight: 'bold' }}>{st.areaTH.replace('จังหวัด', '')}</span>
+                             </div>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '0.95rem', fontWeight: '900', color: textColor }}>{st.val} <span style={{ fontSize: '0.7rem', color: subTextColor }}>{activeUnit}</span></span>
+                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: st.color }}></span>
+                             </div>
+                          </div>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+          )}
 
       </div>
 
-      {/* Spacer ดันขอบล่างสำหรับมือถือ */}
       <div style={{ height: isMobile ? '80px' : '20px', flexShrink: 0 }}></div>
     </div>
   );

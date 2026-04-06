@@ -158,25 +158,20 @@ export default function Dashboard() {
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
-// 🌟 หน้า Loading แบบใหม่: ทางการและมีแอนิเมชัน
-  if (loadingWeather || !weatherData) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', background: appBg, color: textColor, fontFamily: 'Kanit, sans-serif' }}>
+  if (loadingWeather || !weatherData) return (
+    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', background: appBg, color: textColor, fontFamily: 'Kanit, sans-serif' }}>
         <style dangerouslySetInlineStyle={{__html: `@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(0.95); } }`}} />
         <div style={{ fontSize: '4rem', animation: 'pulse 1.5s infinite ease-in-out' }}>🌤️</div>
-        <div style={{ marginTop: '20px', fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-          กำลังประมวลผลข้อมูลสภาพอากาศ
-        </div>
-        <div style={{ fontSize: '0.9rem', color: subTextColor, marginTop: '8px' }}>
-          กรุณารอสักครู่...
-        </div>
-      </div>
-    );
-  }
+        <div style={{ marginTop: '20px', fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>กำลังประมวลผลข้อมูลสภาพอากาศ</div>
+        <div style={{ fontSize: '0.9rem', color: subTextColor, marginTop: '8px' }}>กรุณารอสักครู่...</div>
+    </div>
+  );
 
   const { current, hourly, daily, coords } = weatherData;
-  const aqiBg = current?.pm25 > 75 ? '#ef4444' : current?.pm25 > 37.5 ? '#f97316' : current?.pm25 > 25 ? '#eab308' : '#22c55e';
-  const aqiText = current?.pm25 > 75 ? 'อันตราย' : current?.pm25 > 37.5 ? 'ปานกลาง' : 'อากาศดี';
+  
+  // 🌟 อัปเกรดเกณฑ์ฝุ่น 5 ระดับ ตามกรมควบคุมมลพิษ (อัปเดต 2566)
+  const aqiBg = current?.pm25 > 75 ? '#ef4444' : current?.pm25 > 37.5 ? '#f97316' : current?.pm25 > 25 ? '#eab308' : current?.pm25 > 15 ? '#22c55e' : '#0ea5e9';
+  const aqiText = current?.pm25 > 75 ? 'มีผลกระทบต่อสุขภาพ' : current?.pm25 > 37.5 ? 'เริ่มมีผลกระทบ' : current?.pm25 > 25 ? 'ปานกลาง' : current?.pm25 > 15 ? 'คุณภาพอากาศดี' : 'อากาศดีมาก';
   
   const isRaining = current?.rainProb > 30;
   const isHot = current?.feelsLike >= 38;
@@ -192,7 +187,7 @@ export default function Dashboard() {
   else if (isHot && !isNight) bgGradient = 'linear-gradient(135deg, #ea580c, #9a3412)';
 
   let alertBanner = null;
-  if (current?.pm25 > 75) alertBanner = { type: 'PM2.5', color: '#ef4444', icon: '😷', text: 'มลพิษระดับอันตราย ควรสวมหน้ากาก N95' };
+  if (current?.pm25 > 75) alertBanner = { type: 'PM2.5', color: '#ef4444', icon: '😷', text: 'มลพิษระดับอันตราย ควรสวมหน้ากาก N95 และงดกิจกรรมกลางแจ้ง' };
   else if (current?.rainProb > 70) alertBanner = { type: 'Rain', color: '#3b82f6', icon: '⛈️', text: 'มีพายุฝนฟ้าคะนองในพื้นที่' };
   else if (current?.feelsLike >= 42) alertBanner = { type: 'Heat', color: '#ea580c', icon: '🔥', text: 'ดัชนีความร้อนวิกฤต ระวังโรคลมแดด' };
 
@@ -211,7 +206,8 @@ export default function Dashboard() {
   const CustomXAxisTick = ({ x, y, payload }) => {
     const item = chartData[payload.index];
     if (!item) return null;
-    const pmColor = item.pm25 > 37.5 ? '#ef4444' : (item.pm25 > 25 ? '#f97316' : '#22c55e');
+    // 🌟 อัปเกรดเกณฑ์ฝุ่นในกราฟ
+    const pmColor = item.pm25 > 75 ? '#ef4444' : item.pm25 > 37.5 ? '#f97316' : item.pm25 > 25 ? '#eab308' : item.pm25 > 15 ? '#22c55e' : '#0ea5e9';
     return (
       <g transform={`translate(${x},${y})`}>
         <foreignObject x={-30} y={10} width={60} height={80}>
@@ -238,9 +234,12 @@ export default function Dashboard() {
   else if (current?.pm25 > 37.5) briefingText += `ค่าฝุ่น PM2.5 ค่อนข้างสูง แนะนำให้สวมหน้ากากอนามัยเมื่อออกนอกอาคารครับ 😷`;
   else briefingText += `อากาศเป็นใจ เหมาะสำหรับการทำกิจกรรมนอกบ้านหรือซักผ้าครับ ✨`;
 
-  let exercise = { text: 'ดีเยี่ยม', color: '#22c55e', desc: 'อากาศดี ฝุ่นน้อย' };
-  if (current?.pm25 > 50 || current?.feelsLike > 39 || current?.rainProb > 60) exercise = { text: 'งดกิจกรรม', color: '#ef4444', desc: 'สภาพอากาศไม่เหมาะสม' };
-  else if (current?.pm25 > 25 || current?.feelsLike > 35) exercise = { text: 'พอใช้', color: '#f97316', desc: 'ควรลดเวลาอยู่กลางแจ้ง' };
+  // 🌟 อัปเกรดเกณฑ์ดัชนีการใช้ชีวิต
+  let exercise = { text: 'ดีเยี่ยม', color: '#0ea5e9', desc: 'อากาศดีมาก ฝุ่นน้อย' };
+  if (current?.pm25 > 75 || current?.feelsLike > 39 || current?.rainProb > 60) exercise = { text: 'งดกิจกรรม', color: '#ef4444', desc: 'สภาพอากาศไม่เหมาะสม' };
+  else if (current?.pm25 > 37.5 || current?.feelsLike > 35) exercise = { text: 'ลดเวลา', color: '#f97316', desc: 'มีผลกระทบต่อสุขภาพ' };
+  else if (current?.pm25 > 25) exercise = { text: 'พอใช้', color: '#eab308', desc: 'คุณภาพอากาศปานกลาง' };
+  else if (current?.pm25 > 15) exercise = { text: 'ดี', color: '#22c55e', desc: 'คุณภาพอากาศดี' };
 
   let laundry = { text: 'ทำได้เลย', color: '#22c55e', desc: 'แดดดี ฝนไม่ตก' };
   if (current?.rainProb > 50 || current?.rain > 0) laundry = { text: 'ไม่แนะนำ', color: '#ef4444', desc: 'มีความเสี่ยงฝนตก' };
@@ -367,7 +366,6 @@ export default function Dashboard() {
                   {daily?.time?.map((t, idx) => (
                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', paddingBottom: idx !== 6 ? '12px' : '0', borderBottom: idx !== 6 ? `1px solid ${borderColor}` : 'none' }}>
                         
-                        {/* 🌟 1. ปรับ Layout แถวแรกตามหน้าจอ (คอมชิดซ้าย มือถือจัดตรงกลาง) */}
                         <div style={isMobile ? { display: 'grid', gridTemplateColumns: '40px 40px 1fr', alignItems: 'center' } : { display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 'bold', color: textColor, width: isMobile ? 'auto' : '45px' }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
                             <div style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', textAlign: 'center', width: isMobile ? 'auto' : '30px' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
@@ -380,13 +378,13 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* 🌟 2. ข้อมูลย่อย: คอมเยื้องขวา 55px มือถือชิดขอบ */}
                         <div style={{ marginLeft: isMobile ? '0' : '55px', display: 'flex', justifyContent: 'space-between', marginTop: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '6px 10px', borderRadius: '10px', fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>☔</span> {daily?.precipitation_probability_max?.[idx] || 0}%</div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>🥵</span> {Math.round(daily?.apparent_temperature_max?.[idx] || 0)}°</div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{fontSize:'0.9rem'}}>😷</span> 
-                              <span style={{ color: daily?.pm25_max?.[idx] > 37.5 ? '#ef4444' : (daily?.pm25_max?.[idx] > 25 ? '#f97316' : '#22c55e') }}>
+                              {/* 🌟 อัปเกรดเกณฑ์ฝุ่น 5 ระดับ ในพยากรณ์ล่วงหน้า */}
+                              <span style={{ color: daily?.pm25_max?.[idx] > 75 ? '#ef4444' : daily?.pm25_max?.[idx] > 37.5 ? '#f97316' : daily?.pm25_max?.[idx] > 25 ? '#eab308' : daily?.pm25_max?.[idx] > 15 ? '#22c55e' : '#0ea5e9' }}>
                                 {daily?.pm25_max?.[idx] || 0} <span style={{fontSize:'0.6rem'}}>µg/m³</span>
                               </span>
                            </div>
