@@ -31,7 +31,6 @@ export default function AIPage() {
 
   const sortedStations = useMemo(() => [...(stations || [])].sort((a, b) => a.areaTH.localeCompare(b.areaTH, 'th')), [stations]);
   
-  // 🌟 [แก้บั๊ก] ระบบควานหาอำเภอแบบเจาะเกราะ (เหมือนหน้า Dashboard)
   const currentAmphoes = useMemo(() => {
     if (!geoData || geoData.length === 0 || !selectedProv) return [];
     const cleanProv = selectedProv.replace('จังหวัด', '').trim();
@@ -58,7 +57,6 @@ export default function AIPage() {
     } catch (e) { setLocationName('ตำแหน่งปัจจุบัน'); }
   };
 
-  // 🌟 ฟังก์ชันหา GPS ของฉัน (สำหรับปุ่มใหม่)
   const handleLocateMe = () => {
     if (navigator.geolocation) {
         setLocationName('กำลังหาตำแหน่ง...');
@@ -66,7 +64,7 @@ export default function AIPage() {
             (pos) => {
                 fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
                 fetchLocationName(pos.coords.latitude, pos.coords.longitude);
-                setSelectedProv(''); // ล้างค่าที่เคยเลือกด้วยมือ
+                setSelectedProv(''); 
                 setSelectedDist('');
             },
             () => {
@@ -80,7 +78,7 @@ export default function AIPage() {
 
   useEffect(() => {
     if (!weatherData) {
-      handleLocateMe(); // ใช้ฟังก์ชัน GPS ตอนเปิดหน้าครั้งแรก
+      handleLocateMe(); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -115,7 +113,7 @@ export default function AIPage() {
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', background: appBg, color: textColor, fontFamily: 'Kanit, sans-serif' }}>
         <style dangerouslySetInlineStyle={{__html: `@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(0.95); } }`}} />
         <div style={{ fontSize: '4rem', animation: 'pulse 1.5s infinite ease-in-out' }}>🤖</div>
-        <div style={{ marginTop: '20px', fontSize: '1.2rem', fontWeight: 'bold' }}>AI กำลังวิเคราะห์พื้นที่...</div>
+        <div style={{ marginTop: '20px', fontSize: '1.2rem', fontWeight: 'bold' }}>AI กำลังวิเคราะห์และจัดตารางชีวิต...</div>
     </div>
   );
 
@@ -144,10 +142,14 @@ export default function AIPage() {
 
   const activeThemeColor = tabConfigs.find(t => t.id === activeTab)?.color || '#8b5cf6';
 
+  // 🌟 AI Logic Engine สำหรับสร้าง Report และ ตารางเวลา (Timeline)
   const generateAIReport = () => {
       const { tMax, rain, pm25, wind } = dayData;
-      let report = { score: 10, title: '', text: '', icon: '', tips: [] };
+      let report = { score: 10, title: '', text: '', icon: '', tips: [], timeline: [] };
+      
+      let m_text = "", a_text = "", e_text = ""; // ข้อความ 3 ช่วงเวลา
 
+      // หักคะแนนภาพรวม
       if (rain > 70) report.score -= 4; else if (rain > 40) report.score -= 2;
       if (tMax > 38) report.score -= 3; else if (tMax > 35) report.score -= 1;
       if (pm25 > 75) report.score -= 4; else if (pm25 > 37.5) report.score -= 2;
@@ -159,68 +161,105 @@ export default function AIPage() {
               if (report.score >= 8) report.text = `สภาพอากาศที่ ${locationName} ${displayDateName} ค่อนข้างเป็นใจสุดๆ ค่ะ อากาศโปร่งใส เหมาะกับการทำกิจกรรมเกือบทุกประเภท`;
               else if (report.score >= 5) report.text = `สภาพอากาศที่ ${locationName} ${displayDateName} อยู่ในเกณฑ์ปานกลาง อาจมีปัจจัยรบกวนบ้างเล็กน้อย โปรดเตรียมตัวให้พร้อมก่อนออกจากบ้านค่ะ`;
               else report.text = `โปรดระมัดระวัง! สภาพอากาศที่ ${locationName} ${displayDateName} ค่อนข้างย่ำแย่ ไม่แนะนำให้อยู่กลางแจ้งเป็นเวลานานค่ะ`;
-              report.tips = [
-                  `🌡️ อุณหภูมิ: สูงสุด ${tMax}°C / ต่ำสุด ${dayData.tMin}°C`,
-                  `☔ โอกาสฝนตก: ${rain}% ${rain > 50 ? '(พกร่มด้วยนะคะ)' : ''}`,
-                  `😷 ฝุ่น PM2.5: ${pm25} µg/m³ ${pm25 > 37.5 ? '(ควรสวมหน้ากากอนามัย)' : '(อากาศสะอาด)'}`
-              ];
+              
+              m_text = `อุณหภูมิเย็นสุดของวัน เริ่มต้นวันใหม่ด้วยความสดชื่น ${pm25 > 37.5 ? '(ระวังฝุ่นตอนเช้า)' : ''}`;
+              a_text = tMax > 35 ? `แดดร้อนจัด อุณหภูมิพุ่งถึง ${tMax}°C ควรเลี่ยงการอยู่กลางแดด` : (rain > 40 ? `อากาศอุ่นขึ้น ระวังกลุ่มเมฆฝนก่อตัว` : `อากาศโปร่งสบาย เหมาะกับการเดินทาง`);
+              e_text = rain > 40 ? `ความเสี่ยงฝนตกสูง แนะนำให้พกร่มและเดินทางกลับที่พัก` : `อากาศเย็นลง เหมาะแก่การพักผ่อนสบายๆ`;
               break;
+
           case 'travel':
               report.title = `วางแผนแต่งกาย & ท่องเที่ยว`;
-              if (rain > 60) report.text = `การเดินทางอาจมีอุปสรรคจากฝนตกหนัก แนะนำให้เผื่อเวลาเดินทางและหลีกเลี่ยงเส้นทางรถติด เลือกรองเท้าที่เปียกน้ำได้ค่ะ`;
-              else if (tMax > 36) report.text = `แดดค่อนข้างแรงมาก แนะนำให้ใส่เสื้อผ้าที่ระบายอากาศได้ดี สีอ่อน และอย่าลืมทาครีมกันแดดเพื่อปกป้องผิวค่ะ`;
-              else report.text = `อากาศกำลังดี เหมาะกับการแต่งตัวสบายๆ ไปถ่ายรูปหรือเดินทางท่องเที่ยวได้อย่างราบรื่นค่ะ`;
-              if(rain > 40) report.tips.push('🌂 ไอเทมที่ต้องมี: ร่ม, เสื้อกันฝน, รองเท้าแตะยาง');
-              else if(tMax > 35) report.tips.push('🕶️ ไอเทมที่ต้องมี: ครีมกันแดด SPF50+, หมวก, แว่นกันแดด, พัดลมพกพา');
-              else report.tips.push('📸 ไอเทมที่ต้องมี: เสื้อแจ็คเก็ตบางๆ, กล้องถ่ายรูป แบตสำรอง');
+              if (rain > 60) report.text = `อุปสรรคฝนตกหนัก แนะนำให้เผื่อเวลาและหาร้านอาหาร/คาเฟ่ในร่ม เลือกรองเท้าที่เปียกน้ำได้ค่ะ`;
+              else if (tMax > 36) report.text = `แดดค่อนข้างแรงมาก ใส่เสื้อผ้าระบายอากาศได้ดี สีอ่อน และอย่าลืมทาครีมกันแดดค่ะ`;
+              else report.text = `อากาศกำลังดี เหมาะกับการแต่งตัวสวยๆ ไปถ่ายรูปและเที่ยวกลางแจ้งได้อย่างราบรื่นค่ะ`;
+              
+              m_text = rain > 40 ? `แนะนำเข้าคาเฟ่ หรือแวะพิพิธภัณฑ์ หลบฝนช่วงสาย` : `แสงตอนเช้าสวยที่สุด! เหมาะกับการถ่ายรูปกลางแจ้ง`;
+              a_text = tMax > 35 ? `แดดแรงจัด แนะนำให้หาที่หลบแดดในห้างสรรพสินค้า หรือหาร้านนั่งชิล` : (rain > 40 ? `เช็กเรดาร์ฝน หากมีเมฆดำควรย้ายเข้าในอาคาร` : `เดินทางท่องเที่ยวได้เต็มที่`);
+              e_text = rain > 40 ? `ฝนอาจทำให้รถติดและเดินลำบาก หาร้านอาหารใกล้ๆ ไว้ดีกว่า` : `เดินถนนคนเดิน หรือชมวิวกลางคืนชิลๆ ได้เลย`;
               break;
+
           case 'health':
               report.title = `คำแนะนำด้านสุขภาพ & กีฬา`;
-              if (pm25 > 50 || tMax > 38) report.text = `ไม่แนะนำให้ออกกำลังกายกลางแจ้งใน${displayDateName}เด็ดขาด! เนื่องจากสภาพอากาศเป็นอันตรายต่อสุขภาพ ควรเปลี่ยนไปยิมหรือฟิตเนสในร่มแทนค่ะ`;
-              else if (pm25 > 25 || rain > 40) report.text = `สามารถออกกำลังกายเบาๆ ได้ แต่ควรลดระยะเวลาลง และคอยสังเกตอาการตัวเอง หากมีฝนตกให้งดวิ่งกลางแจ้งเพื่อป้องกันไข้หวัดค่ะ`;
-              else report.text = `สภาพอากาศเพอร์เฟกต์สำหรับการวิ่ง ปั่นจักรยาน หรือเล่นกีฬากลางแจ้งค่ะ! สูตอากาศบริสุทธิ์ให้เต็มปอดได้เลย`;
-              if(pm25 > 37.5) report.tips.push('😷 กลุ่มเสี่ยง (เด็ก, คนชรา, ผู้ป่วยหอบหืด) ควรงดออกจากบ้าน');
-              report.tips.push(`💧 ร่างกายจะสูญเสียเหงื่อมาก แนะนำให้ดื่มน้ำอย่างน้อย ${tMax > 35 ? '3' : '2'} ลิตร`);
+              if (pm25 > 50 || tMax > 38) report.text = `ห้ามออกกำลังกายกลางแจ้งใน${displayDateName}เด็ดขาด! (เสี่ยงฮีทสโตรกหรือภูมิแพ้ฝุ่น) ควรไปยิมหรือฟิตเนสในร่มแทนค่ะ`;
+              else if (pm25 > 25 || rain > 40) report.text = `สามารถออกกำลังกายเบาๆ ได้ แต่ควรคอยสังเกตอาการตัวเอง หากมีฝนให้งดวิ่งกลางแจ้งเพื่อป้องกันไข้หวัด`;
+              else report.text = `เพอร์เฟกต์สำหรับการวิ่ง ปั่นจักรยาน หรือเล่นกีฬากลางแจ้งค่ะ!`;
+
+              m_text = pm25 > 50 ? `ฝุ่นหนา งดวิ่งและปั่นจักรยานกลางแจ้งเด็ดขาด` : `เวลาทองของการวิ่ง! อากาศเย็นสบายและสดชื่น`;
+              a_text = tMax > 35 || rain > 40 ? `เปลี่ยนแผนไปว่ายน้ำ หรือเข้ายิม/โยคะในร่มแทน` : `ออกกำลังกายได้ แต่ควรดื่มน้ำชดเชยให้เพียงพอ`;
+              e_text = `เหมาะกับการออกกำลังกายเบาๆ เช่น เดินแกว่งแขน หรือยืดเหยียดกล้ามเนื้อ`;
               break;
+
           case 'driving':
               report.title = `วิเคราะห์การขับขี่ & จราจร`;
-              if (rain > 70) report.text = `อันตราย! โอกาสฝนตกหนักสูงมาก ถนนจะลื่นและมีแอ่งน้ำขัง ทัศนวิสัยย่ำแย่ แนะนำให้ชะลอความเร็วและทิ้งระยะห่างจากรถคันหน้าให้มากกว่าปกติค่ะ`;
-              else if (rain > 30) report.text = `ระวังถนนลื่นในช่วงฝนเริ่มตกใหม่ๆ อาจมีคราบน้ำมันบนผิวจราจร ขับขี่ด้วยความระมัดระวังค่ะ`;
-              else report.text = `สภาพอากาศปลอดโปร่ง ทัศนวิสัยในการขับขี่ชัดเจน เดินทางได้อย่างปลอดภัยค่ะ`;
-              if(rain > 50) report.tips.push('🚗 เช็กสภาพใบปัดน้ำฝนและลมยางก่อนออกเดินทาง');
-              if(tMax > 38) report.tips.push('🌡️ อากาศร้อนจัด ระวังความร้อนสะสมในเครื่องยนต์หากขับทางไกล');
+              if (rain > 70) report.text = `ถนนจะลื่นและมีแอ่งน้ำขัง ทัศนวิสัยย่ำแย่ แนะนำให้ชะลอความเร็วและทิ้งระยะห่างให้มากกว่าปกติค่ะ`;
+              else if (rain > 30) report.text = `ระวังถนนลื่นในช่วงฝนเริ่มตกใหม่ๆ อาจมีคราบน้ำมันบนผิวจราจร ขับขี่ระมัดระวังค่ะ`;
+              else report.text = `สภาพอากาศปลอดโปร่ง ทัศนวิสัยชัดเจน เดินทางได้อย่างปลอดภัยค่ะ`;
+
+              m_text = rain > 30 ? `หมอกและละอองฝนตอนเช้าทำให้ทัศนวิสัยต่ำ เปิดไฟตัดหมอกด้วยนะคะ` : `การจราจรอาจหนาแน่น แต่สภาพอากาศเคลียร์`;
+              a_text = tMax > 35 ? `ระวังแสงแดดสะท้อนเข้าตา และความร้อนสะสมในเครื่องยนต์หากรถติด` : `ขับขี่ได้อย่างปลอดภัย`;
+              e_text = rain > 40 ? `ถนนลื่น + มืด อันตรายทวีคูณ ขับรถช้าๆ และระวังจักรยานยนต์` : `เปิดไฟหน้าให้พร้อม ทัศนวิสัยปกติ`;
               break;
+
           case 'home':
               report.title = `ซักผ้า & งานบ้าน`;
-              if (rain > 40) report.text = `ไม่แนะนำให้ซักผ้าตากแจ้งใน${displayDateName}ค่ะ เพราะมีความเสี่ยงฝนตกสูง ผ้าอาจจะไม่แห้งและมีกลิ่นอับ แนะนำให้อบผ้าหรือตากในที่ร่มแทน`;
-              else if (tMax > 33 && rain < 20) report.text = `แดดดีเยี่ยม! เป็นวันที่เหมาะมากสำหรับการซักผ้าชิ้นใหญ่ ตากผ้านวม หรือล้างรถค่ะ ผ้าแห้งสนิทแน่นอน`;
-              else report.text = `สามารถซักผ้าได้ แต่ควรตากในจุดที่มีหลังคาหรือคอยสังเกตท้องฟ้าเผื่อมีเมฆหลงมาค่ะ`;
-              if (pm25 > 50) report.tips.push('😷 ฝุ่นเยอะ ควรงดเปิดหน้าต่างบ้านทิ้งไว้เพื่อกันฝุ่นเข้าบ้าน');
+              if (rain > 40) report.text = `ไม่แนะนำให้ซักผ้าตากแจ้ง เพราะเสี่ยงฝนตกสูง ผ้าอาจมีกลิ่นอับ ให้อบผ้าหรือตากในที่ร่มแทน`;
+              else if (tMax > 33 && rain < 20) report.text = `แดดดีเยี่ยม! เป็นวันที่เหมาะมากสำหรับการซักผ้าชิ้นใหญ่ ตากผ้านวม ผ้าแห้งสนิทแน่นอน`;
+              else report.text = `สามารถซักผ้าได้ แต่ควรตากในจุดที่มีหลังคาหรือคอยสังเกตท้องฟ้าค่ะ`;
+
+              m_text = `เริ่มเดินเครื่องซักผ้า ล้างแอร์ หรือทำความสะอาดบ้านเปิดรับลม`;
+              a_text = rain > 40 ? `รีบเก็บผ้าเข้าที่ร่ม เฝ้าระวังลมกระโชกแรง` : `นำผ้าออกตากแดด รับความร้อนสูงสุด ผ้าแห้งและหอมแดด`;
+              e_text = pm25 > 37.5 ? `ปิดหน้าต่างให้สนิทกันฝุ่นเข้าบ้าน และเปิดเครื่องฟอกอากาศ` : `รีดผ้า และจัดระเบียบของใช้สบายๆ`;
               break;
+
           case 'event':
               report.title = `จัดอีเวนต์ & แคมป์ปิ้ง`;
-              if (rain > 50 || wind > 25) report.text = `ไม่เหมาะกับการตั้งแคมป์หรือจัดงานกลางแจ้งค่ะ โอกาสเจอพายุฝนและลมแรงสูงมาก ควรมีเต็นท์สำรองหรือย้ายเข้าในร่ม`;
-              else if (tMax > 37) report.text = `อากาศร้อนจัด หากจัดงานกลางแจ้งควรเตรียมพัดลมไอน้ำ หรือจุดพักผ่อนที่มีร่มเงาให้เพียงพอ เพื่อป้องกันฮีทสโตรกค่ะ`;
-              else report.text = `บรรยากาศดีมาก! เหมาะแก่การกางเต็นท์ ปิกนิก หรือจัดกิจกรรมกลางแจ้ง ลมพัดเย็นสบายค่ะ`;
-              if (wind > 20) report.tips.push('🌪️ ลมค่อนข้างแรง ควรตอกสมอบกเต็นท์ให้แน่นหนา');
+              if (rain > 50 || wind > 25) report.text = `ไม่เหมาะกับการตั้งแคมป์ โอกาสเจอพายุฝนและลมแรงสูงมาก ควรมีเต็นท์สำรองหรือย้ายเข้าในร่ม`;
+              else if (tMax > 37) report.text = `อากาศร้อนจัด ควรเตรียมพัดลมไอน้ำ หรือจุดพักผ่อนที่มีร่มเงาให้เพียงพอ เพื่อป้องกันฮีทสโตรก`;
+              else report.text = `บรรยากาศดีมาก! เหมาะแก่การกางเต็นท์ ปิกนิก หรือจัดกิจกรรมกลางแจ้ง`;
+
+              m_text = `เหมาะกับการลงพื้นที่ กางเต็นท์ จัดเตรียมโครงสร้างเวที`;
+              a_text = tMax > 35 ? `หาที่ร่มและพัดลมไอน้ำคลายร้อนให้แขก งดกิจกรรมกลางแจ้งจัดๆ` : `รันกิจกรรมได้ตามแพลนที่วางไว้`;
+              e_text = rain > 40 ? `เตรียมย้ายเข้าเต็นท์ใหญ่ ระวังลมแรงพัดของพัง` : `อากาศเย็นลง เหมาะกับการรอบกองไฟ หรือเปิดไฟประดับสวยๆ`;
               break;
+
           case 'pet':
               report.title = `การดูแลสัตว์เลี้ยง`;
-              if (tMax > 36) report.text = `ระวัง! พื้นถนนและพื้นปูนจะร้อนจัดจนทำให้ฝ่าเท้าสัตว์เลี้ยงพองได้ ควรงดพาน้องหมา/แมวเดินเล่นตอนกลางวัน ให้พาไปตอนเช้าตรู่หรือค่ำๆ แทนค่ะ`;
-              else if (pm25 > 50) report.text = `ฝุ่น PM2.5 สูง น้องหมาและน้องแมวก็สูดฝุ่นพิษได้เหมือนคนค่ะ แนะนำให้งดกิจกรรมกลางแจ้งและเปิดเครื่องฟอกอากาศในบ้าน`;
-              else report.text = `อากาศกำลังสบาย พาน้องๆ ไปวิ่งเล่นที่สวนสาธารณะเพื่อปลดปล่อยพลังงานได้เลยค่ะ`;
-              if (tMax > 35) report.tips.push('💧 ตั้งชามน้ำสะอาดไว้หลายๆ จุดในบ้าน ป้องกันสัตว์เลี้ยงขาดน้ำ');
+              if (tMax > 36) report.text = `พื้นถนนและพื้นปูนจะร้อนจัดจนทำให้ฝ่าเท้าสัตว์เลี้ยงพองได้ งดพาเดินเล่นตอนกลางวัน ให้พาไปตอนเช้าหรือค่ำแทนค่ะ`;
+              else if (pm25 > 50) report.text = `ฝุ่นสูง น้องแมว/หมาก็สูดฝุ่นพิษได้เหมือนคน งดกิจกรรมกลางแจ้งและเปิดเครื่องฟอกอากาศในบ้าน`;
+              else report.text = `อากาศกำลังสบาย พาน้องๆ ไปวิ่งเล่นปลดปล่อยพลังงานได้เลยค่ะ`;
+
+              m_text = `พาเดินเล่น ขับถ่ายสูดอากาศตอนเช้า ระวังหญ้าเปียกน้ำค้าง`;
+              a_text = tMax > 34 ? `ห้ามพาออกเดินพื้นปูนเด็ดขาด (ตีนพอง) ให้อยู่ในห้องแอร์/พัดลม และเตรียมน้ำให้เยอะๆ` : `นอนพักผ่อนในบ้าน`;
+              e_text = `อากาศเริ่มเย็น พาไปสวนสาธารณะวิ่งเล่นได้ปลอดภัย`;
               break;
+
           case 'farm':
               report.title = `ผู้ช่วยการเกษตร`;
-              if (rain > 60) report.text = `โอกาสฝนตกสูงถึง ${rain}% แนะนำให้งดการฉีดพ่นยาหรือปุ๋ยทางใบทุกชนิด เพราะฝนจะชะล้างน้ำยาทิ้งหมดค่ะ และระวังน้ำขังในแปลง`;
-              else if (rain > 20) report.text = `มีความเสี่ยงฝนตกประปราย ควรเช็กเรดาร์เมฆฝนก่อนเริ่มงานฉีดพ่นยาค่ะ`;
+              if (rain > 60) report.text = `งดการฉีดพ่นยาหรือปุ๋ยทางใบทุกชนิด เพราะฝนจะชะล้างน้ำยาทิ้งหมดค่ะ และระวังน้ำขังในแปลง`;
+              else if (rain > 20) report.text = `มีความเสี่ยงฝนตกประปราย ควรเช็กเรดาร์เมฆฝนก่อนเริ่มงานฉีดพ่นยา`;
               else if (tMax > 37) report.text = `อากาศร้อนและแห้งจัด ควรเพิ่มปริมาณการรดน้ำต้นไม้ในช่วงเช้าตรู่ งดรดน้ำตอนแดดจัดเพื่อป้องกันใบไหม้ค่ะ`;
-              else report.text = `สภาพอากาศเป็นใจ เหมาะสำหรับการลงแปลง ดายหญ้า รดน้ำ หรือฉีดพ่นปุ๋ยบำรุงต้นไม้ค่ะ`;
-              report.tips.push(rain > 40 ? '🌱 ดินมีความชื้นสูง ไม่จำเป็นต้องรดน้ำเพิ่ม' : '💧 ดินอาจแห้งไว ควรรดน้ำให้ชุ่มชื้น');
+              else report.text = `สภาพอากาศเป็นใจ เหมาะสำหรับการลงแปลง ดายหญ้า รดน้ำ หรือฉีดพ่นปุ๋ยค่ะ`;
+
+              m_text = rain > 50 ? `เคลียร์ทางระบายน้ำ` : `เวลาทอง! เหมาะกับการฉีดพ่นฮอร์โมน/ยา เพราะปากใบเปิดและยาไม่ปลิวทิ้ง`;
+              a_text = tMax > 34 ? `หยุดรดน้ำ (น้ำจะต้มรากสุก) ทำงานในร่ม ซ่อมแซมเครื่องมือการเกษตร` : `ดายหญ้า หรือตัดแต่งกิ่ง`;
+              e_text = `รดน้ำต้นไม้ให้ชุ่มชื้น เพื่อให้พืชดูดซึมน้ำเก็บไว้ใช้ในคืนนี้`;
               break;
+
           default: break;
       }
+
+      // ดึง Tip จากโหมด (ใส่ข้อมูลร่วมเข้าไปด้วย)
+      report.tips.push(`🌡️ อุณหภูมิ: สูงสุด ${tMax}°C / ต่ำสุด ${dayData.tMin}°C`);
+      report.tips.push(`☔ โอกาสฝนตก: ${rain}%`);
+      report.tips.push(`😷 ฝุ่น PM2.5: ${pm25} µg/m³`);
+
+      // 🌟 สร้าง Timeline Array 3 ช่วงเวลา
+      report.timeline = [
+          { id: 'morning', time: '06:00 - 12:00', label: 'ช่วงเช้า', icon: '🌅', text: m_text },
+          { id: 'afternoon', time: '12:00 - 18:00', label: 'ช่วงบ่าย', icon: '☀️', text: a_text },
+          { id: 'evening', time: '18:00 เป็นต้นไป', label: 'ช่วงค่ำ', icon: '🌙', text: e_text }
+      ];
+
       return report;
   };
 
@@ -235,7 +274,6 @@ export default function AIPage() {
 
         <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
             
-            {/* 🌟 ย้ายปุ่ม GPS มาไว้ข้างๆ หัวข้อให้กดง่ายๆ */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '1.5rem' }}>🧠</span> กำหนดเงื่อนไขให้ AI วางแผน
@@ -309,10 +347,36 @@ export default function AIPage() {
                     </p>
                 </div>
 
-                <h4 style={{ margin: '0 0 10px 0', color: textColor, fontSize: '1rem' }}>💡 ข้อแนะนำเพิ่มเติมจาก AI:</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* 🌟 ส่วนใหม่: ตารางเวลา (Timeline Schedule) 🌟 */}
+                <h4 style={{ margin: '20px 0 15px 0', color: textColor, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>🕒</span> ตารางกิจกรรมแนะนำ (AI Schedule)
+                </h4>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0', position: 'relative', paddingLeft: '15px', marginBottom: '25px' }}>
+                    {/* เส้นตรงแนวตั้งเชื่อมไทม์ไลน์ */}
+                    <div style={{ position: 'absolute', left: '22px', top: '20px', bottom: '20px', width: '2px', background: darkMode ? '#334155' : '#e2e8f0', zIndex: 0 }}></div>
+
+                    {aiReport.timeline.map((item, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '15px', position: 'relative', zIndex: 1, marginBottom: i !== 2 ? '20px' : '0' }}>
+                            <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: activeThemeColor, border: `4px solid ${cardBg}`, marginTop: '15px', flexShrink: 0 }}></div>
+                            <div style={{ flex: 1, background: darkMode ? '#1e293b' : '#f8fafc', padding: '15px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                                    <span style={{ fontWeight: 'bold', color: activeThemeColor, fontSize: '0.95rem' }}>{item.label}</span>
+                                    <span style={{ fontSize: '0.8rem', color: subTextColor }}>({item.time})</span>
+                                </div>
+                                <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.5 }}>{item.text}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <h4 style={{ margin: '0 0 10px 0', color: textColor, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📊</span> ข้อมูลประกอบการตัดสินใจ
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '10px' }}>
                     {aiReport.tips.map((tip, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', padding: '12px 15px', borderRadius: '12px', fontSize: '0.9rem', color: textColor, fontWeight: '500' }}>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', padding: '12px 15px', borderRadius: '12px', fontSize: '0.85rem', color: textColor, fontWeight: '500' }}>
                             {tip}
                         </div>
                     ))}
