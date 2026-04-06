@@ -5,7 +5,7 @@ import { WeatherContext } from '../context/WeatherContext';
 export default function AIPage() {
   const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode } = useContext(WeatherContext);
   
-  // --- 1. Hooks (States) ---
+  // --- 1. States (Hooks) ---
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กรุงเทพมหานคร');
   const [selectedProv, setSelectedProv] = useState('');
@@ -22,32 +22,27 @@ export default function AIPage() {
     };
     window.addEventListener('resize', handleResize);
 
-    // ดึงพิกัดเฉพาะเมื่อยังไม่มีข้อมูลพยากรณ์
+    // ดึงพิกัดเฉพาะเมื่อยังไม่มีข้อมูลเพื่อประหยัด API (กัน 429)
     if (!weatherData && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
         fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
         setLocationName('ตำแหน่งปัจจุบัน');
       }, () => {
-        if (!weatherData) fetchWeatherByCoords(13.75, 100.5); // Fallback BKK
+        if (!weatherData) fetchWeatherByCoords(13.75, 100.5); 
       }, { timeout: 5000 });
     }
     return () => window.removeEventListener('resize', handleResize);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- 3. AI Logic Engine (แก้บั๊ก ReferenceError: pm25) ---
+  // --- 3. AI Logic Engine (แก้บั๊กจอขาว + เพิ่มลูกเล่นคำพูด) ---
   const aiReport = useMemo(() => {
-    // เช็กความปลอดภัยของข้อมูลก่อนเริ่มคำนวณ
     if (!weatherData || !weatherData.daily || !weatherData.daily.time) return null;
 
     const d = weatherData.daily;
     const tMax = Math.round(d.temperature_2m_max?.[targetDateIdx] ?? 0);
     const rain = d.precipitation_probability_max?.[targetDateIdx] ?? 0;
-    
-    // ดึงค่า PM2.5 อย่างปลอดภัย
-    const currentPm25 = d.pm25_max 
-      ? Math.round(d.pm25_max[targetDateIdx] ?? 0) 
-      : (weatherData.current?.pm25 ?? 0);
+    const currentPm25 = d.pm25_max ? Math.round(d.pm25_max[targetDateIdx] ?? 0) : (weatherData.current?.pm25 ?? 0);
     
     let score = 10;
     if (rain > 50) score -= 3;
@@ -55,36 +50,35 @@ export default function AIPage() {
     if (currentPm25 > 50) score -= 4;
     if (score < 1) score = 1;
 
-    // ระบบสร้างประโยค Dynamic
+    // ระบบประโยค Dynamic อิงตามค่าจริง
     const getMoodText = () => {
-      if (currentPm25 > 50) return `วันนี้ฝุ่น PM2.5 ค่อนข้างสูงนะคะ แนะนำให้สวมหน้ากากและเลี่ยงที่โล่งแจ้งค่ะ 😷`;
-      if (rain > 60) return `ฝุ่นน้อยแต่ฝนหนัก! โอกาสตกถึง ${rain}% พกร่มติดตัวไว้อุ่นใจกว่านะคะ ☔`;
-      if (tMax > 38) return `อากาศร้อนจัดระดับวิกฤต ${tMax}°C ระวังเพลียแดด ดื่มน้ำบ่อยๆ นะคะ 🥵`;
-      if (score >= 8) return `สภาพอากาศเป็นใจมากค่ะ ท้องฟ้าเปิด เหมาะกับทุกกิจกรรมเลย ✨`;
-      return `สภาพอากาศอยู่ในเกณฑ์ปานกลาง มีปัจจัยรบกวนเล็กน้อย เตรียมตัวให้พร้อมนะคะ`;
+      if (currentPm25 > 50) return `วันนี้ฝุ่นเยอะระดับอันตราย (${currentPm25} µg/m³) ใส่แมสก์ด่วนๆ เลยนะคะ AI เป็นห่วง 😷`;
+      if (rain > 60) return `ฟ้าหลังฝนอาจจะสวย แต่ตอนฝนตกแรง ${rain}% แบบนี้ พกเสื้อกันฝนไว้ดีกว่าค่ะ ☔`;
+      if (tMax > 38) return `ร้อนระอุ ${tMax}°C เหมือนซ้อมตกนรก! หาเครื่องดื่มเย็นๆ และเลี่ยงแดดจัดนะคะ 🥵`;
+      if (score >= 8) return `สภาพอากาศดีมากค่ะ เหมาะกับการออกไปใช้ชีวิตให้คุ้มที่สุดในวันหยุดนี้ ✨`;
+      return `อากาศกลางๆ ค่ะ มีแดดสลับเมฆ เตรียมตัวให้พร้อมสำหรับทุกกิจกรรมนะคะ`;
     };
 
     const getTimeline = () => {
       const configs = {
-        summary: { m: 'อากาศสดชื่น เริ่มต้นวันได้ดี', a: tMax > 35 ? 'ร้อนจัด เลี่ยงแดดจ้า' : 'อากาศโปร่ง เดินทางสะดวก', e: 'พักผ่อนสบายๆ ในที่ร่ม' },
-        travel: { m: 'แสงสวย ถ่ายรูปขึ้นกล้องมาก', a: 'แดดแรง พกหมวกและแว่นกันแดด', e: 'เหมาะกับการเดินตลาดนัดชิลๆ' },
-        health: { m: currentPm25 > 40 ? 'ฝุ่นเยอะ งดวิ่งกลางแจ้ง' : 'อากาศดี เหมาะกับการวิ่งเช้า', a: 'จิบน้ำบ่อยๆ ระวังฮีทสโตรก', e: 'ยืดเหยียดกล้ามเนื้อในร่ม' },
-        driving: { m: 'ทัศนวิสัยชัดเจน ขับขี่ปลอดภัย', a: 'ระวังแสงแดดสะท้อนเข้าตา', e: rain > 40 ? 'ถนนลื่น ลดความเร็วทิ้งระยะ' : 'การจราจรปกติ' },
-        home: { m: 'แดดดี เริ่มซักผ้าได้เลย', a: 'ผ้านวมผืนใหญ่แห้งไวแน่นอน', e: 'ปิดหน้าต่างกันฝุ่นเข้าบ้าน' },
-        farm: { m: 'เหมาะกับการพ่นปุ๋ยทางใบ', a: 'งดรดน้ำช่วงแดดจัด กันรากไหม้', e: 'รดน้ำให้ชุ่มชื่นรับวันถัดไป' }
+        summary: { m: 'อากาศสดชื่น เริ่มต้นวันใหม่ด้วยรอยยิ้มค่ะ', a: tMax > 35 ? 'แดดแรงมาก หาที่หลบแดดในคาเฟ่ดีกว่า' : 'ท้องฟ้าเปิด เดินทางไปไหนมาไหนสะดวก', e: 'อากาศเย็นลง เหมาะกับการเดินเล่นรับลม' },
+        travel: { m: 'แสงตอนเช้าถ่ายรูปสวยมาก เตรียมกล้องให้พร้อม!', a: 'แดดจัดแบบนี้ อย่าลืมแว่นกันแดดและครีมกันแดดนะคะ', e: 'เดินตลาดนัดหรือทานอาหารนอกบ้านได้ชิลๆ' },
+        health: { m: currentPm25 > 40 ? 'ฝุ่นหนา เปลี่ยนมาเต้นแอโรบิกในบ้านแทนนะคะ' : 'อากาศดีมาก เหมาะกับการวิ่งในสวนสาธารณะ', a: 'ระวังฮีทสโตรก ดื่มน้ำเปล่าบ่อยๆ ช่วยได้เยอะค่ะ', e: 'โยคะเบาๆ ก่อนนอน ช่วยให้หลับสบายขึ้น' },
+        driving: { m: 'ถนนแห้ง ทัศนวิสัยชัดเจน ขับขี่สบายใจค่ะ', a: 'ระวังแสงแดดแยงตา ใช้ที่บังแดดในรถช่วยนะคะ', e: rain > 40 ? 'ถนนลื่นเพราะฝนตก ขับช้าลงอีกนิดนะคะ' : 'การจราจรไหลลื่น เดินทางปลอดภัยค่ะ' },
+        home: { m: 'แดดเริ่มมาแล้ว รีบเอาผ้าลงเครื่องซักด่วนเลย!', a: 'แดดจัดแบบนี้ ตากผ้านวมผืนใหญ่แห้งไวแน่นอนค่ะ', e: 'ปิดหน้าต่างกันฝุ่นและแมลงเข้าบ้านช่วงหัวค่ำ' },
+        farm: { m: 'ช่วงเวลาทองของการฉีดพ่นปุ๋ย ต้นไม้ดูดซึมได้ดีค่ะ', a: 'งดรดน้ำช่วงนี้เด็ดขาด ป้องกันรากพืชสุกจากดินร้อน', e: 'รดน้ำให้ชุ่มชื่น เตรียมรับแดดในวันพรุ่งนี้ค่ะ' }
       };
       const c = configs[activeTab] || configs.summary;
       return [
-        { label: 'ช่วงเช้า', icon: '🌅', time: '06:00-12:00', text: c.m },
-        { label: 'ช่วงบ่าย', icon: '☀️', time: '12:00-18:00', text: c.a },
-        { label: 'ช่วงค่ำ', icon: '🌙', time: '18:00+', text: c.e }
+        { label: 'เช้า', icon: '🌅', time: '06:00-12:00', text: c.m },
+        { label: 'บ่าย', icon: '☀️', time: '12:00-18:00', text: c.a },
+        { label: 'ค่ำ', icon: '🌙', time: '18:00+', text: c.e }
       ];
     };
 
     return { score, text: getMoodText(), timeline: getTimeline() };
   }, [activeTab, targetDateIdx, weatherData]);
 
-  // --- 4. Configs & Styles ---
   const tabConfigs = [
     { id: 'summary', icon: '📋', label: 'ภาพรวม', color: '#8b5cf6' },
     { id: 'travel', icon: '🎒', label: 'ท่องเที่ยว', color: '#ec4899' },
@@ -101,37 +95,54 @@ export default function AIPage() {
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
   const activeColor = tabConfigs.find(t => t.id === activeTab)?.color || '#8b5cf6';
 
-  // --- 5. Render Logic ---
-  if (loadingWeather) return <div style={{ height: '100vh', background: appBg, display: 'flex', justifyContent: 'center', alignItems: 'center', color: textColor, fontFamily: 'Kanit' }}>🤖 AI กำลังวิเคราะห์ข้อมูล...</div>;
+  if (loadingWeather) return <div style={{ height: '100dvh', background: appBg, display: 'flex', justifyContent: 'center', alignItems: 'center', color: textColor, fontFamily: 'Kanit' }}>🤖 AI กำลังวิเคราะห์ข้อมูล...</div>;
   
-  if (!weatherData) return <div style={{ height: '100vh', background: appBg, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: subTextColor, fontFamily: 'Kanit', padding: '20px', textAlign: 'center' }}>
+  if (!weatherData) return <div style={{ height: '100dvh', background: appBg, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: subTextColor, fontFamily: 'Kanit', padding: '20px', textAlign: 'center' }}>
     <div style={{fontSize: '3rem'}}>⚠️</div>
-    <p>ไม่สามารถโหลดข้อมูลพยากรณ์ได้ (Too Many Requests)</p>
-    <button onClick={() => window.location.reload()} style={{marginTop: '15px', padding: '10px 20px', borderRadius: '12px', background: '#0ea5e9', color: '#fff', border: 'none'}}>ลองอีกครั้ง</button>
+    <p>ไม่สามารถโหลดข้อมูลได้ชั่วคราว (API Limit)</p>
+    <button onClick={() => window.location.reload()} style={{marginTop: '15px', padding: '10px 20px', borderRadius: '12px', background: '#0ea5e9', color: '#fff', border: 'none'}}>ลองใหม่อีกครั้ง</button>
   </div>;
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', WebkitOverflowScrolling: 'touch', fontFamily: 'Kanit, sans-serif' }}>
-      <div style={{ width: '100%', maxWidth: '1100px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '120px' }}>
+    /* 🌟 Container หลัก: แก้ไขให้ Scroll ได้อิสระบนมือถือ */
+    <div style={{ 
+      width: '100%', 
+      minHeight: '100dvh', 
+      background: appBg, 
+      display: 'block', // เปลี่ยนจาก flex เป็น block เพื่อให้เลื่อนง่ายขึ้น
+      overflowY: 'auto', 
+      WebkitOverflowScrolling: 'touch', 
+      fontFamily: 'Kanit, sans-serif' 
+    }}>
+      <div style={{ 
+        width: '100%', 
+        maxWidth: '1100px', 
+        margin: '0 auto', // จัดกึ่งกลางหน้าจอคอม
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '20px', 
+        padding: isMobile ? '15px' : '30px', 
+        paddingBottom: '140px' // เผื่อที่ให้เมนูบาร์ด้านล่าง
+      }}>
 
-        {/* 🌟 1. FILTER SECTION (ตั้งค่า) */}
+        {/* 1. FILTER SECTION */}
         <div style={{ background: cardBg, borderRadius: '24px', padding: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '0.95rem', color: textColor }}>📍 วิเคราะห์พื้นที่: <span style={{color: '#0ea5e9'}}>{locationName}</span></h3>
                 {isMobile && <button onClick={() => setShowFilters(!showFilters)} style={{ background: 'rgba(14,165,233,0.1)', color: '#0ea5e9', border: 'none', padding: '6px 15px', borderRadius: '50px', fontWeight: 'bold', fontSize: '0.75rem' }}>{showFilters ? '▲ ปิด' : '▼ ตั้งค่า'}</button>}
             </div>
             {showFilters && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr auto', gap: '10px' }}>
-                        <select value={selectedProv} onChange={(e) => { setSelectedProv(e.target.value); setLocationName(e.target.value); }} style={{ padding: '10px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', fontSize: '0.9rem' }}>
+                        <select value={selectedProv} onChange={(e) => { setSelectedProv(e.target.value); setLocationName(e.target.value); }} style={{ padding: '12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none' }}>
                             <option value="">เลือกจังหวัด</option>
                             {stations.map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
                         </select>
                         <button onClick={() => window.location.reload()} style={{ background: '#0ea5e9', color: '#fff', border: 'none', padding: '10px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>อัปเดต GPS</button>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="hide-scrollbar">
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px' }} className="hide-scrollbar">
                         {[0,1,2,3,4,5,6].map(idx => (
-                            <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ flexShrink: 0, minWidth: '65px', padding: '8px', borderRadius: '12px', border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, background: targetDateIdx === idx ? activeColor : 'transparent', color: targetDateIdx === idx ? '#fff' : textColor, fontWeight: 'bold', fontSize: '0.8rem' }}>
+                            <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ flexShrink: 0, minWidth: '70px', padding: '10px', borderRadius: '12px', border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, background: targetDateIdx === idx ? activeColor : 'transparent', color: targetDateIdx === idx ? '#fff' : textColor, fontWeight: 'bold', fontSize: '0.8rem' }}>
                                 {idx === 0 ? 'วันนี้' : idx === 1 ? 'พรุ่งนี้' : `+${idx} วัน`}
                             </button>
                         ))}
@@ -140,10 +151,10 @@ export default function AIPage() {
             )}
         </div>
 
-        {/* 🌟 2. MAIN LAYOUT */}
+        {/* 2. MAIN LAYOUT (Tabs + Content) */}
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', alignItems: 'flex-start' }}>
             
-            {/* TABS (โหมดกิจกรรม) */}
+            {/* TABS (โหมดต่างๆ) */}
             <div style={{ 
                 display: 'flex', 
                 flexDirection: isMobile ? 'row' : 'column', 
@@ -168,13 +179,13 @@ export default function AIPage() {
                 })}
             </div>
 
-            {/* AI CONTENT (ผลวิเคราะห์) */}
-            <div style={{ flex: 1, background: cardBg, borderRadius: '24px', padding: isMobile ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', order: isMobile ? 2 : 1, width: '100%' }}>
-                {aiReport ? (
+            {/* AI REPORT BOX */}
+            <div className="fade-in" key={activeTab} style={{ flex: 1, background: cardBg, borderRadius: '24px', padding: isMobile ? '20px' : '30px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', order: isMobile ? 2 : 1, width: '100%' }}>
+                {aiReport && (
                     <>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.3rem', color: textColor }}>{tabConfigs.find(t=>t.id===activeTab)?.icon} AI วางแผน{tabConfigs.find(t=>t.id===activeTab)?.label}</h2>
-                            <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', padding: '10px 15px', borderRadius: '15px', border: `1px solid ${borderColor}` }}>
+                            <h2 style={{ margin: 0, fontSize: '1.3rem', color: textColor }}>{tabConfigs.find(t=>t.id===activeTab)?.icon} AI วางแผนให้คุณ</h2>
+                            <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', padding: '10px 15px', borderRadius: '15px', border: `1px solid ${borderColor}`, textAlign: 'center' }}>
                                 <div style={{ fontSize: '0.7rem', color: subTextColor, fontWeight: 'bold' }}>AI Score</div>
                                 <div style={{ fontSize: '1.2rem', fontWeight: '900', color: activeColor }}>{aiReport.score}/10</div>
                             </div>
@@ -184,7 +195,7 @@ export default function AIPage() {
                             <p style={{ margin: 0, fontSize: '1.05rem', color: textColor, lineHeight: 1.6 }}>{aiReport.text}</p>
                         </div>
 
-                        <h4 style={{ margin: '0 0 20px 0', color: textColor }}>🕒 กิจกรรมแนะนำประจำวัน</h4>
+                        <h4 style={{ margin: '0 0 20px 0', color: textColor, display: 'flex', alignItems: 'center', gap: '10px' }}>🕒 ตารางกิจกรรมที่ AI แนะนำ:</h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             {aiReport.timeline.map((item, i) => (
                                 <div key={i} style={{ display: 'flex', gap: '15px', position: 'relative' }}>
@@ -192,21 +203,17 @@ export default function AIPage() {
                                         <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: activeColor, zIndex: 1 }}></div>
                                         {i < 2 && <div style={{ width: '2px', flex: 1, background: borderColor }}></div>}
                                     </div>
-                                    <div style={{ flex: 1, background: darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', padding: '15px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                            <span style={{ fontWeight: 'bold', color: activeColor }}>{item.icon} {item.label}</span>
+                                    <div style={{ flex: 1, background: darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', padding: '18px', borderRadius: '18px', border: `1px solid ${borderColor}` }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <span style={{ fontWeight: 'bold', color: activeColor, fontSize: '1rem' }}>{item.icon} {item.label}</span>
                                             <span style={{ fontSize: '0.75rem', color: subTextColor }}>{item.time}</span>
                                         </div>
-                                        <div style={{ fontSize: '0.95rem', color: textColor }}>{item.text}</div>
+                                        <div style={{ fontSize: '0.95rem', color: textColor, lineHeight: 1.5 }}>{item.text}</div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </>
-                ) : (
-                    <div style={{textAlign: 'center', padding: '40px', color: subTextColor}}>
-                        กำลังเตรียมข้อมูลวิเคราะห์...
-                    </div>
                 )}
             </div>
         </div>
