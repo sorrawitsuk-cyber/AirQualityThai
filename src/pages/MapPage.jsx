@@ -1,11 +1,12 @@
-import React, { useContext, useState, useEffect } from 'react';
+// src/pages/MapPage.jsx (หรือชื่อไฟล์แผนที่ของคุณ)
+import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function MapPage() {
-  const { stations, stationTemps, darkMode } = useContext(WeatherContext); // 🌟 เอา loadingWeather ออกไปเลยครับ
+  const { stations, stationTemps, darkMode } = useContext(WeatherContext);
   const [geoData, setGeoData] = useState(null);
   const [activeMode, setActiveMode] = useState('pm25');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
@@ -16,9 +17,13 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 🌟 ดึงไฟล์จากโฟลเดอร์ public ในเครื่องตัวเอง ปลอดภัย 100%
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/prakobm/thailand-geojson/master/thailand.json')
-      .then(res => res.json())
+    fetch('/thailand.json')
+      .then(res => {
+          if(!res.ok) throw new Error("หาไฟล์ไม่เจอ เช็กว่าใส่ไฟล์ถูกที่ไหม");
+          return res.json();
+      })
       .then(data => setGeoData(data))
       .catch(e => console.error('Error loading GeoJSON:', e));
   }, []);
@@ -91,13 +96,12 @@ export default function MapPage() {
     ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' 
     : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 
-  // 🌟 เช็กการโหลดแค่ 2 อย่าง: 1. ไฟล์เส้นขอบเขตมาหรือยัง? 2. ข้อมูล 77 จังหวัดมาหรือยัง?
   if (!geoData || Object.keys(stationTemps).length === 0) return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', background: appBg, color: textColor, fontFamily: 'Kanit, sans-serif' }}>
         <style dangerouslySetInlineStyle={{__html: `@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(0.95); } }`}} />
         <div style={{ fontSize: '4rem', animation: 'pulse 1.5s infinite ease-in-out' }}>🗺️</div>
-        <div style={{ marginTop: '20px', fontSize: '1.2rem', fontWeight: 'bold' }}>กำลังเรนเดอร์แผนที่ประเทศไทย</div>
-        <div style={{ fontSize: '0.9rem', color: subTextColor, marginTop: '8px' }}>ดึงข้อมูลขอบเขตจังหวัดและข้อมูลดาวเทียม...</div>
+        <div style={{ marginTop: '20px', fontSize: '1.2rem', fontWeight: 'bold' }}>กำลังประมวลผลแผนที่</div>
+        <div style={{ fontSize: '0.9rem', color: subTextColor, marginTop: '8px' }}>กรุณารอสักครู่...</div>
     </div>
   );
 
@@ -137,8 +141,10 @@ export default function MapPage() {
         >
             <TileLayer url={mapUrl} attribution='&copy; OpenStreetMap & CartoDB' />
 
+            {/* วาดและระบายสีจังหวัดตามข้อมูล */}
             {geoData && <GeoJSON data={geoData} style={styleGeoJSON} />}
 
+            {/* ตัวเลขข้อมูลแต่ละจังหวัด */}
             {stations.map(st => {
                 const val = getVal(st);
                 if (val === 0 && activeMode === 'rain') return null; 
