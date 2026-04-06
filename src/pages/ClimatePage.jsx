@@ -1,17 +1,11 @@
-// src/pages/ClimatePage.jsx
-import React, { useContext, useState, useEffect } from 'react';
+// src/pages/AlertsPage.jsx (หรือ Climate.jsx ของคุณ)
+import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
-import { extractProvince } from '../utils/helpers';
 
-export default function ClimatePage() {
-  const { stations, stationTemps, loading, darkMode, lastUpdateText } = useContext(WeatherContext);
-  const [alertsLocationName, setAlertsLocationName] = useState('');
-  const [activeStation, setActiveStation] = useState(null);
-  
-  // 🌟 ตั้งค่าเริ่มต้นเป็นเรดาร์ฝน
-  const [windyLayer, setWindyLayer] = useState('rain');
-
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+export default function AlertsPage() {
+  const { stations, stationTemps, weatherData, darkMode, lastUpdateText } = useContext(WeatherContext);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [radarLayer, setRadarLayer] = useState('rain'); // ค่าเริ่มต้นคือเรดาร์ฝน
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -19,229 +13,191 @@ export default function ClimatePage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const safeStations = stations || [];
-  const provinces = [...new Set(safeStations.map(s => extractProvince(s.areaTH)))].sort((a, b) => a.localeCompare(b, 'th'));
-
-  useEffect(() => {
-    if (provinces.length > 0 && !alertsLocationName) {
-      setAlertsLocationName(provinces.includes('กรุงเทพมหานคร') ? 'กรุงเทพมหานคร' : provinces[0]);
-    }
-  }, [provinces, alertsLocationName]);
-
-  useEffect(() => {
-    if (safeStations.length > 0 && alertsLocationName) {
-      const target = safeStations.find(s => extractProvince(s.areaTH) === alertsLocationName);
-      if (target) setActiveStation(target);
-    }
-  }, [alertsLocationName, safeStations]);
-
-  const bgGradient = darkMode ? '#0f172a' : '#f8fafc'; 
-  const cardBg = darkMode ? 'rgba(30, 41, 59, 0.95)' : '#ffffff';
-  const innerCardBg = darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9';
-  const textColor = darkMode ? '#f8fafc' : '#0f172a';
+  const appBg = darkMode ? '#020617' : '#f8fafc'; 
+  const cardBg = darkMode ? '#0f172a' : '#ffffff';
+  const textColor = darkMode ? '#f8fafc' : '#0f172a'; 
+  const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
-  const borderColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0'; 
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: bgGradient, color: textColor, fontWeight: 'bold' }}>กำลังโหลดข้อมูล... ⏳</div>;
+  // 🌟 Logic Engine: สแกนข้อมูลทั้งประเทศเพื่อหา "ภัยพิบัติ" และ "จุดความร้อน"
+  const { extremeAlerts, fireRisks, nationalSummary } = useMemo(() => {
+    let alerts = [];
+    let fires = [];
+    let maxTemp = { val: -99, prov: '' };
+    let maxRain = { val: -1, prov: '' };
+    let maxPm25 = { val: -1, prov: '' };
 
-  const pmVal = activeStation?.AQILast?.PM25?.value ? Number(activeStation.AQILast.PM25.value) : null;
-  const tObj = activeStation ? stationTemps[activeStation.stationID] : {};
-  const tempVal = tObj?.temp != null ? Math.round(tObj.temp) : '-';
-  const heatVal = tObj?.feelsLike != null ? Math.round(tObj.feelsLike) : '-';
-  const rainProb = tObj?.rainProb != null ? Math.round(tObj.rainProb) : 0;
-  const windVal = tObj?.windSpeed != null ? Math.round(tObj.windSpeed) : 0;
-  const pressureVal = tempVal !== '-' ? Math.round(1013 - (tempVal - 30) * 0.5 - (rainProb > 50 ? 5 : 0)) : 1010;
+    stations.forEach(st => {
+      const data = stationTemps[st.stationID];
+      if (!data) return;
 
-  const generateAlerts = () => {
-    const alerts = [];
-    if (pmVal >= 75) alerts.push({ id: 1, type: 'danger', icon: '🚨', title: 'วิกฤตฝุ่น PM2.5 รุนแรง', desc: `ค่าฝุ่นพุ่งสูงถึง ${pmVal} µg/m³ งดกิจกรรมกลางแจ้งเด็ดขาด`, color: '#ef4444', bg: 'rgba(239,68,68,0.1)' });
-    if (heatVal >= 41) alerts.push({ id: 3, type: 'danger', icon: '🔥', title: 'เตือนภัยฮีทสโตรก (ลมแดด)', desc: `Heat Index พุ่งแตะ ${heatVal}°C หลีกเลี่ยงแดดจัด`, color: '#ef4444', bg: 'rgba(239,68,68,0.1)' });
-    if (rainProb >= 70) alerts.push({ id: 5, type: 'info', icon: '⛈️', title: 'ระวังพายุฝนฟ้าคะนอง', desc: `โอกาสเกิดฝนตกสูงถึง ${rainProb}% เตรียมร่มให้พร้อม`, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' });
-    return alerts;
-  };
-  const activeAlerts = generateAlerts();
+      const pm25 = st.AQILast?.PM25?.value || 0;
+      const temp = Math.round(data.temp || 0);
+      const rain = data.rainProb || 0;
+      const provName = st.areaTH.replace('จังหวัด', '');
 
-  const lat = activeStation ? parseFloat(activeStation.lat) : 13.75;
-  const lon = activeStation ? parseFloat(activeStation.long) : 100.50;
+      // สถิติประเทศ
+      if (temp > maxTemp.val) maxTemp = { val: temp, prov: provName };
+      if (rain > maxRain.val) maxRain = { val: rain, prov: provName };
+      if (pm25 > maxPm25.val) maxPm25 = { val: pm25, prov: provName };
 
-  const windyModes = [
-    { id: 'rain', label: 'เรดาร์ฝน', icon: '⛈️' },
-    { id: 'pm2p5', label: 'ฝุ่น PM2.5', icon: '😷' },
-    { id: 'fires', label: 'จุดความร้อน', icon: '🔥' },
-    { id: 'temp', label: 'อุณหภูมิ', icon: '🌡️' },
-    { id: 'wind', label: 'ลม', icon: '🌬️' },
-    { id: 'gust', label: 'ลมกระโชก', icon: '💨' },
-    { id: 'clouds', label: 'เมฆ', icon: '☁️' },
-    { id: 'rh', label: 'ความชื้น', icon: '💧' },
-    { id: 'pressure', label: 'ความกดอากาศ', icon: '🔽' },
-    { id: 'visibility', label: 'ทัศนวิสัย', icon: '👁️' },
-    { id: 'uvindex', label: 'UV Index', icon: '☀️' },
-    { id: 'capes', label: 'พายุฟ้าคะนอง', icon: '⚡' }
-  ];
+      // กรองภัยพิบัติ (สีแดง)
+      if (pm25 > 75) alerts.push({ prov: provName, type: 'PM2.5', msg: `ฝุ่นพิษระดับอันตราย (${pm25} µg/m³)`, color: '#ef4444', icon: '😷' });
+      if (temp > 40) alerts.push({ prov: provName, type: 'Heat', msg: `ระวังฮีทสโตรก อากาศร้อนจัด (${temp}°C)`, color: '#ea580c', icon: '🔥' });
+      if (rain > 80) alerts.push({ prov: provName, type: 'Rain', msg: `ระวังน้ำท่วมฉับพลัน พายุฝน (${rain}%)`, color: '#3b82f6', icon: '⛈️' });
 
-  // 🌟 จำลองข้อมูลข่าวสารแบบเป็นทางการ (อัปเดตสถานการณ์จริง)
-  const newsItems = [
-    {
-      id: 1,
-      source: 'GISTDA สำนักงานพัฒนาเทคโนโลยีอวกาศฯ',
-      time: 'อัปเดตล่าสุด 2 ชั่วโมงที่ผ่านมา',
-      title: 'รายงานสถานการณ์จุดความร้อน (Hotspot) ประเทศไทยล่าสุด',
-      desc: 'GISTDA เผยข้อมูลจากดาวเทียม Suomi NPP (ระบบ VIIRS) พบจุดความร้อนทั่วประเทศรวมกว่า 1,245 จุด โดยพบมากที่สุดในพื้นที่ป่าอนุรักษ์ภาคเหนือ แนะนำประชาชนในพื้นที่เฝ้าระวังผลกระทบจากฝุ่นละออง PM2.5 อย่างใกล้ชิด',
-      tag: 'ไฟป่า', tagColor: '#ef4444'
-    },
-    {
-      id: 2,
-      source: 'กรมอุตุนิยมวิทยา (TMD)',
-      time: 'ประกาศฉบับที่ 4',
-      title: 'เตือนพายุฤดูร้อนบริเวณประเทศไทยตอนบน',
-      desc: 'กรมอุตุนิยมวิทยาออกประกาศเตือน มวลอากาศเย็นจากประเทศจีนได้แผ่ลงมาปกคลุมประเทศไทยตอนบน ทำให้เกิดพายุฤดูร้อน พายุฝนฟ้าคะนอง ลมกระโชกแรง และอาจมีลูกเห็บตกบางพื้นที่ ขอให้หลีกเลี่ยงการอยู่ในที่โล่งแจ้ง',
-      tag: 'พายุฤดูร้อน', tagColor: '#3b82f6'
-    },
-    {
-      id: 3,
-      source: 'องค์การอุตุนิยมวิทยาโลก (WMO)',
-      time: 'รายงานสถานการณ์ภูมิอากาศโลก',
-      title: 'WMO เตือนอุณหภูมิโลกพุ่งทำสถิติสูงสุดใหม่',
-      desc: 'รายงานสถานการณ์ภูมิอากาศโลกล่าสุดระบุว่า อุณหภูมิเฉลี่ยพื้นผิวโลกมีแนวโน้มสูงขึ้นอย่างต่อเนื่องจากสภาวะเอลนีโญร่วมกับการปล่อยก๊าซเรือนกระจก ส่งผลให้ทวีปเอเชียตะวันออกเฉียงใต้ต้องเผชิญกับคลื่นความร้อนที่ยาวนานขึ้น',
-      tag: 'โลกร้อน', tagColor: '#f97316'
-    },
-    {
-      id: 4,
-      source: 'กรมควบคุมโรค กระทรวงสาธารณสุข',
-      time: 'ประกาศเตือนด้านสุขภาพ',
-      title: 'ยกระดับเฝ้าระวังสุขภาพประชาชนกลุ่มเสี่ยงจาก PM2.5',
-      desc: 'กรมควบคุมโรคแนะนำประชาชนกลุ่มเสี่ยง (เด็ก ผู้สูงอายุ หญิงตั้งครรภ์ และผู้มีโรคประจำตัว) ให้งดกิจกรรมกลางแจ้งเด็ดขาดในพื้นที่สีแดงและสีส้ม และสวมหน้ากากอนามัย N95 ทุกครั้งเมื่อมีความจำเป็นต้องออกนอกอาคาร',
-      tag: 'สุขภาพ', tagColor: '#10b981'
-    }
+      // กรองจุดความร้อน (เสี่ยงไฟป่า: ร้อน + แห้ง + ฝุ่นเยอะ)
+      if (temp >= 36 && pm25 > 50 && data.humidity < 40) {
+        fires.push({ prov: provName, temp, pm25 });
+      }
+    });
+
+    return { 
+      extremeAlerts: alerts.sort((a,b) => b.val - a.val).slice(0, 8), // เอาแค่ 8 แจ้งเตือนหลัก
+      fireRisks: fires.sort((a,b) => b.temp - a.temp).slice(0, 5), // Top 5 จุดเสี่ยงไฟป่า
+      nationalSummary: { maxTemp, maxRain, maxPm25 }
+    };
+  }, [stations, stationTemps]);
+
+  // ตั้งค่าเรดาร์
+  const radarOptions = [
+    { id: 'rain', icon: '⛈️', label: 'ฝน & พายุ', color: '#3b82f6' },
+    { id: 'pm25', icon: '😷', label: 'ฝุ่น PM2.5', color: '#f97316' },
+    { id: 'temp', icon: '🌡️', label: 'อุณหภูมิ', color: '#ef4444' },
+    { id: 'wind', icon: '🌬️', label: 'ลม', color: '#22c55e' },
+    { id: 'rh', icon: '💧', label: 'ความชื้น', color: '#0ea5e9' },
+    { id: 'clouds', icon: '☁️', label: 'เมฆ', color: '#94a3b8' }
   ];
 
   return (
-    <div style={{ height: '100%', width: '100%', padding: isMobile ? '12px' : '30px', paddingBottom: isMobile ? '100px' : '40px', display: 'flex', flexDirection: 'column', gap: isMobile ? '15px' : '20px', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', background: bgGradient, fontFamily: 'Kanit, sans-serif' }}>
-      
-      {/* ฝัง CSS สำหรับซ่อนแถบ Scrollbar */}
+    <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       <style dangerouslySetInlineStyle={{__html: `
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; } 
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        .marquee-container { overflow: hidden; white-space: nowrap; position: relative; }
+        .marquee-content { display: inline-block; animation: marquee 25s linear infinite; }
+        .marquee-content:hover { animation-play-state: paused; }
       `}} />
+      
+      <div style={{ width: '100%', maxWidth: '1200px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '80px' }}>
 
-      {!isMobile && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <div>
-            <h1 style={{ fontSize: '2rem', color: textColor, margin: 0, fontWeight: '800' }}>🚨 ศูนย์เตือนภัย & ข่าวสาร</h1>
-          </div>
-          <div style={{ background: innerCardBg, padding: '6px 12px', borderRadius: '12px', color: subTextColor, fontSize: '0.75rem', fontWeight: 'bold', border: `1px solid ${borderColor}` }}>⏱️ ข้อมูลล่าสุด: {lastUpdateText || '-'}</div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: cardBg, padding: '8px 15px', borderRadius: '14px', border: `1px solid ${borderColor}`, boxShadow: '0 2px 10px rgba(0,0,0,0.02)', flexShrink: 0 }}>
-        <span style={{ fontSize: '1.1rem' }}>📍 พื้นที่ติดตาม:</span>
-        <select value={alertsLocationName} onChange={(e) => setAlertsLocationName(e.target.value)} style={{ flex: 1, background: 'transparent', color: '#0ea5e9', border: 'none', fontWeight: '900', fontSize: '1.05rem', outline: 'none', cursor: 'pointer' }}>
-          {provinces.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flexShrink: 0 }}>
-        {activeAlerts.length > 0 ? (
-          activeAlerts.map(alert => (
-            <div key={alert.id} style={{ display: 'flex', gap: '15px', background: alert.bg, border: `1px solid ${alert.color}50`, padding: '15px', borderRadius: '16px', alignItems: 'flex-start' }}>
-              <div style={{ fontSize: '2rem', lineHeight: 1 }}>{alert.icon}</div>
-              <div><h3 style={{ margin: '0 0 5px 0', color: alert.color, fontSize: '1rem', fontWeight: 'bold' }}>{alert.title}</h3><p style={{ margin: 0, color: textColor, fontSize: '0.85rem', lineHeight: 1.5 }}>{alert.desc}</p></div>
+        {/* 🌟 1. Breaking News Ticker (แถบข่าววิ่งฉุกเฉิน) */}
+        <div style={{ background: extremeAlerts.length > 0 ? '#ef4444' : '#22c55e', color: '#fff', padding: '12px 20px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '15px', boxShadow: '0 10px 25px rgba(239, 68, 68, 0.2)' }}>
+            <span style={{ fontWeight: '900', fontSize: '1rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{animation: 'pulse 1.5s infinite'}}>🚨</span> BREAKING:
+            </span>
+            <div className="marquee-container" style={{ flex: 1, fontSize: '0.95rem', fontWeight: '500' }}>
+                <div className="marquee-content">
+                    {extremeAlerts.length > 0 
+                        ? extremeAlerts.map((alt, i) => <span key={i} style={{ margin: '0 20px' }}>{alt.icon} <b>จ.{alt.prov}</b>: {alt.msg}</span>)
+                        : "✅ สถานการณ์ปกติ ไม่มีประกาศเตือนภัยร้ายแรงในขณะนี้"
+                    }
+                </div>
             </div>
-          ))
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(34, 197, 94, 0.1)', border: `1px solid rgba(34, 197, 94, 0.3)`, padding: '15px', borderRadius: '16px' }}>
-            <span style={{ fontSize: '1.8rem' }}>✅</span>
-            <div><h3 style={{ margin: '0 0 2px 0', color: '#22c55e', fontSize: '1rem', fontWeight: 'bold' }}>สถานการณ์ปกติ (All Clear)</h3><p style={{ margin: 0, color: subTextColor, fontSize: '0.85rem' }}>ขณะนี้ไม่มีประกาศเตือนภัยร้ายแรงในพื้นที่ {alertsLocationName}</p></div>
-          </div>
-        )}
-      </div>
+        </div>
 
-      <div style={{ background: cardBg, padding: '20px', borderRadius: '20px', border: `1px solid ${borderColor}`, flexShrink: 0 }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '1.05rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>⏱️ สรุปสถานการณ์ ณ ปัจจุบัน (Nowcast)</h3>
-        <p style={{ margin: 0, color: textColor, fontSize: '0.9rem', lineHeight: 1.8, background: innerCardBg, padding: '15px', borderRadius: '12px' }}>
-          ขณะนี้ในพื้นที่ <strong>{alertsLocationName}</strong> อุณหภูมิอยู่ที่ <strong>{tempVal}°C</strong> โดยมี Heat Index อยู่ที่ <strong>{heatVal}°C</strong> 
-          ระดับฝุ่นละออง PM2.5 ตรวจวัดได้ <strong>{pmVal || '-'} µg/m³</strong> โอกาสเกิดฝน <strong>{rainProb}%</strong> ความเร็วลม <strong>{windVal} km/h</strong> 
-          และความกดอากาศบริเวณพื้นผิวอยู่ที่ <strong>{pressureVal} hPa</strong>
-        </p>
-      </div>
+        {/* 🌟 2. Bento Box News Layout */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '20px' }}>
+            
+            {/* Box 2.1: ข่าวอุตุนิยมวิทยารายวัน (Daily Briefing) */}
+            <div style={{ background: cardBg, padding: '25px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.5rem' }}>📰</span> สรุปข่าวอากาศประจำวัน
+                    </h2>
+                    <span style={{ fontSize: '0.8rem', color: subTextColor, background: darkMode ? '#1e293b' : '#f1f5f9', padding: '4px 10px', borderRadius: '50px' }}>อัปเดตล่าสุด: {lastUpdateText}</span>
+                </div>
+                
+                <div style={{ background: darkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff', borderLeft: '4px solid #3b82f6', padding: '15px', borderRadius: '12px', color: textColor, fontSize: '1rem', lineHeight: '1.7' }}>
+                    <b>สรุปสถานการณ์ระดับประเทศ:</b> วันนี้จังหวัดที่ร้อนที่สุดคือ <b>{nationalSummary.maxTemp.prov} ({nationalSummary.maxTemp.val}°C)</b> ในขณะที่ <b>{nationalSummary.maxRain.prov}</b> มีความเสี่ยงพายุฝนฟ้าคะนองสูงสุด ({nationalSummary.maxRain.val}%) 
+                    สำหรับคุณภาพอากาศ <b>{nationalSummary.maxPm25.prov}</b> วิกฤตหนักที่สุด พบค่าฝุ่นสูงถึง {nationalSummary.maxPm25.val} µg/m³ ขอให้ประชาชนในพื้นที่เสี่ยงเฝ้าระวังสุขภาพและเตรียมพร้อมรับมือสภาพอากาศแปรปรวน
+                </div>
 
-      <div style={{ background: cardBg, padding: isMobile ? '15px' : '20px', borderRadius: '20px', border: `1px solid ${borderColor}`, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px' }}>
-          <h3 style={{ margin: 0, fontSize: '1.05rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            🛰️ เรดาร์ตรวจอากาศ (Windy)
-          </h3>
-          
-          <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', width: '100%', paddingBottom: '10px' }} className="hide-scrollbar">
-              {windyModes.map(layer => (
-                <button 
-                  key={layer.id} onClick={() => setWindyLayer(layer.id)}
-                  style={{ 
-                    background: windyLayer === layer.id ? '#0ea5e9' : innerCardBg, 
-                    color: windyLayer === layer.id ? '#fff' : subTextColor, 
-                    border: `1px solid ${windyLayer === layer.id ? '#0ea5e9' : borderColor}`, 
-                    padding: '8px 16px', 
-                    borderRadius: '50px', 
-                    fontSize: '0.85rem', 
-                    fontWeight: 'bold', 
-                    cursor: 'pointer', 
-                    whiteSpace: 'nowrap', 
-                    transition: 'all 0.2s', 
-                    flexShrink: 0,
-                    boxShadow: windyLayer === layer.id ? '0 4px 10px rgba(14, 165, 233, 0.3)' : 'none'
-                  }}>
-                  <span style={{ fontSize: '1rem', marginRight: '6px' }}>{layer.icon}</span> {layer.label}
-                </button>
-              ))}
+                {/* กล่องย่อยพื้นที่สีแดง */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                    {extremeAlerts.slice(0, 4).map((alt, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: darkMode ? '#1e293b' : '#f8fafc', padding: '12px', borderRadius: '12px', border: `1px solid ${borderColor}` }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: `${alt.color}20`, color: alt.color, display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}>{alt.icon}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>{alt.prov}</span>
+                                <span style={{ fontSize: '0.9rem', color: textColor, fontWeight: 'bold' }}>{alt.msg}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
-          </div>
-        </div>
 
-        <div style={{ height: isMobile ? '350px' : '450px', width: '100%', borderRadius: '14px', overflow: 'hidden', background: '#e2e8f0', position: 'relative' }}>
-          <iframe 
-            width="100%" 
-            height="100%" 
-            src={`https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=450&zoom=7&level=surface&overlay=${windyLayer}&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`} 
-            frameBorder="0" 
-            title="Windy Map">
-          </iframe>
-        </div>
-      </div>
-
-      {/* 🌟🌟 ส่วนข่าวสารที่กู้คืนมาให้แบบจัดเต็ม! 🌟🌟 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px', flexShrink: 0 }}>
-        <h3 style={{ margin: 0, fontSize: '1.2rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '5px' }}>
-          📰 ข่าวสารด้านสภาพอากาศและมลพิษ
-        </h3>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
-          {newsItems.map(news => (
-            <div key={news.id} style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#fff', background: news.tagColor, padding: '4px 10px', borderRadius: '8px' }}>
-                  {news.tag}
-                </span>
-                <span style={{ fontSize: '0.7rem', color: subTextColor }}>{news.time}</span>
-              </div>
-              
-              <h4 style={{ margin: 0, fontSize: '1.05rem', color: textColor, lineHeight: 1.4 }}>
-                {news.title}
-              </h4>
-              
-              <p style={{ margin: 0, fontSize: '0.85rem', color: subTextColor, lineHeight: 1.6, flex: 1 }}>
-                {news.desc}
-              </p>
-              
-              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${borderColor}`, fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span>อ้างอิง:</span> <span style={{ color: '#0ea5e9' }}>{news.source}</span>
-              </div>
-
+            {/* Box 2.2: ระบบเฝ้าระวังจุดความร้อน (Hotspot & Fire Watch) */}
+            <div style={{ background: cardBg, padding: '25px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.5rem' }}>🛰️</span> เฝ้าระวังจุดความร้อน
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: subTextColor }}>พื้นที่เสี่ยงเกิดไฟป่าและฝุ่นควัน (อิงจาก อุณหภูมิ + ฝุ่น + ความชื้นต่ำ)</p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
+                    {fireRisks.length > 0 ? fireRisks.map((fire, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: darkMode ? '#451a03' : '#fff7ed', border: '1px solid #ea580c', padding: '12px', borderRadius: '12px' }}>
+                            <span style={{ color: '#ea580c', fontWeight: 'bold', fontSize: '0.95rem' }}>{idx+1}. {fire.prov}</span>
+                            <div style={{ display: 'flex', gap: '10px', fontSize: '0.8rem', fontWeight: 'bold', color: darkMode ? '#fdba74' : '#9a3412' }}>
+                                <span style={{background: 'rgba(255,255,255,0.2)', padding:'2px 6px', borderRadius:'6px'}}>🔥 {fire.temp}°</span>
+                                <span style={{background: 'rgba(255,255,255,0.2)', padding:'2px 6px', borderRadius:'6px'}}>😷 {fire.pm25}</span>
+                            </div>
+                        </div>
+                    )) : (
+                        <div style={{ textAlign: 'center', padding: '30px 0', color: '#22c55e', fontWeight: 'bold' }}>✅ ไม่พบพื้นที่เสี่ยงจุดความร้อนรุนแรง</div>
+                    )}
+                </div>
             </div>
-          ))}
-        </div>
-      </div>
 
+        </div>
+
+        {/* 🌟 3. Pro Radar Console (แผนที่ลมล้ำๆ) */}
+        <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '15px', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+                <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📡</span> เรดาร์ตรวจอากาศ (Windy)
+                </h2>
+
+                {/* Console Buttons สำหรับเปลี่ยน Layer */}
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="hide-scrollbar">
+                    {radarOptions.map(opt => {
+                        const isActive = radarLayer === opt.id;
+                        return (
+                            <button 
+                                key={opt.id} 
+                                onClick={() => setRadarLayer(opt.id)}
+                                style={{ 
+                                    padding: '8px 16px', borderRadius: '50px', border: `1px solid ${isActive ? opt.color : borderColor}`, 
+                                    background: isActive ? (darkMode ? `${opt.color}30` : `${opt.color}15`) : (darkMode ? '#1e293b' : '#f8fafc'), 
+                                    color: isActive ? (darkMode ? '#fff' : opt.color) : subTextColor, 
+                                    fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                                    whiteSpace: 'nowrap', transition: 'all 0.2s'
+                                }}
+                            >
+                                <span>{opt.icon}</span> {opt.label}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* กรอบแผนที่ Windy */}
+            <div style={{ width: '100%', height: isMobile ? '400px' : '550px', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${borderColor}`, background: '#000' }}>
+                <iframe 
+                    width="100%" height="100%" 
+                    src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=5&level=surface&overlay=${radarLayer}&product=ecmwf&menu=&message=true&marker=true`} 
+                    frameBorder="0" title="Windy Radar Map"
+                ></iframe>
+            </div>
+
+            <div style={{ fontSize: '0.8rem', color: subTextColor, textAlign: 'right' }}>
+                สนับสนุนข้อมูลเรดาร์โดย <a href="https://www.windy.com" target="_blank" rel="noreferrer" style={{color: '#3b82f6', textDecoration:'none'}}>Windy.com</a>
+            </div>
+        </div>
+
+      </div>
     </div>
   );
 }
