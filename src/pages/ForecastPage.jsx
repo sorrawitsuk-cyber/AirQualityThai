@@ -25,17 +25,27 @@ export default function AIPage() {
   useEffect(() => {
     fetch('/thai_geo.json')
       .then(res => res.json())
-      .then(data => setGeoData(Array.isArray(data) ? data : (data.data || Object.values(data)[0] || [])))
+      .then(data => setGeoData(Array.isArray(data) ? data : (data.data || data.RECORDS || data.records || Object.values(data)[0] || [])))
       .catch(e => setGeoError(true));
   }, []);
 
   const sortedStations = useMemo(() => [...(stations || [])].sort((a, b) => a.areaTH.localeCompare(b.areaTH, 'th')), [stations]);
+  
+  // 🌟 [แก้บั๊ก] ระบบควานหาอำเภอแบบเจาะเกราะ (เหมือนหน้า Dashboard)
   const currentAmphoes = useMemo(() => {
     if (!geoData || geoData.length === 0 || !selectedProv) return [];
     const cleanProv = selectedProv.replace('จังหวัด', '').trim();
-    const pObj = geoData.find(p => String(p.name_th || p.nameTh || '').replace('จังหวัด', '').trim().includes(cleanProv));
+    const pObj = geoData.find(p => {
+      const pName = String(p.name_th || p.nameTh || p.name || p.province || p.province_name || '').replace('จังหวัด', '').trim();
+      return pName === cleanProv || pName.includes(cleanProv) || cleanProv.includes(pName);
+    });
+
     if (pObj) {
-      return [...(pObj.amphure || pObj.amphoe || [])].map(a => ({ id: a.id, name: (a.name_th || a.nameTh).trim() })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+      const distArray = pObj.amphure || pObj.amphures || pObj.district || pObj.districts || pObj.amphoe || pObj.amphoes || pObj.amphur || [];
+      return [...distArray].map(a => {
+        const distName = String(a.name_th || a.nameTh || a.name || a.amphoe || a.district_name || a.amphur_name || '').trim();
+        return { id: a.id || a.code || Math.random(), name: distName };
+      }).filter(a => a.name !== "").sort((a, b) => a.name.localeCompare(b.name, 'th'));
     }
     return [];
   }, [geoData, selectedProv]);
@@ -44,18 +54,33 @@ export default function AIPage() {
     try {
       const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
       const data = await res.json();
-      setLocationName(data?.locality || data?.city || 'ตำแหน่งที่เลือก');
-    } catch (e) { setLocationName('ตำแหน่งที่เลือก'); }
+      setLocationName(data?.locality || data?.city || 'ตำแหน่งปัจจุบัน');
+    } catch (e) { setLocationName('ตำแหน่งปัจจุบัน'); }
+  };
+
+  // 🌟 ฟังก์ชันหา GPS ของฉัน (สำหรับปุ่มใหม่)
+  const handleLocateMe = () => {
+    if (navigator.geolocation) {
+        setLocationName('กำลังหาตำแหน่ง...');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
+                fetchLocationName(pos.coords.latitude, pos.coords.longitude);
+                setSelectedProv(''); // ล้างค่าที่เคยเลือกด้วยมือ
+                setSelectedDist('');
+            },
+            () => {
+                alert("ไม่สามารถดึงตำแหน่งได้ กรุณาเปิด GPS หรือเลือกจังหวัดจากเมนูค่ะ");
+                setLocationName('กรุณาระบุตำแหน่ง');
+            },
+            { timeout: 5000 }
+        );
+    }
   };
 
   useEffect(() => {
     if (!weatherData) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => { fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude); fetchLocationName(pos.coords.latitude, pos.coords.longitude); }, 
-          () => { fetchWeatherByCoords(13.75, 100.5); setLocationName('กรุงเทพมหานคร'); }
-        );
-      } else { fetchWeatherByCoords(13.75, 100.5); setLocationName('กรุงเทพมหานคร'); }
+      handleLocateMe(); // ใช้ฟังก์ชัน GPS ตอนเปิดหน้าครั้งแรก
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -106,7 +131,6 @@ export default function AIPage() {
       wind: daily.windspeed_10m_max ? Math.round(daily.windspeed_10m_max[targetDateIdx] || 0) : (weatherData.current?.windSpeed || 0)
   };
 
-  // 🌟 ตั้งค่า 8 โหมด + สี Theme ประจำโหมด
   const tabConfigs = [
     { id: 'summary', icon: '📋', label: 'ภาพรวมรายวัน', color: '#8b5cf6' },
     { id: 'travel', icon: '🎒', label: 'แต่งกาย & ท่องเที่ยว', color: '#ec4899' },
@@ -124,11 +148,10 @@ export default function AIPage() {
       const { tMax, rain, pm25, wind } = dayData;
       let report = { score: 10, title: '', text: '', icon: '', tips: [] };
 
-      // Base Score deduction
       if (rain > 70) report.score -= 4; else if (rain > 40) report.score -= 2;
       if (tMax > 38) report.score -= 3; else if (tMax > 35) report.score -= 1;
       if (pm25 > 75) report.score -= 4; else if (pm25 > 37.5) report.score -= 2;
-      if (report.score < 1) report.score = 1; // Min score is 1
+      if (report.score < 1) report.score = 1;
 
       switch (activeTab) {
           case 'summary':
@@ -153,7 +176,7 @@ export default function AIPage() {
               break;
           case 'health':
               report.title = `คำแนะนำด้านสุขภาพ & กีฬา`;
-              if (pm25 > 50 || tMax > 38) report.text = `ไม่แนะนำให้ออกกำลังกายกลางแจ้งใน${displayDateName}เด็ดขาด! เนื่องจากสภาพอากาศเป็นอันตรายต่อสุขภาพ (เสี่ยงฮีทสโตรกหรือภูมิแพ้ฝุ่น) ควรเปลี่ยนไปยิมหรือฟิตเนสในร่มแทนค่ะ`;
+              if (pm25 > 50 || tMax > 38) report.text = `ไม่แนะนำให้ออกกำลังกายกลางแจ้งใน${displayDateName}เด็ดขาด! เนื่องจากสภาพอากาศเป็นอันตรายต่อสุขภาพ ควรเปลี่ยนไปยิมหรือฟิตเนสในร่มแทนค่ะ`;
               else if (pm25 > 25 || rain > 40) report.text = `สามารถออกกำลังกายเบาๆ ได้ แต่ควรลดระยะเวลาลง และคอยสังเกตอาการตัวเอง หากมีฝนตกให้งดวิ่งกลางแจ้งเพื่อป้องกันไข้หวัดค่ะ`;
               else report.text = `สภาพอากาศเพอร์เฟกต์สำหรับการวิ่ง ปั่นจักรยาน หรือเล่นกีฬากลางแจ้งค่ะ! สูตอากาศบริสุทธิ์ให้เต็มปอดได้เลย`;
               if(pm25 > 37.5) report.tips.push('😷 กลุ่มเสี่ยง (เด็ก, คนชรา, ผู้ป่วยหอบหืด) ควรงดออกจากบ้าน');
@@ -211,9 +234,16 @@ export default function AIPage() {
       <div style={{ width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '50px' }}>
 
         <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1.5rem' }}>🧠</span> กำหนดเงื่อนไขให้ AI วางแผน
-            </h2>
+            
+            {/* 🌟 ย้ายปุ่ม GPS มาไว้ข้างๆ หัวข้อให้กดง่ายๆ */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.5rem' }}>🧠</span> กำหนดเงื่อนไขให้ AI วางแผน
+                </h2>
+                <button onClick={handleLocateMe} style={{ background: 'rgba(14, 165, 233, 0.1)', color: '#0ea5e9', border: '1px solid #0ea5e9', padding: '6px 14px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.2s' }}>
+                    📍 ใช้ตำแหน่งปัจจุบัน
+                </button>
+            </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
                 <select value={selectedProv} onChange={handleProvChange} style={{ padding: '12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', outline: 'none', fontWeight: 'bold', cursor: 'pointer' }}>
@@ -273,7 +303,6 @@ export default function AIPage() {
                     </div>
                 </div>
 
-                {/* 🌟 กรอบข้อความเปลี่ยนสีขอบซ้ายตาม Theme สีของโหมด */}
                 <div style={{ padding: '20px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f8fafc', borderRadius: '16px', borderLeft: `4px solid ${activeThemeColor}`, marginBottom: '20px' }}>
                     <p style={{ margin: 0, fontSize: '1.05rem', color: textColor, lineHeight: 1.6, fontWeight: '500' }}>
                         {aiReport.text}
@@ -292,6 +321,7 @@ export default function AIPage() {
             </div>
         </div>
 
+        <div style={{ height: isMobile ? '80px' : '0px', flexShrink: 0, width: '100%' }}></div>
       </div>
     </div>
   );
