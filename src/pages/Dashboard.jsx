@@ -269,6 +269,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '20px', flexShrink: 0 }}>
           
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', minWidth: 0 }}>
+            
             <div style={{ background: bgGradient, borderRadius: isMobile ? '24px' : '30px', padding: isMobile ? '20px' : '30px 20px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', transition: 'background 0.5s ease', position: 'relative', flexShrink: 0 }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '15px' }}>
                   <div>
@@ -296,9 +297,9 @@ export default function Dashboard() {
                     <div style={{ fontSize: '0.7rem', color: subTextColor }}>{current?.visibility < 2000 ? 'มีหมอกหนา' : 'เคลียร์'}</div>
                 </div>
                 <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
-                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>💧 จุดน้ำค้าง</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{Math.round(current?.dewPoint || 0)}°C</div>
-                    <div style={{ fontSize: '0.7rem', color: subTextColor }}>{current?.dewPoint > 24 ? 'เหนียวตัว' : 'แห้งสบาย'}</div>
+                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>☔ โอกาสฝนตก</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{chartData[0]?.rain || 0} <span style={{fontSize:'0.75rem'}}>%</span></div>
+                    <div style={{ fontSize: '0.7rem', color: subTextColor }}>{(chartData[0]?.rain || 0) > 40 ? 'ควรพกร่มติดตัว' : 'ฝนทิ้งช่วง'}</div>
                 </div>
                 <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                     <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🧭 ความกดอากาศ</div>
@@ -351,10 +352,12 @@ export default function Dashboard() {
                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {daily?.time?.map((t, idx) => (
                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', paddingBottom: idx !== 6 ? '12px' : '0', borderBottom: idx !== 6 ? `1px solid ${borderColor}` : 'none' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '40px 40px 1fr', alignItems: 'center' }}>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: textColor }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
-                            <div style={{ fontSize: '1.2rem', textAlign: 'center' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        
+                        {/* 🌟 1. ปรับ Layout แถวแรกตามหน้าจอ (คอมชิดซ้าย มือถือจัดตรงกลาง) */}
+                        <div style={isMobile ? { display: 'grid', gridTemplateColumns: '40px 40px 1fr', alignItems: 'center' } : { display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 'bold', color: textColor, width: isMobile ? 'auto' : '45px' }}>{idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</div>
+                            <div style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', textAlign: 'center', width: isMobile ? 'auto' : '30px' }}>{daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
                                <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', width: '25px', textAlign: 'right' }}>{Math.round(daily?.temperature_2m_min?.[idx] || 0)}°</span>
                                <div style={{ flex: 1, height: '4px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
                                   <div style={{ position: 'absolute', left: '20%', right: '20%', top: 0, bottom: 0, background: 'linear-gradient(to right, #3b82f6, #f97316)' }}></div>
@@ -363,7 +366,8 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '6px 10px', borderRadius: '10px', fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>
+                        {/* 🌟 2. ข้อมูลย่อย: คอมเยื้องขวา 55px มือถือชิดขอบ */}
+                        <div style={{ marginLeft: isMobile ? '0' : '55px', display: 'flex', justifyContent: 'space-between', marginTop: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '6px 10px', borderRadius: '10px', fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>☔</span> {daily?.precipitation_probability_max?.[idx] || 0}%</div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>🥵</span> {Math.round(daily?.apparent_temperature_max?.[idx] || 0)}°</div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -373,6 +377,7 @@ export default function Dashboard() {
                               </span>
                            </div>
                         </div>
+
                      </div>
                   ))}
                </div>
@@ -431,12 +436,10 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* 🌟 กล่องเรดาร์ (ใส่ flexShrink: 0 และ minHeight ยันไว้ไม่ให้เบราว์เซอร์บีบจนแบน) */}
         <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0 }}>
             <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ
             </h3>
-            {/* 🌟 บังคับ minHeight ให้กล่อง Iframe เสมอ */}
             <div style={{ width: '100%', height: isMobile ? '250px' : '350px', minHeight: isMobile ? '250px' : '350px', borderRadius: '12px', overflow: 'hidden' }}>
                 <iframe 
                     width="100%" height="100%" 
@@ -446,11 +449,12 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* 🌟 Footer */}
         <div style={{ textAlign: 'center', marginTop: '10px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7, flexShrink: 0 }}>
            <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>อุตุนิยมวิทยาโดย Open-Meteo API • พิกัดโดย OpenStreetMap</div>
            <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px' }}>อัปเดตข้อมูลล่าสุด: {lastUpdateText}</div>
         </div>
+
+        <div style={{ height: '150px', flexShrink: 0, width: '100%' }}></div>
 
       </div>
     </div>
