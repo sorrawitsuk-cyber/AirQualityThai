@@ -1,9 +1,35 @@
-// src/pages/MapPage.jsx (หรือชื่อไฟล์แผนที่ของคุณ)
-import React, { useContext, useState, useEffect, useMemo } from 'react';
+// src/pages/MapPage.jsx
+import React, { useContext, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { WeatherContext } from '../context/WeatherContext';
+
+// 🌟 ดิกชันนารีแปลชื่อจังหวัด (อังกฤษ -> ไทย) เพื่อให้ GeoJSON คุยกับข้อมูลเราได้รู้เรื่อง
+const provMap = {
+  "Bangkok Metropolis": "กรุงเทพมหานคร", "Bangkok": "กรุงเทพมหานคร", 
+  "Samut Prakan": "สมุทรปราการ", "Nonthaburi": "นนทบุรี", "Pathum Thani": "ปทุมธานี",
+  "Phra Nakhon Si Ayutthaya": "พระนครศรีอยุธยา", "Ayutthaya": "พระนครศรีอยุธยา", 
+  "Ang Thong": "อ่างทอง", "Lop Buri": "ลพบุรี", "Sing Buri": "สิงห์บุรี", "Chai Nat": "ชัยนาท", 
+  "Saraburi": "สระบุรี", "Chon Buri": "ชลบุรี", "Rayong": "ระยอง", "Chanthaburi": "จันทบุรี",
+  "Trat": "ตราด", "Chachoengsao": "ฉะเชิงเทรา", "Prachin Buri": "ปราจีนบุรี", "Nakhon Nayok": "นครนายก", 
+  "Sa Kaeo": "สระแก้ว", "Nakhon Ratchasima": "นครราชสีมา", "Buri Ram": "บุรีรัมย์", "Surin": "สุรินทร์", 
+  "Si Sa Ket": "ศรีสะเกษ", "Ubon Ratchathani": "อุบลราชธานี", "Yasothon": "ยโสธร", "Chaiyaphum": "ชัยภูมิ", 
+  "Amnat Charoen": "อำนาจเจริญ", "Bueng Kan": "บึงกาฬ", "Nong Bua Lam Phu": "หนองบัวลำภู", 
+  "Khon Kaen": "ขอนแก่น", "Udon Thani": "อุดรธานี", "Loei": "เลย", "Nong Khai": "หนองคาย", 
+  "Maha Sarakham": "มหาสารคาม", "Roi Et": "ร้อยเอ็ด", "Kalasin": "กาฬสินธุ์", "Sakon Nakhon": "สกลนคร", 
+  "Nakhon Phanom": "นครพนม", "Mukdahan": "มุกดาหาร", "Chiang Mai": "เชียงใหม่", "Lamphun": "ลำพูน", 
+  "Lampang": "ลำปาง", "Uttaradit": "อุตรดิตถ์", "Phrae": "แพร่", "Nan": "น่าน", "Phayao": "พะเยา",
+  "Chiang Rai": "เชียงราย", "Mae Hong Son": "แม่ฮ่องสอน", "Nakhon Sawan": "นครสวรรค์", 
+  "Uthai Thani": "อุทัยธานี", "Kamphaeng Phet": "กำแพงเพชร", "Tak": "ตาก", "Sukhothai": "สุโขทัย", 
+  "Phitsanulok": "พิษณุโลก", "Phichit": "พิจิตร", "Phetchabun": "เพชรบูรณ์", "Ratchaburi": "ราชบุรี", 
+  "Kanchanaburi": "กาญจนบุรี", "Suphan Buri": "สุพรรณบุรี", "Nakhon Pathom": "นครปฐม", 
+  "Samut Sakhon": "สมุทรสาคร", "Samut Songkhram": "สมุทรสงคราม", "Phetchaburi": "เพชรบุรี",
+  "Prachuap Khiri Khan": "ประจวบคีรีขันธ์", "Nakhon Si Thammarat": "นครศรีธรรมราช", "Krabi": "กระบี่",
+  "Phangnga": "พังงา", "Phang Nga": "พังงา", "Phuket": "ภูเก็ต", "Surat Thani": "สุราษฎร์ธานี", 
+  "Ranong": "ระนอง", "Chumphon": "ชุมพร", "Songkhla": "สงขลา", "Satun": "สตูล", "Trang": "ตรัง", 
+  "Phatthalung": "พัทลุง", "Pattani": "ปัตตานี", "Yala": "ยะลา", "Narathiwat": "นราธิวาส"
+};
 
 export default function MapPage() {
   const { stations, stationTemps, darkMode } = useContext(WeatherContext);
@@ -17,11 +43,10 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 ดึงไฟล์จากโฟลเดอร์ public ในเครื่องตัวเอง ปลอดภัย 100%
   useEffect(() => {
     fetch('/thailand.json')
       .then(res => {
-          if(!res.ok) throw new Error("หาไฟล์ไม่เจอ เช็กว่าใส่ไฟล์ถูกที่ไหม");
+          if(!res.ok) throw new Error("หาไฟล์ไม่เจอ");
           return res.json();
       })
       .then(data => setGeoData(data))
@@ -38,7 +63,7 @@ export default function MapPage() {
   ];
 
   const getVal = (station) => {
-    if (!station || !stationTemps[station.stationID]) return 0;
+    if (!station || !stationTemps[station.stationID]) return null;
     const data = stationTemps[station.stationID];
     switch(activeMode) {
         case 'pm25': return station.AQILast?.PM25?.value || 0;
@@ -52,22 +77,33 @@ export default function MapPage() {
   };
 
   const getColor = (val, mode) => {
+    if (val === null || val === undefined) return darkMode ? '#334155' : '#cbd5e1';
+    
     if (mode === 'pm25') return val > 75 ? '#ef4444' : val > 37.5 ? '#f97316' : val > 25 ? '#eab308' : '#22c55e';
     if (mode === 'temp' || mode === 'heat') return val > 39 ? '#ef4444' : val > 34 ? '#f97316' : val > 28 ? '#eab308' : val > 22 ? '#22c55e' : '#3b82f6';
     if (mode === 'rain' || mode === 'humidity') return val > 70 ? '#1e3a8a' : val > 40 ? '#3b82f6' : val > 10 ? '#60a5fa' : '#94a3b8';
     if (mode === 'wind') return val > 40 ? '#ef4444' : val > 20 ? '#f97316' : val > 10 ? '#eab308' : '#22c55e';
-    return '#94a3b8';
+    return darkMode ? '#334155' : '#cbd5e1';
   };
 
-  // ... (โค้ดส่วนบนเหมือนเดิม) ...
-
-  // 🌟 4. ฟังก์ชันจับคู่ GeoJSON กับข้อมูลอุตุนิยมวิทยาของเรา
+  // 🌟 ฟังก์ชันวาดเส้นและลงสี (ฉบับอัปเกรด)
   const styleGeoJSON = (feature) => {
-    const props = Object.values(feature.properties || {}).map(v => String(v).replace('จ.', '').replace('จังหวัด', '').trim());
-    
+    // 1. ดึงชื่อทั้งหมดที่มีในไฟล์แผนที่
+    const props = Object.values(feature.properties || {}).map(v => String(v).trim());
+    let thaiNameFromMap = "";
+
+    // 2. ลองแปลจากอังกฤษเป็นไทยผ่าน Dictionary
+    for (let p of props) {
+        if (provMap[p]) {
+            thaiNameFromMap = provMap[p];
+            break;
+        }
+    }
+
+    // 3. จับคู่กับข้อมูล Stations ของเรา
     const station = stations.find(s => {
         const cleanName = s.areaTH.replace('จังหวัด', '').trim();
-        return props.includes(cleanName) || props.some(p => p.includes(cleanName) || cleanName.includes(p));
+        return cleanName === thaiNameFromMap || props.includes(cleanName) || props.some(p => p.includes(cleanName));
     });
 
     const val = getVal(station);
@@ -75,26 +111,22 @@ export default function MapPage() {
 
     return {
         fillColor: color,
-        weight: 1.5,
+        weight: 1.5, // ความหนาเส้นขอบ
         opacity: 1,
-        // 🌟 เปลี่ยนสีกรอบเป็นสีขาวตามรีเควส
-        color: '#ffffff', 
-        fillOpacity: 0.75 
+        color: '#ffffff', // 🌟 เส้นขอบ Polygon สีขาว
+        fillOpacity: 0.8  // ความทึบสี
     };
   };
 
-  // 🌟 5. สร้างไอคอนตัวเลขลอยๆ ตรงกลางจังหวัด
+  // 🌟 สร้างไอคอนตัวเลขลอยตัวขนาดมินิมอล (สีเทาดำ ขอบขาวบางๆ)
   const createLabelIcon = (val) => {
     return L.divIcon({
         className: 'custom-text-icon',
-        // 🌟 ปรับขนาดฟอนต์ให้เล็กลง และเปลี่ยนสีเป็นเทาดำ (#334155) พร้อมขอบขาวบางๆ ให้อ่านง่ายบนทุกสีพื้นหลัง
-        html: `<div style="color: #334155; font-weight: 900; font-size: ${isMobile ? '10px' : '12px'}; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; text-align: center;">${val}</div>`,
+        html: `<div style="color: #1e293b; font-weight: 900; font-size: ${isMobile ? '10px' : '12px'}; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; text-align: center;">${val}</div>`,
         iconSize: [40, 40],
-        iconAnchor: [20, 20] 
+        iconAnchor: [20, 20]
     });
   };
-
-  // ... (โค้ดส่วนล่างเหมือนเดิม) ...
 
   const appBg = darkMode ? '#020617' : '#f8fafc'; 
   const cardBg = darkMode ? '#0f172a' : '#ffffff';
@@ -150,25 +182,27 @@ export default function MapPage() {
         >
             <TileLayer url={mapUrl} attribution='&copy; OpenStreetMap & CartoDB' />
 
-            {/* วาดและระบายสีจังหวัดตามข้อมูล */}
             {geoData && <GeoJSON data={geoData} style={styleGeoJSON} />}
 
-            {/* ตัวเลขข้อมูลแต่ละจังหวัด */}
             {stations.map(st => {
                 const val = getVal(st);
+                // ตัดซ่อนตัวเลข 0 เฉพาะตอนโหมด % ฝนตก
                 if (val === 0 && activeMode === 'rain') return null; 
+                if (val === null) return null; // กันพังถ้าไม่มีข้อมูล
+
                 return (
                     <Marker 
                         key={st.stationID} 
                         position={[st.lat, st.long]} 
                         icon={createLabelIcon(val)} 
-                        interactive={false} 
+                        interactive={false} // ทะลุได้ เลื่อนแมพได้ปกติ
                     />
                 );
             })}
         </MapContainer>
       </div>
       
+      {/* Spacer ดันขอบล่างสำหรับมือถือ */}
       <div style={{ height: isMobile ? '80px' : '20px', flexShrink: 0 }}></div>
     </div>
   );
