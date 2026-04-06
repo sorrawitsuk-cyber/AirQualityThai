@@ -4,7 +4,8 @@ import { WeatherContext } from '../context/WeatherContext';
 import { AreaChart, Area, ResponsiveContainer, XAxis, LabelList } from 'recharts';
 
 export default function Dashboard() {
-  const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
+  // 🌟 ดึง stationTemps เข้ามาเพิ่มเพื่อทำตารางจัดอันดับประเทศ
+  const { stations, stationTemps, weatherData, fetchWeatherByCoords, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
@@ -232,6 +233,7 @@ export default function Dashboard() {
   else if (current?.pm25 > 37.5) briefingText += `ค่าฝุ่น PM2.5 ค่อนข้างสูง แนะนำให้สวมหน้ากากอนามัยเมื่อออกนอกอาคารครับ 😷`;
   else briefingText += `อากาศเป็นใจ เหมาะสำหรับการทำกิจกรรมนอกบ้านหรือซักผ้าครับ ✨`;
 
+  // 🌟 อัปเกรดดัชนีการใช้ชีวิต เพิ่ม "ขับขี่" และ "ตั้งแคมป์" ให้ครบ 6 กล่อง
   let exercise = { text: 'ดีเยี่ยม', color: '#0ea5e9', desc: 'อากาศดีมาก ฝุ่นน้อย' };
   if (current?.pm25 > 75 || current?.feelsLike > 39 || current?.rainProb > 60) exercise = { text: 'งดกิจกรรม', color: '#ef4444', desc: 'สภาพอากาศไม่เหมาะสม' };
   else if (current?.pm25 > 37.5 || current?.feelsLike > 35) exercise = { text: 'ลดเวลา', color: '#f97316', desc: 'มีผลกระทบต่อสุขภาพ' };
@@ -248,6 +250,45 @@ export default function Dashboard() {
   let spray = { text: 'ฉีดพ่นได้', color: '#22c55e', desc: 'ลมสงบ น้ำยาไม่ปลิว' };
   if (current?.windSpeed > 15) spray = { text: 'ลมแรงไป', color: '#ef4444', desc: 'น้ำยาอาจปลิวสูญเปล่า' };
   else if (current?.rainProb > 40) spray = { text: 'เสี่ยงฝนชะล้าง', color: '#f97316', desc: 'ฝนอาจชะล้างน้ำยา' };
+
+  // ใหม่: ขับขี่เดินทาง
+  let driving = { text: 'ปลอดภัย', color: '#22c55e', desc: 'ทัศนวิสัยเคลียร์ ถนนแห้ง' };
+  if ((current?.visibility / 1000) < 2 || current?.rainProb > 60) driving = { text: 'เพิ่มความระมัดระวัง', color: '#ef4444', desc: 'ทัศนวิสัยต่ำ/ถนนลื่น' };
+  else if ((current?.visibility / 1000) < 5 || current?.rainProb > 30) driving = { text: 'ระวังฝนระยะสั้น', color: '#eab308', desc: 'อาจมีฝนปรอย/หมอกลง' };
+
+  // ใหม่: ท่องเที่ยว/ตั้งแคมป์
+  let camping = { text: 'บรรยากาศดี', color: '#22c55e', desc: 'อากาศโปร่ง เหมาะจัดทริป' };
+  if (current?.rainProb > 50 || current?.windSpeed > 25) camping = { text: 'เลื่อนไปก่อน', color: '#ef4444', desc: 'เสี่ยงพายุและลมแรง' };
+  else if (current?.pm25 > 37.5 || current?.feelsLike > 38) camping = { text: 'ไม่น่าสบายนัก', color: '#f97316', desc: 'ฝุ่นหนาหรือร้อนจัด' };
+
+  // 🌟 ประมวลผลตารางจัดอันดับ Top 5 (คำนวณจาก stationTemps ทั่วประเทศ)
+  const top5Heat = useMemo(() => {
+    return [...(stations || [])]
+      .map(st => ({ name: st.areaTH.replace('จังหวัด',''), val: Math.round(stationTemps[st.stationID]?.temp || -99) }))
+      .filter(st => st.val !== -99)
+      .sort((a, b) => b.val - a.val).slice(0, 5);
+  }, [stations, stationTemps]);
+
+  const top5Cool = useMemo(() => {
+    return [...(stations || [])]
+      .map(st => ({ name: st.areaTH.replace('จังหวัด',''), val: Math.round(stationTemps[st.stationID]?.temp || 999) }))
+      .filter(st => st.val !== 999)
+      .sort((a, b) => a.val - b.val).slice(0, 5);
+  }, [stations, stationTemps]);
+
+  const top5PM25 = useMemo(() => {
+    return [...(stations || [])]
+      .map(st => ({ name: st.areaTH.replace('จังหวัด',''), val: st.AQILast?.PM25?.value || 0 }))
+      .filter(st => st.val > 0)
+      .sort((a, b) => b.val - a.val).slice(0, 5);
+  }, [stations]);
+
+  const top5Rain = useMemo(() => {
+    return [...(stations || [])]
+      .map(st => ({ name: st.areaTH.replace('จังหวัด',''), val: stationTemps[st.stationID]?.rainProb || 0 }))
+      .filter(st => st.val > 0)
+      .sort((a, b) => b.val - a.val).slice(0, 5);
+  }, [stations, stationTemps]);
 
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
@@ -393,7 +434,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 🌟 1. กล่อง AI สรุปยาวเต็มตาด้านบน */}
         <div style={{ background: cardBg, padding: '20px', borderRadius: isMobile ? '20px' : '25px', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: '15px', marginBottom: '15px', flexShrink: 0 }}>
             <span style={{ fontSize: '2.5rem' }}>🤖</span>
             <div>
@@ -402,10 +442,7 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* 🌟 2. กล่อง Gauge แถบสี ซ้าย(UV) ขวา(PM2.5) */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', flexShrink: 0, marginBottom: '15px' }}>
-            
-            {/* กล่อง UV */}
             <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
                     <span style={{ fontSize: '1.2rem' }}>☀️</span> รังสีอัลตราไวโอเลต (UV)
@@ -420,7 +457,6 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* 🌟 กล่อง PM2.5 แบบแถบสี 5 ระดับ (เกณฑ์ PCD 2023) */}
             <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: '20px', border: `1px solid ${borderColor}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
                     <span style={{ fontSize: '1.2rem' }}>😷</span> คุณภาพอากาศ (PM2.5)
@@ -431,14 +467,13 @@ export default function Dashboard() {
                     </span>
                 </div>
                 <div style={{ width: '100%', height: '8px', background: 'linear-gradient(to right, #0ea5e9, #22c55e, #eab308, #f97316, #ef4444)', borderRadius: '10px', marginTop: '15px', position: 'relative' }}>
-                    {/* ให้แถบวิ่งจาก 0 ถึง 100 µg/m³ เป็น Max Visual */}
                     <div style={{ position: 'absolute', top: '-4px', left: `${Math.min(((current?.pm25 || 0) / 100) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
                 </div>
             </div>
-
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', flexShrink: 0 }}>
+        {/* 🌟 1. ปรับกล่องกิจกรรมเป็น 6 กล่อง (เพิ่ม ขับขี่เดินทาง และ ตั้งแคมป์) */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '10px', flexShrink: 0, marginBottom: '20px' }}>
             <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>🏃‍♂️</div>
                 <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>ออกกำลังกาย</div>
@@ -463,6 +498,72 @@ export default function Dashboard() {
                 <div style={{ fontSize: '1.2rem', fontWeight: '900', color: spray.color }}>{spray.text}</div>
                 <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: 'auto', paddingTop: '5px' }}>{spray.desc}</div>
             </div>
+            {/* กล่องใหม่ 1 */}
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>🚘</div>
+                <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>ขับขี่เดินทาง</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: driving.color }}>{driving.text}</div>
+                <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: 'auto', paddingTop: '5px' }}>{driving.desc}</div>
+            </div>
+            {/* กล่องใหม่ 2 */}
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>⛺</div>
+                <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>เที่ยว / ตั้งแคมป์</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: camping.color }}>{camping.text}</div>
+                <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: 'auto', paddingTop: '5px' }}>{camping.desc}</div>
+            </div>
+        </div>
+
+        {/* 🌟 2. กระดานจัดอันดับ Top 5 ของประเทศ (National Leaderboard) */}
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>🇹🇭</span> สถิติ Top 5 ระดับประเทศ ณ ตอนนี้
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '15px', flexShrink: 0, marginBottom: '20px' }}>
+            
+            {/* Top 5 ร้อนสุด */}
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}` }}>
+                <div style={{ fontSize: '0.9rem', color: '#ef4444', fontWeight: 'bold', marginBottom: '10px', borderBottom: `1px solid ${borderColor}`, paddingBottom: '5px' }}>🔥 ร้อนจัดที่สุด</div>
+                {top5Heat.map((st, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+                        <span style={{ color: textColor }}>{i+1}. {st.name}</span>
+                        <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{st.val}°</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Top 5 เย็นสุด */}
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}` }}>
+                <div style={{ fontSize: '0.9rem', color: '#3b82f6', fontWeight: 'bold', marginBottom: '10px', borderBottom: `1px solid ${borderColor}`, paddingBottom: '5px' }}>❄️ เย็นสบายที่สุด</div>
+                {top5Cool.map((st, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+                        <span style={{ color: textColor }}>{i+1}. {st.name}</span>
+                        <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{st.val}°</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Top 5 ฝุ่นหนา */}
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}` }}>
+                <div style={{ fontSize: '0.9rem', color: '#f97316', fontWeight: 'bold', marginBottom: '10px', borderBottom: `1px solid ${borderColor}`, paddingBottom: '5px' }}>😷 ฝุ่น PM2.5 สูงสุด</div>
+                {top5PM25.map((st, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+                        <span style={{ color: textColor }}>{i+1}. {st.name}</span>
+                        <span style={{ color: '#f97316', fontWeight: 'bold' }}>{st.val}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Top 5 ฝนชุก */}
+            <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}` }}>
+                <div style={{ fontSize: '0.9rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '10px', borderBottom: `1px solid ${borderColor}`, paddingBottom: '5px' }}>☔ โอกาสฝนตกสูงสุด</div>
+                {top5Rain.map((st, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+                        <span style={{ color: textColor }}>{i+1}. {st.name}</span>
+                        <span style={{ color: '#0ea5e9', fontWeight: 'bold' }}>{st.val}%</span>
+                    </div>
+                ))}
+            </div>
+
         </div>
 
         <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0 }}>
@@ -483,7 +584,8 @@ export default function Dashboard() {
            <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px' }}>อัปเดตข้อมูลล่าสุด: {lastUpdateText}</div>
         </div>
 
-        <div style={{ height: '150px', flexShrink: 0, width: '100%' }}></div>
+        {/* 🌟 3. ปรับช่องว่างล่างสุดให้มีแค่ในมือถือ ส่วนในคอมเป็น 0 เพื่อลดพื้นที่โล่งดำๆ */}
+        <div style={{ height: isMobile ? '80px' : '0px', flexShrink: 0, width: '100%' }}></div>
 
       </div>
     </div>
