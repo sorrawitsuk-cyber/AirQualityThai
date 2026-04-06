@@ -1,171 +1,179 @@
-// src/pages/MapPage.jsx
-import React, { useContext, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Tooltip, Popup, useMapEvents } from 'react-leaflet';
+import React, { useContext, useState, useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, GeoJSON, Marker } from 'react-leaflet';
 import L from 'leaflet';
-import { WeatherContext } from '../context/WeatherContext';
-import { getPM25Color } from '../utils/helpers';
 import 'leaflet/dist/leaflet.css';
-
-const getHeatColor = (val) => { if(val==null)return'#94a3b8'; if(val>=41)return'#ef4444'; if(val>=32)return'#f97316'; if(val>=27)return'#eab308'; return'#22c55e'; };
-const getTempColor = (val) => { if(val==null)return'#94a3b8'; if(val>=35)return'#ef4444'; if(val>=30)return'#f97316'; if(val>=25)return'#eab308'; if(val>=20)return'#22c55e'; return'#3b82f6'; };
-const getRainColor = (val) => { if(val==null)return'#94a3b8'; if(val>=80)return'#1e3a8a'; if(val>=20)return'#3b82f6'; if(val>0)return'#93c5fd'; return'#e0f2fe'; };
-const getHumidityColor = (val) => { if(val==null)return'#94a3b8'; if(val>=80)return'#064e3b'; if(val>=60)return'#059669'; if(val>=40)return'#34d399'; return'#a7f3d0'; };
-const getWindColor = (val) => { if(val==null)return'#94a3b8'; if(val>=30)return'#831843'; if(val>=15)return'#db2777'; if(val>=5)return'#f472b6'; return'#fbcfe8'; };
-
-const getColorByMode = (mode, val) => {
-  if (mode === 'pm25') return getPM25Color(val);
-  if (mode === 'heat') return getHeatColor(val);
-  if (mode === 'temp') return getTempColor(val);
-  if (mode === 'rain') return getRainColor(val);
-  if (mode === 'humidity') return getHumidityColor(val);
-  if (mode === 'wind') return getWindColor(val);
-  return '#94a3b8';
-};
-
-// 🌟 สร้างไอคอนปักหมุดแบบ Custom (แก้ปัญหาไอคอนพัง)
-const pinIcon = L.divIcon({
-  html: `<div style="font-size: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); transform: translate(-10px, -20px);">📍</div>`,
-  className: 'custom-pin-icon',
-  iconSize: [30, 30]
-});
-
-function LocationMarker({ onMapClick }) {
-  useMapEvents({ click(e) { onMapClick(e.latlng.lat, e.latlng.lng); } });
-  return null;
-}
+import { WeatherContext } from '../context/WeatherContext';
 
 export default function MapPage() {
-  const { stations, stationTemps, darkMode, fetchWeatherByCoords, weatherData } = useContext(WeatherContext);
-  
+  const { stations, stationTemps, darkMode, loadingWeather } = useContext(WeatherContext);
+  const [geoData, setGeoData] = useState(null);
   const [activeMode, setActiveMode] = useState('pm25');
-  const [isRankingOpen, setIsRankingOpen] = useState(false);
-  const [clickPos, setClickPos] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 🌟 1. ดึงไฟล์ลากเส้นขอบเขตจังหวัด (GeoJSON) ของประเทศไทย
+  useEffect(() => {
+    // ใช้ไฟล์ GeoJSON มาตรฐานที่แจกฟรีบน Github
+    fetch('https://raw.githubusercontent.com/prakobm/thailand-geojson/master/thailand.json')
+      .then(res => res.json())
+      .then(data => setGeoData(data))
+      .catch(e => console.error('Error loading GeoJSON:', e));
+  }, []);
+
+  // เมนูโหมดต่างๆ (อัปเดตเป็น โอกาสฝนตก ตามที่คุณขอ)
   const modes = [
-    { id: 'pm25', label: 'ฝุ่น PM2.5', icon: '😷', color: '#0ea5e9', unit: 'µg/m³', type: 'leaflet' },
-    { id: 'heat', label: 'ดัชนีความร้อน', icon: '🥵', color: '#f97316', unit: '°C', type: 'leaflet' },
-    { id: 'temp', label: 'อุณหภูมิ', icon: '🌡️', color: '#eab308', unit: '°C', type: 'leaflet' },
-    { id: 'rain', label: 'ปริมาณฝน', icon: '☔', color: '#3b82f6', unit: 'mm', type: 'leaflet' },
-    { id: 'humidity', label: 'ความชื้น', icon: '💧', color: '#10b981', unit: '%', type: 'leaflet' },
-    { id: 'wind', label: 'ความเร็วลม', icon: '🌬️', color: '#db2777', unit: 'km/h', type: 'leaflet' },
-    { id: 'radar', label: 'เรดาร์สภาพอากาศ', icon: '⛈️', color: '#8b5cf6', type: 'windy', layer: 'rain' }
+    { id: 'pm25', name: '😷 ฝุ่น PM2.5' },
+    { id: 'heat', name: '🥵 ดัชนีความร้อน' },
+    { id: 'temp', name: '🌡️ อุณหภูมิ' },
+    { id: 'rain', name: '☔ โอกาสฝนตก' },
+    { id: 'humidity', name: '💧 ความชื้น' },
+    { id: 'wind', name: '🌬️ ความเร็วลม' }
   ];
 
-  const currentModeObj = modes.find(m => m.id === activeMode);
-  const isWindy = currentModeObj.type === 'windy';
-
-  const handleMapClick = (lat, lon) => {
-    if (isWindy) return; 
-    setClickPos({ lat, lon });
-    fetchWeatherByCoords(lat, lon); 
+  // 🌟 2. ฟังก์ชันดึงค่าตัวเลขตามโหมดที่กำลังเลือก
+  const getVal = (station) => {
+    if (!station || !stationTemps[station.stationID]) return 0;
+    const data = stationTemps[station.stationID];
+    switch(activeMode) {
+        case 'pm25': return station.AQILast?.PM25?.value || 0;
+        case 'heat': return Math.round(data.feelsLike);
+        case 'temp': return Math.round(data.temp);
+        case 'rain': return data.rainProb || 0; // % ฝนตก
+        case 'humidity': return Math.round(data.humidity);
+        case 'wind': return Math.round(data.windSpeed);
+        default: return 0;
+    }
   };
 
-  const rankingData = useMemo(() => {
-    if (isWindy || stations.length === 0) return [];
-    return stations.map(st => {
-      const tObj = stationTemps[st.stationID] || {};
-      let val = activeMode === 'pm25' ? Number(st.AQILast?.PM25?.value) : (activeMode === 'heat' ? tObj.feelsLike : (activeMode === 'temp' ? tObj.temp : (activeMode === 'rain' ? tObj.rainProb : (activeMode === 'humidity' ? tObj.humidity : tObj.windSpeed))));
-      return { name: st.areaTH, value: activeMode === 'rain' ? (val || 0).toFixed(1) : Math.round(val || 0) };
-    }).sort((a, b) => parseFloat(b.value) - parseFloat(a.value));
-  }, [activeMode, stations, stationTemps, isWindy]);
+  // 🌟 3. ฟังก์ชันกำหนดสีระบายลง Polygon (Choropleth Color Scale)
+  const getColor = (val, mode) => {
+    if (mode === 'pm25') return val > 75 ? '#ef4444' : val > 37.5 ? '#f97316' : val > 25 ? '#eab308' : '#22c55e';
+    if (mode === 'temp' || mode === 'heat') return val > 39 ? '#ef4444' : val > 34 ? '#f97316' : val > 28 ? '#eab308' : val > 22 ? '#22c55e' : '#3b82f6';
+    if (mode === 'rain' || mode === 'humidity') return val > 70 ? '#1e3a8a' : val > 40 ? '#3b82f6' : val > 10 ? '#60a5fa' : '#94a3b8';
+    if (mode === 'wind') return val > 40 ? '#ef4444' : val > 20 ? '#f97316' : val > 10 ? '#eab308' : '#22c55e';
+    return '#94a3b8';
+  };
 
-  const mapBg = darkMode ? '#0f172a' : '#f8fafc';
-  const cardBg = darkMode ? 'rgba(30, 41, 59, 0.98)' : 'rgba(255, 255, 255, 0.98)';
-  const textColor = darkMode ? '#f8fafc' : '#0f172a';
-  const borderColor = darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  // 🌟 4. ฟังก์ชันจับคู่ GeoJSON กับข้อมูลอุตุนิยมวิทยาของเรา
+  const styleGeoJSON = (feature) => {
+    // กวาดหาชื่อจังหวัดใน GeoJSON (เผื่อไฟล์ใช้ Key ชื่อต่างกัน)
+    const props = Object.values(feature.properties || {}).map(v => String(v).replace('จ.', '').replace('จังหวัด', '').trim());
+    
+    const station = stations.find(s => {
+        const cleanName = s.areaTH.replace('จังหวัด', '').trim();
+        return props.includes(cleanName) || props.some(p => p.includes(cleanName) || cleanName.includes(p));
+    });
+
+    const val = getVal(station);
+    const color = station ? getColor(val, activeMode) : (darkMode ? '#334155' : '#cbd5e1');
+
+    return {
+        fillColor: color,
+        weight: 1.5,
+        opacity: 1,
+        color: darkMode ? '#0f172a' : '#ffffff', // สีกรอบเส้นขอบจังหวัด
+        fillOpacity: 0.75 // ความโปร่งใสของสี (ให้เห็นพื้นหลังแผนที่นิดๆ)
+    };
+  };
+
+  // 🌟 5. สร้างไอคอนตัวเลขลอยๆ ตรงกลางจังหวัด (แทนจุดกลมๆ)
+  const createLabelIcon = (val) => {
+    return L.divIcon({
+        className: 'custom-text-icon',
+        html: `<div style="color: white; font-weight: 900; font-size: ${isMobile ? '12px' : '14px'}; text-shadow: 0 0 5px rgba(0,0,0,0.9), 1px 1px 3px rgba(0,0,0,0.9); text-align: center;">${val}</div>`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20] // จัดให้อยู่กึ่งกลางเป๊ะ
+    });
+  };
+
+  const appBg = darkMode ? '#020617' : '#f8fafc'; 
+  const cardBg = darkMode ? '#0f172a' : '#ffffff';
+  const textColor = darkMode ? '#f8fafc' : '#0f172a'; 
+  const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
+  
+  const mapUrl = darkMode 
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' 
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+  if (loadingWeather || !geoData) return (
+    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', background: appBg, color: textColor, fontFamily: 'Kanit, sans-serif' }}>
+        <style dangerouslySetInlineStyle={{__html: `@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(0.95); } }`}} />
+        <div style={{ fontSize: '4rem', animation: 'pulse 1.5s infinite ease-in-out' }}>🗺️</div>
+        <div style={{ marginTop: '20px', fontSize: '1.2rem', fontWeight: 'bold' }}>กำลังเรนเดอร์แผนที่ประเทศไทย</div>
+        <div style={{ fontSize: '0.9rem', color: subTextColor, marginTop: '8px' }}>กรุณารอสักครู่...</div>
+    </div>
+  );
 
   return (
-    <div style={{ position: 'relative', height: '100%', width: '100%', background: mapBg, overflow: 'hidden', fontFamily: 'Kanit' }}>
+    <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '10px' : '20px' }}>
       
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: isWindy ? -1 : 1, opacity: isWindy ? 0 : 1 }}>
-        <MapContainer center={[13.75, 100.5]} zoom={6} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-          <TileLayer url={darkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"} />
-          
-          <LocationMarker onMapClick={handleMapClick} />
+      {/* 🌟 Tab Bar เลือกโหมดข้อมูล */}
+      <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '15px', background: cardBg, borderRadius: '20px', marginBottom: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} className="hide-scrollbar">
+        <style dangerouslySetInlineStyle={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
+        {modes.map(m => (
+           <button 
+             key={m.id} 
+             onClick={() => setActiveMode(m.id)} 
+             style={{ 
+                padding: '10px 20px', 
+                borderRadius: '12px', 
+                border: 'none', 
+                background: activeMode === m.id ? '#0ea5e9' : (darkMode ? '#1e293b' : '#f1f5f9'), 
+                color: activeMode === m.id ? '#fff' : textColor, 
+                fontWeight: 'bold', 
+                cursor: 'pointer', 
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s',
+                boxShadow: activeMode === m.id ? '0 4px 10px rgba(14, 165, 233, 0.3)' : 'none'
+             }}
+           >
+              {m.name}
+           </button>
+        ))}
+      </div>
 
-          {!isWindy && stations.map(st => {
-            const lat = parseFloat(st.lat); const lon = parseFloat(st.long);
-            const tObj = stationTemps[st.stationID] || {};
-            const pmVal = Number(st.AQILast?.PM25?.value);
-            
-            let valToShow = '-'; let circleColor = '#94a3b8';
-            if (activeMode === 'pm25') { valToShow = pmVal; circleColor = getPM25Color(pmVal); }
-            else if (activeMode === 'heat') { valToShow = Math.round(tObj.feelsLike); circleColor = getHeatColor(tObj.feelsLike); }
-            else if (activeMode === 'temp') { valToShow = Math.round(tObj.temp); circleColor = getTempColor(tObj.temp); }
-            else if (activeMode === 'rain') { valToShow = (tObj.rainProb || 0).toFixed(1); circleColor = getRainColor(tObj.rainProb); }
-            else if (activeMode === 'humidity') { valToShow = Math.round(tObj.humidity); circleColor = getHumidityColor(tObj.humidity); }
-            else if (activeMode === 'wind') { valToShow = Math.round(tObj.windSpeed); circleColor = getWindColor(tObj.windSpeed); }
+      {/* 🌟 ตัวแผนที่ */}
+      <div style={{ flex: 1, borderRadius: '25px', overflow: 'hidden', border: `1px solid ${darkMode ? '#1e293b' : '#e2e8f0'}`, boxShadow: '0 10px 30px rgba(0,0,0,0.15)', position: 'relative' }}>
+        <MapContainer 
+            center={[13.5, 100.5]} 
+            zoom={isMobile ? 5 : 6} 
+            style={{ height: '100%', width: '100%', background: darkMode ? '#020617' : '#f8fafc' }}
+            zoomControl={false}
+        >
+            <TileLayer url={mapUrl} attribution='&copy; OpenStreetMap & CartoDB' />
 
-            const htmlContent = `<div style="background-color: ${circleColor}; color: #fff; width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 11px; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${valToShow}</div>`;
-            const icon = L.divIcon({ html: htmlContent, className: 'custom-div-icon', iconSize: [32, 32], iconAnchor: [16, 16] });
+            {/* วาด Polygon ขอบเขตจังหวัดพร้อมระบายสี */}
+            {geoData && <GeoJSON data={geoData} style={styleGeoJSON} />}
 
-            return (
-              <Marker key={st.stationID} position={[lat, lon]} icon={icon}>
-                <Tooltip direction="top"><b>{st.areaTH}</b><br/>{valToShow} {currentModeObj.unit}</Tooltip>
-              </Marker>
-            );
-          })}
-
-          {/* 🌟 วาดหมุดที่เราคลิกลงไป (ใช้ไอคอนใหม่ที่สวยๆ ไม่แตก) */}
-          {clickPos && weatherData && (
-            <Marker position={[clickPos.lat, clickPos.lon]} icon={pinIcon}>
-              <Popup closeButton={true} autoPan={true}>
-                <div style={{ padding: '10px', fontFamily: 'Kanit', minWidth: '150px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#0ea5e9' }}>📍 ผลวิเคราะห์พิกัดที่เลือก</h4>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>🌡️ อุณหภูมิ: {Math.round(weatherData.current.temp)}°C</div>
-                  <div style={{ fontSize: '0.9rem' }}>😷 ดัชนีฝุ่น PM2.5: <b>{weatherData.current.pm25}</b></div>
-                  <div style={{ fontSize: '0.9rem' }}>☔ ปริมาณฝน: <b>{weatherData.current.rain} mm</b></div>
-                  <hr style={{ margin: '10px 0', opacity: 0.2 }} />
-                  <div style={{ fontSize: '0.7rem', color: '#666' }}>GPS: {clickPos.lat.toFixed(4)}, {clickPos.lon.toFixed(4)}</div>
-                </div>
-              </Popup>
-            </Marker>
-          )}
+            {/* วางตัวเลขไว้ตรงกลางจังหวัด */}
+            {stations.map(st => {
+                const val = getVal(st);
+                // ตัดสถานีที่ไม่มีข้อมูลออกเพื่อไม่ให้รก
+                if (val === 0 && activeMode === 'rain') return null; 
+                return (
+                    <Marker 
+                        key={st.stationID} 
+                        position={[st.lat, st.long]} 
+                        icon={createLabelIcon(val)} 
+                        interactive={false} // ทำให้กดทะลุตัวเลขได้ (ไม่บล็อกการเลื่อนแผนที่)
+                    />
+                );
+            })}
         </MapContainer>
-      </div>
 
-      {isWindy && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2 }}>
-          <iframe width="100%" height="100%" src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=6&level=surface&overlay=${currentModeObj.layer}&product=ecmwf&menu=&message=true`} frameBorder="0"></iframe>
-        </div>
-      )}
-
-      <div style={{ position: 'absolute', top: 20, left: 20, right: 20, zIndex: 1000, display: 'flex', gap: '15px', overflowX: 'auto' }} className="hide-scrollbar">
-        <div style={{ display: 'flex', alignItems: 'center', background: cardBg, borderRadius: '50px', padding: '6px 8px', border: `1px solid ${borderColor}` }}>
-          <span style={{ fontSize: '1rem', fontWeight: 'bold', color: textColor, margin: '0 15px' }}>🇹🇭 ครอบคลุม 77 จังหวัด</span>
-          {modes.map(mode => (
-            <button key={mode.id} onClick={() => setActiveMode(mode.id)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 14px', borderRadius: '50px', border: 'none', background: activeMode === mode.id ? mode.color : 'transparent', color: activeMode === mode.id ? '#fff' : textColor, fontWeight: 'bold', cursor: 'pointer', marginRight: '4px' }}>
-              <span>{mode.icon}</span>{mode.label}
-            </button>
-          ))}
+        {/* 🌟 ป้ายบอกสถานะมุมขวาล่าง */}
+        <div style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000, background: darkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(5px)', padding: '10px 15px', borderRadius: '12px', border: `1px solid ${darkMode ? '#1e293b' : '#e2e8f0'}`, fontSize: '0.8rem', color: textColor, fontWeight: 'bold', pointerEvents: 'none' }}>
+            อัปเดตล่าสุด: {lastUpdateText}
         </div>
       </div>
-
-      <div style={{ position: 'absolute', top: 80, right: 20, zIndex: 1000 }}>
-        {!isWindy && (
-          <button onClick={() => setIsRankingOpen(!isRankingOpen)} style={{ background: isRankingOpen ? '#8b5cf6' : cardBg, color: isRankingOpen ? '#fff' : textColor, border: `1px solid ${borderColor}`, padding: '10px 15px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
-            <span style={{ fontSize: '1.2rem' }}>📊</span> {isRankingOpen ? 'ปิดหน้าต่างรายงาน' : 'เปิดรายงานข้อมูลสถิติ'}
-          </button>
-        )}
-      </div>
-
-      <div style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: '380px', zIndex: 9998, background: cardBg, borderLeft: `1px solid ${borderColor}`, transform: isRankingOpen && !isWindy ? 'translateX(0)' : 'translateX(105%)', transition: 'transform 0.4s', display: 'flex', flexDirection: 'column', paddingTop: '100px' }}>
-        <div style={{ padding: '0 25px 15px', borderBottom: `1px solid ${borderColor}` }}>
-          <h3 style={{ margin: 0, color: textColor }}>🏆 ข้อมูลการจัดอันดับ ({currentModeObj.label})</h3>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>รายงานสถิติเรียลไทม์ 77 จังหวัด</p>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '15px 20px' }}>
-          {rankingData.map((item, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: darkMode?'rgba(0,0,0,0.3)':'#f1f5f9', padding: '12px 15px', borderRadius: '16px', marginBottom: '10px' }}>
-              <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#64748b' }}>{idx + 1}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor }}>{item.name}</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: '900', color: getColorByMode(activeMode, parseFloat(item.value)) }}>{item.value} <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{currentModeObj.unit}</span></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      
+      {/* Spacer ดันขอบล่างสำหรับมือถือ */}
+      <div style={{ height: isMobile ? '80px' : '20px', flexShrink: 0 }}></div>
     </div>
   );
 }
