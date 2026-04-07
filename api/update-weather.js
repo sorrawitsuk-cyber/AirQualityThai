@@ -27,7 +27,8 @@ const provinces77 = [
 
 export default async function handler(req, res) {
   try {
-    const chunkSize = 20; // จัดกลุ่มใหญ่ขึ้นหน่อยเพื่อให้ทันเวลา 10 วินาทีของ Vercel
+    // 🌟 หั่นแค่ 3 ก้อน (ก้อนละ 26 จังหวัด) ประหยัดเวลา ไม่ต้องหยุดพัก
+    const chunkSize = 26; 
     let allWData = [];
     let allAData = [];
 
@@ -39,22 +40,16 @@ export default async function handler(req, res) {
       const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m&timezone=Asia%2FBangkok`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm2_5&timezone=Asia%2FBangkok`;
 
-      // 🌟 ท่าไม้ตาย: ยิงทีละเส้น (ไม่ใช้ Promise.all) และดัก Error ถ้าเกิด fetch failed
+      // ยิงตรงไปเลย ไม่ต้อง setTimeout หน่วงเวลาแล้ว
       const wRes = await fetch(wUrl);
-      if (!wRes.ok) throw new Error(`Weather Fetch Error: ${wRes.status}`);
+      if (!wRes.ok) throw new Error(`Weather API Error: ${wRes.status}`);
       const wJson = await wRes.json();
-      allWData = [...allWData, ...(Array.isArray(wJson) ? wJson : [wJson])];
-
-      // พักนิดนึงให้ API หายใจ
-      await new Promise(resolve => setTimeout(resolve, 300));
+      allWData.push(...(Array.isArray(wJson) ? wJson : [wJson]));
 
       const aRes = await fetch(aUrl);
-      if (!aRes.ok) throw new Error(`Air Quality Fetch Error: ${aRes.status}`);
+      if (!aRes.ok) throw new Error(`AQI API Error: ${aRes.status}`);
       const aJson = await aRes.json();
-      allAData = [...allAData, ...(Array.isArray(aJson) ? aJson : [aJson])];
-
-      // พักก่อนขึ้นกลุ่มถัดไป
-      await new Promise(resolve => setTimeout(resolve, 300));
+      allAData.push(...(Array.isArray(aJson) ? aJson : [aJson]));
     }
 
     const realStations = [];
@@ -86,9 +81,9 @@ export default async function handler(req, res) {
       lastUpdated: updateTime
     });
 
-    res.status(200).json({ success: true, message: "Weather data updated to Firebase successfully!", lastUpdated: updateTime });
+    res.status(200).json({ success: true, message: "OK! Updated Fast.", lastUpdated: updateTime });
   } catch (error) {
-    console.error("Cron Job Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error("Vercel Fast Fetch Error:", error);
+    res.status(500).json({ success: false, error: error.message || "Unknown Fetch Error" });
   }
 }
