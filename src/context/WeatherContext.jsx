@@ -26,10 +26,9 @@ export const WeatherProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(true);
   const [lastUpdateText, setLastUpdateText] = useState("");
 
-  // 🌟 ท่าไม้ตาย: ยิงคิวเรียงตัว (Sequential) + หั่นกลุ่มเล็ก 10 จังหวัด
   const fetchReal77Provinces = async () => {
     try {
-      const chunkSize = 10; // หั่นให้เล็กลงอีก
+      const chunkSize = 10;
       let allWData = [];
       let allAData = [];
 
@@ -41,24 +40,20 @@ export const WeatherProvider = ({ children }) => {
         const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m&timezone=Asia%2FBangkok`;
         const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm2_5&timezone=Asia%2FBangkok`;
 
-        // 1. ขอดึงสภาพอากาศก่อน
         const wRes = await fetch(wUrl);
         if (wRes.ok) {
             const wJson = await wRes.json();
             allWData = [...allWData, ...(Array.isArray(wJson) ? wJson : [wJson])];
         }
 
-        // 2. พักหายใจ 300ms 
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        // 3. ขอดึงฝุ่นตามมา
         const aRes = await fetch(aUrl);
         if (aRes.ok) {
             const aJson = await aRes.json();
             allAData = [...allAData, ...(Array.isArray(aJson) ? aJson : [aJson])];
         }
 
-        // 4. พัก 500ms ก่อนเริ่มกลุ่ม 10 จังหวัดถัดไป
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
@@ -92,15 +87,19 @@ export const WeatherProvider = ({ children }) => {
     }
   };
 
-  const fetchWeatherByCoords = async (lat, lon) => {
+  const fetchWeatherByCoords = async (inputLat, inputLon) => {
     setLoadingWeather(true);
     try {
+      // 🌟 ไฮไลท์การแก้ปัญหา: บังคับให้พิกัดเป็นตัวเลขเสมอ ถ้าได้ค่าพัง (NaN) ให้ใช้ กทม. แทน
+      const lat = !isNaN(parseFloat(inputLat)) ? parseFloat(inputLat) : 13.7538;
+      const lon = !isNaN(parseFloat(inputLon)) ? parseFloat(inputLon) : 100.5014;
+
       const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,uv_index,visibility,surface_pressure,dew_point_2m&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,weathercode,apparent_temperature_max,precipitation_probability_max,sunrise,sunset&timezone=Asia%2FBangkok`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5,us_aqi&hourly=pm2_5&timezone=Asia%2FBangkok`;
 
-      // ยิงเส้นเดี่ยว แยกคิวเช่นกัน ป้องกัน API ช็อต
       const wRes = await fetch(wUrl);
-      const wData = wRes.ok ? await wRes.json() : {};
+      if (!wRes.ok) throw new Error("Weather API Error"); // ป้องกันค่าว่าง
+      const wData = await wRes.json();
 
       await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -137,15 +136,15 @@ export const WeatherProvider = ({ children }) => {
           pm25: aData.hourly?.pm2_5 || []
         }, 
         daily: { ...wData.daily, pm25_max: dailyPm25 },
-        coords: { lat, lon }
+        coords: { lat, lon } // 🌟 ตรงนี้รับประกันแล้วว่าพิกัดเป็นตัวเลขแน่นอน แผนที่ Leaflet จะไม่พัง
       });
 
       const now = new Date();
       setLastUpdateText(`${now.toLocaleDateString('th-TH')} ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`);
     } catch (error) { 
         console.error("Open-Meteo Single Fetch Error:", error); 
-        // 🌟 กันเหนียว: ถ้าพังไปเลยจริงๆ ต้องปิด Loading ไม่งั้นจอดำ
-        setWeatherData({}); 
+        // ถ้าพังจริงๆ เซ็ตกลับเป็นค่าเริ่มต้น (พิกัดกทม.)
+        setWeatherData(prev => prev || null);
     } finally { 
         setLoadingWeather(false); 
     }
