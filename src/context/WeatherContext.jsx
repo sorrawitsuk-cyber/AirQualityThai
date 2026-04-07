@@ -150,8 +150,30 @@ export const WeatherProvider = ({ children }) => {
     }
   };
 
+// ... โค้ดด้านบนของ WeatherContext เหมือนเดิม ...
+
   useEffect(() => { 
+      // 1. สั่งดึงข้อมูล 77 จังหวัดเบื้องหลัง
       fetchReal77Provinces(); 
+
+      // 2. 🌟 สั่งดึงข้อมูลพยากรณ์ตำแหน่งปัจจุบันทันที เพื่อปลดล็อคหน้า Loading
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                  // ถ้าอนุญาต GPS ให้ใช้พิกัดจริง
+                  fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
+              }, 
+              (err) => {
+                  // ถ้าไม่อนุญาต GPS หรือหาไม่เจอ ให้ใช้พิกัด กทม. แทน (แอปจะได้ไม่ค้าง)
+                  fetchWeatherByCoords(13.7538, 100.5014);
+              }, 
+              { timeout: 5000 } // รอ GPS แค่ 5 วินาที ถ้าช้ากว่านี้ให้ข้ามไปใช้ กทม. เลย
+          );
+      } else {
+          fetchWeatherByCoords(13.7538, 100.5014);
+      }
+      
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
