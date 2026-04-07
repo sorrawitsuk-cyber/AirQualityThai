@@ -34,7 +34,7 @@ export const WeatherProvider = ({ children }) => {
 
   const fetchReal77Provinces = async () => {
     try {
-      const chunkSize = 15;
+      const chunkSize = 8;
       let allWData = [];
       let allAData = [];
 
