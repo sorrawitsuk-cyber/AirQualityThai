@@ -26,168 +26,129 @@ export const WeatherProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(true);
   const [lastUpdateText, setLastUpdateText] = useState("");
 
-  const API_KEY = "5bd54936b5d3411f853170051262103"; 
-
-  const adjustRainProb = (chance, precip_mm) => {
-    if (!precip_mm || precip_mm === 0) return 0;
-    if (precip_mm < 0.2) return Math.min(chance, 20); 
-    if (precip_mm < 1.0) return Math.min(chance, 40); 
-    return chance; 
-  };
-
-  const calculateAQI = (pm25) => {
-    const pm = parseFloat(pm25) || 0;
-    if (pm <= 12.0) return Math.round((50/12.0) * pm);
-    if (pm <= 35.4) return Math.round(((100-51)/(35.4-12.1)) * (pm - 12.1) + 51);
-    if (pm <= 55.4) return Math.round(((150-101)/(55.4-35.5)) * (pm - 35.5) + 101);
-    if (pm <= 150.4) return Math.round(((200-151)/(150.4-55.5)) * (pm - 55.5) + 151);
-    return Math.round(((300-201)/(250.4-150.5)) * (pm - 150.5) + 201);
-  };
-
-  // 🌟 ฟังก์ชันแปลงเวลาจาก 12 ชั่วโมง (06:15 AM) ให้กลายเป็นรูปแบบวันที่ (ISO) ที่ React ชอบ
-  const convertAstroTimeToDate = (dateStr, time12h) => {
-    if (!time12h || time12h === '') return '';
-    const [time, modifier] = time12h.split(' ');
-    let [hours, minutes] = time.split(':');
-    if (hours === '12') hours = '00';
-    if (modifier === 'PM') hours = (parseInt(hours, 10) + 12).toString();
-    return `${dateStr}T${hours.padStart(2, '0')}:${minutes}:00`;
-  };
-
+  // 🌟 ท่าไม้ตาย: ดึง 77 จังหวัดด้วย URL เดียวจบ! (ไม่โดนบล็อกแน่นอน)
   const fetchReal77Provinces = async () => {
     try {
-      const chunkSize = 10;
-      const newStations = [...initialStations];
+      const lats = provinces77.map(p => p.lat).join(',');
+      const lons = provinces77.map(p => p.lon).join(',');
+
+      // ยิงเปรี้ยงเดียว 77 จังหวัด
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m&daily=precipitation_probability_max&timezone=Asia%2FBangkok`;
+      const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm2_5&timezone=Asia%2FBangkok`;
+
+      const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
+
+      if (!wRes.ok || !aRes.ok) throw new Error("Bulk API Error");
+
+      const wJson = await wRes.json();
+      const aJson = await aRes.json();
+
+      // Open-Meteo จะคืนค่ามาเป็น Array 77 ก้อน
+      const wArray = Array.isArray(wJson) ? wJson : [wJson];
+      const aArray = Array.isArray(aJson) ? aJson : [aJson];
+
+      const newStations = [];
       const newTemps = {};
 
-      for (let i = 0; i < provinces77.length; i += chunkSize) {
-        const chunk = provinces77.slice(i, i + chunkSize);
-        
-        const promises = chunk.map(async (p, idx) => {
-          const globalIdx = i + idx;
-          const url = `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${p.lat},${p.lon}&aqi=yes`;
-          
-          try {
-            const res = await fetch(url);
-            if (!res.ok) return;
-            const data = await res.json();
-            
-            const sID = `PROV_${globalIdx}`;
-            const pm25Val = Math.round(data.current?.air_quality?.pm2_5 || 0);
+      provinces77.forEach((p, idx) => {
+        const w = wArray[idx] || {};
+        const a = aArray[idx] || {};
+        const sID = `PROV_${idx}`;
 
-            newStations[globalIdx] = { 
-              ...newStations[globalIdx], 
-              AQILast: { PM25: { value: pm25Val } } 
-            };
-            
-            newTemps[sID] = { 
-              temp: Math.round(data.current?.temp_c || 0), 
-              feelsLike: Math.round(data.current?.feelslike_c || 0), 
-              humidity: Math.round(data.current?.humidity || 0), 
-              rainProb: 0, 
-              windSpeed: Math.round(data.current?.wind_kph || 0) 
-            };
-          } catch (e) {
-             // ข้ามไป
-          }
+        newStations.push({
+          stationID: sID, areaTH: p.n, lat: p.lat, long: p.lon,
+          AQILast: { PM25: { value: Math.round(a.current?.pm2_5 || 0) } }
         });
 
-        await Promise.allSettled(promises);
-        await new Promise(r => setTimeout(r, 600)); 
-      }
+        newTemps[sID] = {
+          temp: Math.round(w.current?.temperature_2m || 0),
+          feelsLike: Math.round(w.current?.apparent_temperature || 0),
+          humidity: Math.round(w.current?.relative_humidity_2m || 0),
+          rainProb: Math.round(w.daily?.precipitation_probability_max?.[0] || 0), // ดึง % ฝนมาโชว์ใน Top 5 แล้ว!
+          windSpeed: Math.round(w.current?.wind_speed_10m || 0)
+        };
+      });
 
-      setStations([...newStations]); 
+      setStations(newStations);
       setStationTemps(newTemps);
-    } catch (error) { console.error("77 Provinces Fetch Error:", error); }
+    } catch (error) { 
+      console.error("77 Provinces Fetch Error:", error); 
+    }
   };
 
+  // ดึงตำแหน่งปัจจุบัน (โหมดละเอียดยิบ 7 วัน)
   const fetchWeatherByCoords = async (inputLat, inputLon) => {
     setLoadingWeather(true);
     try {
       const lat = !isNaN(parseFloat(inputLat)) ? parseFloat(inputLat) : 13.7538;
       const lon = !isNaN(parseFloat(inputLon)) ? parseFloat(inputLon) : 100.5014;
 
-      const url = `https://api.weatherapi.com/v1/forecast.json?key=${API_KEY}&q=${lat},${lon}&days=3&aqi=yes`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("API Limit หรือ Key ผิด");
-      
-      const data = await res.json();
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,uv_index,visibility,surface_pressure,dew_point_2m&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,weathercode,apparent_temperature_max,precipitation_probability_max,sunrise,sunset&timezone=Asia%2FBangkok`;
+      const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5,us_aqi&hourly=pm2_5&timezone=Asia%2FBangkok`;
 
-      const pm25Current = data.current?.air_quality?.pm2_5 || 0;
-      
-      const hTime = [], hTemp = [], hPm25 = [];
-      data.forecast?.forecastday?.forEach(day => {
-        day.hour?.forEach(h => {
-          hTime.push(h.time);
-          hTemp.push(h.temp_c);
-          hPm25.push(pm25Current); 
-        });
-      });
+      const wRes = await fetch(wUrl);
+      if (!wRes.ok) throw new Error("Weather API Error");
+      const wData = await wRes.json();
 
-      const dTime = [], dMax = [], dMin = [], dCode = [], dPm25 = [], dRainProb = [];
-      data.forecast?.forecastday?.forEach(day => {
-        dTime.push(day.date);
-        dMax.push(day.day.maxtemp_c);
-        dMin.push(day.day.mintemp_c);
-        dCode.push(day.day.condition.code); 
-        dPm25.push(pm25Current);
-        dRainProb.push(adjustRainProb(day.day.daily_chance_of_rain, day.day.totalprecip_mm));
-      });
+      const aRes = await fetch(aUrl);
+      const aData = aRes.ok ? await aRes.json() : {};
 
-      // ดึงวันที่ของวันนี้มาเพื่อประกอบร่างกับเวลาพระอาทิตย์ขึ้น/ตก
-      const todayDateStr = data.forecast?.forecastday[0]?.date || '';
-      const rawSunrise = data.forecast?.forecastday[0]?.astro?.sunrise || '';
-      const rawSunset = data.forecast?.forecastday[0]?.astro?.sunset || '';
+      const dailyPm25 = [];
+      if (aData.hourly && aData.hourly.pm2_5) {
+        for (let i = 0; i < 7; i++) {
+          const dayData = aData.hourly.pm2_5.slice(i * 24, (i + 1) * 24).filter(v => v !== null);
+          dailyPm25.push(dayData.length > 0 ? Math.round(Math.max(...dayData)) : Math.round(aData.current?.pm2_5 || 0));
+        }
+      }
 
       setWeatherData({
         current: {
-          temp: Math.round(data.current?.temp_c || 0), 
-          feelsLike: Math.round(data.current?.feelslike_c || 0),
-          pm25: Math.round(pm25Current), 
-          aqi: calculateAQI(pm25Current),
-          humidity: Math.round(data.current?.humidity || 0), 
-          windSpeed: Math.round(data.current?.wind_kph || 0),
-          rain: Math.round(data.current?.precip_mm || 0), 
-          uv: Math.round(data.current?.uv || 0),
-          rainProb: adjustRainProb(data.forecast?.forecastday[0]?.day?.daily_chance_of_rain || 0, data.current?.precip_mm || 0),
-          
-          // 🌟 แมปตัวแปรใหม่ที่แอปตามหา (ทัศนวิสัย & ความกดอากาศ)
-          visibility: Math.round(data.current?.vis_km || 0),
-          pressure: Math.round(data.current?.pressure_mb || 0),
-          
-          // 🌟 ส่งค่าเวลาที่แปลงเป็น Date เรียบร้อยแล้ว (แก้ Invalid Date)
-          sunrise: convertAstroTimeToDate(todayDateStr, rawSunrise), 
-          sunset: convertAstroTimeToDate(todayDateStr, rawSunset)
+          temp: Math.round(wData.current?.temperature_2m || 0), 
+          feelsLike: Math.round(wData.current?.apparent_temperature || 0),
+          humidity: Math.round(wData.current?.relative_humidity_2m || 0), 
+          windSpeed: Math.round(wData.current?.wind_speed_10m || 0),
+          rain: Math.round(wData.current?.precipitation || 0), 
+          uv: Math.round(wData.current?.uv_index || 0),
+          rainProb: Math.round(wData.daily?.precipitation_probability_max?.[0] || 0), 
+          pm25: Math.round(aData.current?.pm2_5 || 0), 
+          aqi: Math.round(aData.current?.us_aqi || 0),
+          visibility: Math.round((wData.current?.visibility || 0) / 1000), // แปลงเป็นกิโลเมตร
+          pressure: Math.round(wData.current?.surface_pressure || 0), // ความกดอากาศ hPa
+          dewPoint: Math.round(wData.current?.dew_point_2m || 0),
+          sunrise: wData.daily?.sunrise?.[0] || '', // กลับมาเป็นเวลาปกติ
+          sunset: wData.daily?.sunset?.[0] || ''
         },
-        hourly: { time: hTime, temperature_2m: hTemp, pm25: hPm25 }, 
-        daily: { 
-          time: dTime, temperature_2m_max: dMax, temperature_2m_min: dMin, 
-          weathercode: dCode, pm25_max: dPm25, precipitation_probability_max: dRainProb 
+        hourly: {
+          ...wData.hourly,
+          pm25: aData.hourly?.pm2_5 || []
         }, 
+        daily: { ...wData.daily, pm25_max: dailyPm25 },
         coords: { lat, lon }
       });
-      
+
       const now = new Date();
       setLastUpdateText(`${now.toLocaleDateString('th-TH')} ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`);
     } catch (error) { 
-      console.error("Fetch Error:", error); 
+        console.error("Single Fetch Error:", error); 
+        setWeatherData(prev => prev || null);
     } finally { 
-      setLoadingWeather(false); 
+        setLoadingWeather(false); 
     }
   };
 
   useEffect(() => { 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude), 
-        () => fetchWeatherByCoords(13.7538, 100.5014),
-        { timeout: 5000 }
-      );
-    } else {
-      fetchWeatherByCoords(13.7538, 100.5014);
-    }
-
-    setTimeout(() => fetchReal77Provinces(), 2000);
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+              (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude), 
+              (err) => fetchWeatherByCoords(13.7538, 100.5014),
+              { timeout: 5000 }
+          );
+      } else {
+          fetchWeatherByCoords(13.7538, 100.5014);
+      }
+      
+      // เรียกใช้ Bulk Fetch (ยิงนัดเดียวจบ)
+      fetchReal77Provinces(); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
