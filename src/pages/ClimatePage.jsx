@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useMemo } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function ClimatePage() {
@@ -7,10 +7,12 @@ export default function ClimatePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('heat'); 
 
+  // Location States
   const [userProv, setUserProv] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [isLocating, setIsLocating] = useState(true); // เพิ่ม State เช็คการโหลดพิกัด
+  const [locationType, setLocationType] = useState('auto'); // 'auto' หรือ 'default'
   
-  // 🌟 [ใหม่] สร้างระบบนาฬิกาเดินแบบวินาทีต่อวินาทีสำหรับปุ่ม LIVE
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -24,14 +26,15 @@ export default function ClimatePage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 [ปรับปรุง] ระบบ Auto Location (เพิ่ม Timeout และกันค้าง)
-  useEffect(() => {
-    if (stations && stations.length > 0) {
-      // ฟังก์ชันดึงค่า กทม. เป็นค่าเริ่มต้น ถ้าหา GPS ไม่เจอ
+  // 🌟 ฟังก์ชันจัดการค้นหาพิกัด (รวมแบบ Auto และ Manual ไว้ด้วยกัน)
+  const fetchUserLocation = useCallback(() => {
+      setIsLocating(true);
+
       const fallbackToDefault = () => {
           const closest = stations.find(st => st.areaTH.includes('กรุงเทพ'));
           if (closest) {
               setUserProv('กรุงเทพมหานคร');
+              setLocationType('default'); // บอกว่าเป็นพิกัดจำลอง
               if(stationTemps && stationTemps[closest.stationID]) {
                  setUserData({
                    temp: Math.round(stationTemps[closest.stationID].temp || 0),
@@ -40,6 +43,7 @@ export default function ClimatePage() {
                  });
               }
           }
+          setIsLocating(false);
       };
 
       if (navigator.geolocation) {
@@ -56,6 +60,7 @@ export default function ClimatePage() {
             });
             if (closest) {
               setUserProv(closest.areaTH.replace('จังหวัด', ''));
+              setLocationType('auto'); // บอกว่าเป็นพิกัดจริง
               if(stationTemps && stationTemps[closest.stationID]) {
                  setUserData({
                    temp: Math.round(stationTemps[closest.stationID].temp || 0),
@@ -64,15 +69,22 @@ export default function ClimatePage() {
                  });
               }
             }
+            setIsLocating(false);
           }, 
-          () => { fallbackToDefault(); }, // ถ้ากดไม่อนุญาต ให้สลับไป กทม.
-          { timeout: 5000 } // ถ้าเกิน 5 วินาที ให้เลิกหาแล้วสลับไป กทม. เลย
+          () => { fallbackToDefault(); }, 
+          { timeout: 5000, maximumAge: 60000 } // จำกัดเวลาหาแค่ 5 วิ
         );
       } else {
         fallbackToDefault();
       }
-    }
   }, [stations, stationTemps]);
+
+  // เรียกใช้ครั้งแรกเมื่อโหลดข้อมูลสถานีเสร็จ
+  useEffect(() => {
+    if (stations && stations.length > 0) {
+        fetchUserLocation();
+    }
+  }, [stations, fetchUserLocation]);
 
   const { groupedAlerts } = useMemo(() => {
     let alerts = { heat: [], pm25: [], rain: [], fire: [] };
@@ -150,12 +162,12 @@ export default function ClimatePage() {
       return 'temp';
   };
 
-  // 🌟 [ใหม่] วิเคราะห์สถานการณ์สำหรับพิกัดของผู้ใช้
-  let locSummary = { text: 'สถานการณ์ปกติ', color: '#22c55e', icon: '✅' };
+  // 🌟 ประเมินสถานการณ์สำหรับพื้นที่ของผู้ใช้
+  let locSummary = { text: 'อากาศปกติ ไม่มีแจ้งเตือน', color: '#22c55e', bg: '#dcfce7', icon: '✅' };
   if (userData) {
-      if (userData.temp >= 38) { locSummary = { text: 'อากาศร้อนจัด ระวังฮีทสโตรก', color: '#ef4444', icon: '🥵' }; }
-      else if (userData.pm25 >= 37.5) { locSummary = { text: 'ฝุ่นเริ่มหนา ควรสวมหน้ากาก', color: '#f97316', icon: '😷' }; }
-      else if (userData.rain >= 40) { locSummary = { text: 'มีโอกาสฝนตก พกร่มเผื่อไว้', color: '#3b82f6', icon: '⛈️' }; }
+      if (userData.temp >= 38) { locSummary = { text: 'อากาศร้อนจัด ระวังฮีทสโตรก', color: '#ef4444', bg: '#fee2e2', icon: '🥵' }; }
+      else if (userData.pm25 >= 37.5) { locSummary = { text: 'ฝุ่นหนา ควรสวมหน้ากาก', color: '#f97316', bg: '#ffedd5', icon: '😷' }; }
+      else if (userData.rain >= 40) { locSummary = { text: 'มีโอกาสฝนตก พกร่มเผื่อไว้', color: '#3b82f6', bg: '#dbeafe', icon: '⛈️' }; }
   }
 
   if (loading || stations.length === 0) return <div style={{ height: '100%', background: appBg }}></div>;
@@ -174,12 +186,10 @@ export default function ClimatePage() {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
-                {/* 🌟 นาฬิกา LIVE วินาทีต่อวินาที */}
                 <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '8px 16px', borderRadius: '50px', border: `1px solid ${borderColor}`, fontSize: '0.9rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
                     <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#22c55e', borderRadius: '50%', boxShadow: '0 0 8px #22c55e', animation: 'pulse 1.5s infinite' }}></span>
                     LIVE: {currentTime.toLocaleTimeString('th-TH')}
                 </div>
-                {/* บอกเวลาที่ข้อมูลหลังบ้านอัปเดตล่าสุด */}
                 <div style={{ fontSize: '0.7rem', color: subTextColor, paddingRight: '5px' }}>
                     ข้อมูลอากาศล่าสุด: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}) : '-'} น.
                 </div>
@@ -189,22 +199,40 @@ export default function ClimatePage() {
         {/* พิกัด + แท็บเมนู */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr', gap: '20px' }}>
             
-            {/* 🌟 กล่อง Auto Location (เพิ่ม Summary) */}
-            <div style={{ background: darkMode ? 'linear-gradient(135deg, #1e3a8a40, #3b82f610)' : 'linear-gradient(135deg, #eff6ff, #ffffff)', border: `1px solid ${darkMode ? '#1e3a8a' : '#bfdbfe'}`, padding: '25px', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
-                {userProv && userData ? (
-                    <>
-                        {/* แถบสรุปสถานการณ์ด่วนของจังหวัดนี้ */}
-                        <div style={{ position: 'absolute', top: 0, right: 0, background: locSummary.color, color: '#fff', padding: '4px 12px', borderBottomLeftRadius: '16px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            {locSummary.icon} {locSummary.text}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', marginTop: '10px' }}>
-                            <div style={{ background: '#3b82f6', color: '#fff', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(59,130,246,0.3)' }}>📍</div>
-                            <div>
-                                <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 'bold' }}>พิกัดปัจจุบัน (คาดคะเน)</div>
-                                <div style={{ fontSize: '1.4rem', fontWeight: '900', color: textColor }}>จ.{userProv}</div>
+            {/* 🌟 กล่อง Auto Location (อัปเกรดใหม่) */}
+            <div style={{ background: darkMode ? 'linear-gradient(135deg, #1e3a8a40, #3b82f610)' : 'linear-gradient(135deg, #eff6ff, #ffffff)', border: `1px solid ${darkMode ? '#1e3a8a' : '#bfdbfe'}`, padding: '25px', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ background: '#3b82f6', color: '#fff', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(59,130,246,0.3)' }}>📍</div>
+                        <div>
+                            <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 'bold' }}>
+                                {locationType === 'auto' ? 'พิกัดปัจจุบันของคุณ' : 'พิกัดเริ่มต้น (จำลอง)'}
+                            </div>
+                            <div style={{ fontSize: '1.4rem', fontWeight: '900', color: textColor }}>
+                                {isLocating ? 'กำลังค้นหา...' : `จ.${userProv}`}
                             </div>
                         </div>
+                    </div>
+                    {/* 🌟 ปุ่มกดอัปเดตพิกัด (Manual Refresh) */}
+                    <button 
+                        onClick={fetchUserLocation} 
+                        disabled={isLocating}
+                        style={{ background: darkMode ? 'rgba(0,0,0,0.3)' : '#fff', border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', color: textColor, cursor: isLocating ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 'bold', transition: '0.2s', opacity: isLocating ? 0.5 : 1 }}
+                        title="ค้นหาพิกัดใหม่"
+                    >
+                        {isLocating ? '⏳' : '📍 รีเฟรช'}
+                    </button>
+                </div>
+
+                {!isLocating && userData && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        
+                        {/* 🌟 ป้ายสรุปสถานการณ์แบบเด่นชัด */}
+                        <div style={{ background: darkMode ? `${locSummary.color}20` : locSummary.bg, color: locSummary.color, padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '0.9rem', border: `1px solid ${locSummary.color}50` }}>
+                            <span style={{ fontSize: '1.2rem' }}>{locSummary.icon}</span> {locSummary.text}
+                        </div>
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.8)', padding: '15px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '0.7rem', color: subTextColor }}>อุณหภูมิ</div>
@@ -219,11 +247,6 @@ export default function ClimatePage() {
                                 <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: userData.rain >= 40 ? '#3b82f6' : textColor }}>{userData.rain}%</div>
                             </div>
                         </div>
-                    </>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: subTextColor, gap: '10px' }}>
-                        <span style={{ fontSize: '2rem', animation: 'pulse 1.5s infinite' }}>📍</span>
-                        กำลังค้นหาพิกัดของคุณ...
                     </div>
                 )}
             </div>
