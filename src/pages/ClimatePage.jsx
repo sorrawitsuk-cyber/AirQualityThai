@@ -113,7 +113,6 @@ export default function ClimatePage() {
           if (pm25 > 15) alerts.pm25.push({ prov: provName, val: pm25, unit: 'µg/m³' });
           if (uv >= 3) alerts.uv.push({ prov: provName, val: uv, unit: 'Index' });
           if (rain > 30) alerts.rain.push({ prov: provName, val: rain, unit: '%' });
-          // 🌟 เพิ่มเงื่อนไขลมแรง (เช่น > 15 km/h ถือว่าลมเริ่มแรง)
           if (windSpeed > 15) alerts.wind.push({ prov: provName, val: windSpeed, unit: 'km/h' });
         });
     }
@@ -162,7 +161,6 @@ export default function ClimatePage() {
       }
   };
 
-  // 🌟 เพิ่มแท็บลม (Wind) เข้าไป รวมเป็น 6 แท็บ
   const tabs = [
       { id: 'heat', label: 'ความร้อน', icon: '🥵', color: '#ef4444', data: groupedAlerts.heat },
       { id: 'pm25', label: 'ฝุ่น PM2.5', icon: '😷', color: '#f97316', data: groupedAlerts.pm25 },
@@ -180,16 +178,45 @@ export default function ClimatePage() {
       if (tabId === 'rain') return 'rain';
       if (tabId === 'pm25') return 'pm2p5';
       if (tabId === 'uv') return 'uvindex';
-      if (tabId === 'wind') return 'wind'; // ใช้ layer ลมของ Windy
+      if (tabId === 'wind') return 'wind'; 
       return 'temp';
   };
 
+  // 🌟 [แก้ปัญหาชี้เป้า] ประเมินสถานการณ์แบบเจาะจงสาเหตุ (Smart Threat Detection)
   let locSummary = { text: 'สถานการณ์ปกติ', color: '#22c55e', bg: darkMode ? '#052e16' : '#dcfce7', icon: '✅', desc: 'ไม่มีการแจ้งเตือนภัยพิบัติรุนแรงในพื้นที่ของคุณ' };
-  if (userData) {
-      if (userData.temp >= 40 || userData.pm25 >= 75 || userData.rain >= 80) {
-          locSummary = { text: 'อันตรายระดับวิกฤต', color: '#ef4444', bg: darkMode ? '#450a0a' : '#fee2e2', icon: '🚨', desc: 'สภาพอากาศเป็นอันตรายต่อสุขภาพ หลีกเลี่ยงการอยู่กลางแจ้ง' };
-      } else if (userData.temp >= 36 || userData.pm25 >= 37.5 || userData.rain >= 60 || userData.wind >= 20) {
-          locSummary = { text: 'พื้นที่เฝ้าระวังพิเศษ', color: '#f97316', bg: darkMode ? '#431407' : '#ffedd5', icon: '⚠️', desc: 'มีความเสี่ยงสภาพอากาศที่อาจส่งผลกระทบต่อการใช้ชีวิต' };
+  
+  if (userData && userData.temp !== '-') {
+      let criticalThreats = [];
+      let warningThreats = [];
+
+      // วิเคราะห์ระดับวิกฤต (สีแดง)
+      if (userData.temp >= 40) criticalThreats.push(`ร้อนจัด (${userData.temp}°C)`);
+      if (userData.pm25 >= 75) criticalThreats.push(`ฝุ่นอันตราย (${userData.pm25} µg)`);
+      if (userData.rain >= 80) criticalThreats.push(`ฝนตกหนัก (${userData.rain}%)`);
+
+      // วิเคราะห์ระดับเฝ้าระวัง (สีส้ม)
+      if (userData.temp >= 36 && userData.temp < 40) warningThreats.push(`อากาศร้อน (${userData.temp}°C)`);
+      if (userData.pm25 >= 37.5 && userData.pm25 < 75) warningThreats.push(`ฝุ่นเริ่มหนา (${userData.pm25} µg)`);
+      if (userData.rain >= 60 && userData.rain < 80) warningThreats.push(`โอกาสฝนตก (${userData.rain}%)`);
+      if (userData.wind >= 20) warningThreats.push(`ลมพัดแรง (${userData.wind} km/h)`);
+
+      // สรุปผลลัพธ์เพื่อแสดงบนหน้าจอ
+      if (criticalThreats.length > 0) {
+          locSummary = { 
+              text: 'อันตรายระดับวิกฤต', 
+              color: '#ef4444', 
+              bg: darkMode ? '#450a0a' : '#fee2e2', 
+              icon: '🚨', 
+              desc: `แจ้งเตือน: ${criticalThreats.join(', ')} ควรระมัดระวังสุขภาพเป็นพิเศษ` 
+          };
+      } else if (warningThreats.length > 0) {
+          locSummary = { 
+              text: 'พื้นที่เฝ้าระวังพิเศษ', 
+              color: '#f97316', 
+              bg: darkMode ? '#431407' : '#ffedd5', 
+              icon: '⚠️', 
+              desc: `เฝ้าระวัง: ${warningThreats.join(', ')} แนะนำให้เตรียมพร้อมรับมือ` 
+          };
       }
   }
 
@@ -199,7 +226,6 @@ export default function ClimatePage() {
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
       <div style={{ width: '100%', maxWidth: '1200px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '100px' }}>
         
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
             <div>
                 <h1 style={{ margin: 0, color: textColor, fontSize: '1.8rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -218,7 +244,6 @@ export default function ClimatePage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr', gap: '20px', alignItems: 'start' }}>
             
-            {/* กล่องประเมินสถานการณ์พิกัดปัจจุบัน */}
             <div style={{ background: locSummary.bg, border: `1px solid ${locSummary.color}50`, borderRadius: '24px', padding: '25px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', transition: '0.3s' }}>
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -242,6 +267,7 @@ export default function ClimatePage() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '20px', gap: '5px' }}>
                         <div style={{ fontSize: '3rem', animation: locSummary.icon === '🚨' ? 'pulse 1.5s infinite' : 'none' }}>{locSummary.icon}</div>
                         <div style={{ fontSize: '1.3rem', fontWeight: '900', color: locSummary.color, textAlign: 'center', lineHeight: '1.2' }}>{locSummary.text}</div>
+                        {/* 🌟 แสดงคำอธิบายที่บอกสาเหตุชัดเจน */}
                         <div style={{ fontSize: '0.85rem', color: textColor, textAlign: 'center', opacity: 0.8, padding: '0 10px', marginBottom: '10px' }}>{locSummary.desc}</div>
                         
                         <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -263,12 +289,10 @@ export default function ClimatePage() {
                 )}
             </div>
 
-            {/* 🌟 จัด Grid แผงควบคุมเป็น 2 แถว แถวละ 3 ช่องเป๊ะๆ */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', paddingLeft: '5px' }}>
                     👆 แผงควบคุมและประเมินสถานการณ์ <span style={{fontWeight: 'normal', opacity: 0.8}}>(คลิกเพื่อสลับโหมด)</span>
                 </div>
-                {/* 🌟 บังคับเป็น repeat(3, 1fr) จะเรียง 3 คอลัมน์ 2 แถวอัตโนมัติ */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', flex: 1 }}>
                     {tabs.map((tab, idx) => (
                         <div key={idx} onClick={() => setActiveTab(tab.id)} style={{ background: cardBg, padding: '12px 5px', borderRadius: '20px', border: `2px solid ${activeTab === tab.id ? tab.color : borderColor}`, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px', boxShadow: activeTab === tab.id ? `0 10px 20px ${tab.color}15` : 'none', transform: activeTab === tab.id ? 'translateY(-3px)' : 'none' }}>
@@ -284,7 +308,6 @@ export default function ClimatePage() {
             </div>
         </div>
 
-        {/* แผนที่ + สรุปบริบท */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr', gap: '20px', marginTop: '20px' }}>
             
             <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
