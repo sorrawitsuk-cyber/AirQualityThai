@@ -59,7 +59,7 @@ export default function ClimatePage() {
           const provName = st.areaTH.replace('จังหวัด', '');
 
           if (feelsLike >= 35) alerts.heat.push({ prov: provName, val: feelsLike, unit: '°C' });
-          if (pm25 > 15) alerts.pm25.push({ prov: provName, val: pm25, unit: 'µg' });
+          if (pm25 > 15) alerts.pm25.push({ prov: provName, val: pm25, unit: 'µg/m³' });
           if (rain > 30) alerts.rain.push({ prov: provName, val: rain, unit: '%' });
         });
     }
@@ -81,7 +81,6 @@ export default function ClimatePage() {
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
-  // 🌟 [ใหม่] ข้อมูลสรุปสถานการณ์ (Briefing) ที่เปลี่ยนตามโหมด
   const modeBriefings = {
       heat: { 
           level: '🔴 เฝ้าระวังฮีทสโตรก', 
@@ -90,18 +89,18 @@ export default function ClimatePage() {
       },
       pm25: { 
           level: '🟠 อากาศเริ่มปิด', 
-          desc: 'คุณภาพอากาศเริ่มมีผลกระทบต่อสุขภาพในภาคเหนือ แนะนำสวมหน้ากาก N95 และเปิดเครื่องฟอกอากาศ',
-          statTitle: 'ฝุ่นสูงสุดเมื่อวาน', statVal: '115 µg', statLoc: 'จ.เชียงใหม่', bg: '#fff7ed', border: '#fed7aa' 
+          desc: 'คุณภาพอากาศเริ่มมีผลกระทบต่อสุขภาพ แนะนำสวมหน้ากากอนามัย และเปิดเครื่องฟอกอากาศเมื่ออยู่ในอาคาร',
+          statTitle: 'ฝุ่นสูงสุดเมื่อวาน', statVal: '115 µg/m³', statLoc: 'จ.เชียงใหม่', bg: '#fff7ed', border: '#fed7aa' 
       },
       rain: { 
           level: '🔵 พายุฤดูร้อน', 
           desc: 'มีโอกาสเกิดฝนฟ้าคะนองและลมกระโชกแรง ระวังอันตรายจากป้ายโฆษณาหรือต้นไม้หักโค่น',
-          statTitle: 'ฝนสะสมสูงสุด', statVal: '85 mm', statLoc: 'จ.ตราด', bg: '#eff6ff', border: '#bfdbfe' 
+          statTitle: 'ฝนสะสมสูงสุดเมื่อวาน', statVal: '85 mm', statLoc: 'จ.ตราด', bg: '#eff6ff', border: '#bfdbfe' 
       },
       fire: { 
           level: '🔴 เสี่ยงไฟป่ารุนแรง', 
           desc: 'พบจุดความร้อนกระจายตัวหนาแน่น สภาพอากาศแห้งแล้งเอื้อต่อการลุกลาม ห้ามจุดไฟในที่โล่งเด็ดขาด',
-          statTitle: 'จุดความร้อนรวม', statVal: '1,208 จุด', statLoc: 'ข้อมูล GISTDA', bg: '#fef2f2', border: '#fed7aa' 
+          statTitle: 'จุดความร้อนรวมเมื่อวาน', statVal: '1,208 จุด', statLoc: 'ข้อมูล GISTDA', bg: '#fef2f2', border: '#fed7aa' 
       }
   };
 
@@ -115,6 +114,13 @@ export default function ClimatePage() {
   const activeTabData = tabs.find(t => t.id === activeTab);
   const activeBriefing = modeBriefings[activeTab];
   const filteredData = activeTabData.data.filter(item => item.prov.includes(searchTerm));
+
+  // ฟังก์ชันแปลงชื่อโหมดไปเป็นพารามิเตอร์ของ Windy (แก้บั๊ก PM2.5)
+  const getWindyOverlay = (tabId) => {
+      if (tabId === 'rain') return 'rain';
+      if (tabId === 'pm25') return 'pm2p5'; // ต้องใช้ pm2p5 สำหรับชั้นข้อมูลฝุ่นใน Windy
+      return 'temp'; // heat และ fire ใช้แผนที่ความร้อน
+  };
 
   if (loading || stations.length === 0) return <div style={{ height: '100%', background: appBg }}></div>;
 
@@ -138,6 +144,8 @@ export default function ClimatePage() {
 
         {/* พิกัด + แท็บเมนู */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr', gap: '20px' }}>
+            
+            {/* กล่อง Auto Location */}
             <div style={{ background: darkMode ? 'linear-gradient(135deg, #1e3a8a40, #3b82f610)' : 'linear-gradient(135deg, #eff6ff, #ffffff)', border: `1px solid ${darkMode ? '#1e3a8a' : '#bfdbfe'}`, padding: '25px', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 {userProv && userData ? (
                     <>
@@ -168,24 +176,30 @@ export default function ClimatePage() {
                 )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '15px' }}>
-                {tabs.map((tab, idx) => (
-                    <div key={idx} onClick={() => setActiveTab(tab.id)} style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `2px solid ${activeTab === tab.id ? tab.color : borderColor}`, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: activeTab === tab.id ? `0 10px 20px ${tab.color}15` : 'none', transform: activeTab === tab.id ? 'translateY(-3px)' : 'none' }}>
-                        <span style={{ fontSize: '2rem' }}>{tab.icon}</span>
-                        <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>{tab.label}</span>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
-                            <span style={{ fontSize: '1.6rem', fontWeight: '900', color: tab.color }}>{tab.data.length}</span>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: tab.color }}>จ.</span>
+            {/* กลุ่มแผงควบคุม (Tabs) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', paddingLeft: '5px' }}>
+                    👆 แผงควบคุมและประเมินสถานการณ์ <span style={{fontWeight: 'normal', opacity: 0.8}}>(คลิกเพื่อสลับโหมดวิเคราะห์ข้อมูลเรียลไทม์)</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '15px', flex: 1 }}>
+                    {tabs.map((tab, idx) => (
+                        <div key={idx} onClick={() => setActiveTab(tab.id)} style={{ background: cardBg, padding: '15px 10px', borderRadius: '24px', border: `2px solid ${activeTab === tab.id ? tab.color : borderColor}`, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px', boxShadow: activeTab === tab.id ? `0 10px 20px ${tab.color}15` : 'none', transform: activeTab === tab.id ? 'translateY(-3px)' : 'none' }}>
+                            <span style={{ fontSize: '2rem' }}>{tab.icon}</span>
+                            <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>{tab.label}</span>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+                                <span style={{ fontSize: '1.5rem', fontWeight: '900', color: tab.color }}>{tab.data.length}</span>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: tab.color }}>จ.</span>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         </div>
 
         {/* แผนที่ + สรุปบริบท (Contextual Summary) */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr', gap: '20px' }}>
             
-            {/* แผนที่ Windy (เปลี่ยนอัตโนมัติ) */}
+            {/* แผนที่ Windy (แก้ชั้นข้อมูลให้ถูกต้อง) */}
             <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h2 style={{ margin: 0, color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -193,11 +207,11 @@ export default function ClimatePage() {
                     </h2>
                 </div>
                 <div style={{ flex: 1, minHeight: isMobile ? '350px' : '550px', borderRadius: '16px', overflow: 'hidden', background: '#000' }}>
-                    <iframe width="100%" height="100%" src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=5&level=surface&overlay=${activeTab === 'rain' ? 'rain' : (activeTab === 'pm25' ? 'pm25' : 'temp')}&product=ecmwf&menu=&message=true&marker=true`} style={{ border: 'none' }}></iframe>
+                    <iframe width="100%" height="100%" src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=5&level=surface&overlay=${getWindyOverlay(activeTab)}&product=ecmwf&menu=&message=true&marker=true`} style={{ border: 'none' }}></iframe>
                 </div>
             </div>
 
-            {/* 🌟 ศูนย์ข้อมูลเชิงลึกเฉพาะโหมด (Dynamic Mode Dashboard) */}
+            {/* ศูนย์ข้อมูลเชิงลึกเฉพาะโหมด (Dynamic Mode Dashboard) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 
                 {/* 1. กล่องสรุปสถานการณ์ด่วน (Briefing Card) */}
@@ -219,17 +233,21 @@ export default function ClimatePage() {
                     </div>
                 </div>
 
-                {/* 2. รายการพื้นที่ (สลับตามแท็บ) */}
+                {/* 2. รายการพื้นที่ (สลับตามแท็บ) พร้อมย้ำว่าเป็นข้อมูล Nowcast */}
                 <div style={{ background: cardBg, borderRadius: '24px', border: `1px solid ${borderColor}`, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     
                     <div style={{ padding: '15px 20px', borderBottom: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#f8fafc' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <h3 style={{ margin: 0, color: textColor, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 📋 จัดอันดับพื้นที่เสี่ยง
                             </h3>
                             <span style={{ fontSize: '0.8rem', background: `${activeTabData.color}20`, color: activeTabData.color, padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold' }}>
                                 รวม {activeTabData.data.length} จ.
                             </span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#0ea5e9', borderRadius: '50%' }}></span>
+                            Nowcast - ข้อมูลสภาพอากาศ ณ ปัจจุบัน
                         </div>
                         <input 
                             type="text" 
