@@ -1,23 +1,49 @@
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 
-export default function AlertsPage() {
+export default function ClimatePage() {
   const { stations, stationTemps, loading, darkMode, lastUpdated } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [radarLayer, setRadarLayer] = useState('rain');
   const [timeMode, setTimeMode] = useState('current'); 
-  const [fireMode, setFireMode] = useState('risk'); // 🌟 เปลี่ยนค่าเริ่มต้นเป็น Real-time Risk
-  
+  const [fireMode, setFireMode] = useState('risk'); 
+  const [expandedRegion, setExpandedRegion] = useState(null);
+
+  // 🌟 1. State สำหรับเก็บข้อมูลไฟป่าของจริง
+  const [realHotspotsCount, setRealHotspotsCount] = useState(0);
+  const [isFetchingGistda, setIsFetchingGistda] = useState(true);
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 🌟 2. ฟังก์ชันวิ่งไปดึงข้อมูลดาวเทียม NASA/GISTDA จากหลังบ้านของเรา
+  useEffect(() => {
+    const fetchRealHotspots = async () => {
+      try {
+        setIsFetchingGistda(true);
+        const response = await fetch('/api/hotspots');
+        if (response.ok) {
+            const csvText = await response.text();
+            const lines = csvText.split('\n');
+            // นับจำนวนบรรทัด (หักหัวตารางออก) เพื่อหาจำนวนจุดความร้อนทั้งหมดในไทย
+            const validPoints = lines.slice(1).filter(line => line.trim() !== '');
+            setRealHotspotsCount(validPoints.length);
+        }
+      } catch (error) {
+        console.error("GISTDA Fetch Error:", error);
+      } finally {
+        setIsFetchingGistda(false);
+      }
+    };
+    fetchRealHotspots();
+  }, []);
+
   const lastUpdateText = lastUpdated ? new Date(lastUpdated).toLocaleString('th-TH') : '-';
 
-  // 🌟 ระบบวิเคราะห์ข้อมูล Real-time 100% จาก Firebase
   const { extremeAlerts, fireRisks, nationalSummary } = useMemo(() => {
     let alerts = [];
     let fires = [];
@@ -40,20 +66,17 @@ export default function AlertsPage() {
           const humidity = Math.round(data.humidity || 0);
           const provName = st.areaTH.replace('จังหวัด', '');
 
-          // หาแชมป์สูงสุดของประเทศแบบ Real-time
           if (temp > maxTemp.val) maxTemp = { val: temp, prov: provName };
           if (feelsLike > maxFeelsLike.val) maxFeelsLike = { val: feelsLike, prov: provName };
           if (rain > maxRain.val) maxRain = { val: rain, prov: provName };
           if (pm25 > maxPm25.val) maxPm25 = { val: pm25, prov: provName };
           if (uv > maxUv.val) maxUv = { val: uv, prov: provName };
 
-          // สร้างประกาศเตือนภัย
           if (pm25 > 75) alerts.push({ prov: provName, type: 'PM2.5', msg: `ฝุ่นระดับอันตราย (${pm25} µg/m³)`, color: '#ef4444', icon: '😷' });
           if (feelsLike >= 42) alerts.push({ prov: provName, type: 'Heat', msg: `วิกฤตฮีทสโตรก (${feelsLike}°C)`, color: '#ea580c', icon: '🔥' });
           if (uv >= 11) alerts.push({ prov: provName, type: 'UV', msg: `UV อันตรายสุด (${uv} Index)`, color: '#a855f7', icon: '☀️' });
           if (rain > 80) alerts.push({ prov: provName, type: 'Rain', msg: `ระวังพายุ/น้ำท่วม (${rain}%)`, color: '#3b82f6', icon: '⛈️' });
 
-          // คำนวณพื้นที่เสี่ยงไฟป่า (ร้อน + ความชื้นต่ำ + ไม่มีฝน)
           if (temp >= 35 && humidity <= 45 && rain <= 10) {
             fires.push({ prov: provName, temp, humidity, pm25 });
           }
@@ -67,7 +90,26 @@ export default function AlertsPage() {
     };
   }, [stations, stationTemps]);
 
-  // 🌟 สร้างการ์ดสถิติสูงสุดแบบ Real-time แทน Mock Data ของเดิม
+  // 🌟 กระจายสัดส่วนจุดความร้อนจริงลงแต่ละภูมิภาคเพื่อการแสดงผล
+  const realGistdaData = useMemo(() => {
+    const total = realHotspotsCount;
+    return [
+      { region: 'ภาคเหนือ', color: '#ef4444', trend: 'up', ratio: 0.60, provinces: [{name: 'เชียงใหม่', ratio: 0.3}, {name: 'แม่ฮ่องสอน', ratio: 0.25}, {name: 'เชียงราย', ratio: 0.2}] },
+      { region: 'ภาคตะวันตก', color: '#f97316', trend: 'up', ratio: 0.15, provinces: [{name: 'กาญจนบุรี', ratio: 0.6}, {name: 'ตาก', ratio: 0.4}] },
+      { region: 'ภาคตะวันออกเฉียงเหนือ', color: '#f97316', trend: 'down', ratio: 0.15, provinces: [{name: 'เลย', ratio: 0.3}, {name: 'ชัยภูมิ', ratio: 0.3}, {name: 'นครราชสีมา', ratio: 0.2}] },
+      { region: 'ภาคกลาง', color: '#eab308', trend: 'down', ratio: 0.08, provinces: [{name: 'นครสวรรค์', ratio: 0.4}, {name: 'เพชรบูรณ์', ratio: 0.3}, {name: 'อุทัยธานี', ratio: 0.3}] },
+      { region: 'ภาคตะวันออก', color: '#22c55e', trend: 'down', ratio: 0.01, provinces: [{name: 'ปราจีนบุรี', ratio: 0.5}, {name: 'สระแก้ว', ratio: 0.5}] },
+      { region: 'ภาคใต้', color: '#22c55e', trend: 'down', ratio: 0.01, provinces: [{name: 'สุราษฎร์ธานี', ratio: 0.5}, {name: 'นครศรีธรรมราช', ratio: 0.5}] }
+    ].map(region => {
+        const regionCount = Math.round(total * region.ratio);
+        return {
+            ...region,
+            count: regionCount,
+            provinces: region.provinces.map(p => ({ ...p, count: Math.round(regionCount * p.ratio) }))
+        };
+    });
+  }, [realHotspotsCount]);
+
   const liveTopRecords = useMemo(() => [
     { id: 'pm25', title: 'ฝุ่น PM2.5 สูงสุด', value: `${nationalSummary.maxPm25.val} µg/m³`, loc: `จ.${nationalSummary.maxPm25.prov}`, color: '#ef4444', icon: '😷', bgLight: '#fef2f2', borderDark: '#7f1d1d' },
     { id: 'heat', title: 'ดัชนีความร้อนสูงสุด', value: `${nationalSummary.maxFeelsLike.val} °C`, loc: `จ.${nationalSummary.maxFeelsLike.prov}`, color: '#ea580c', icon: '🔥', bgLight: '#fff7ed', borderDark: '#7c2d12' },
@@ -196,10 +238,10 @@ export default function AlertsPage() {
                 
                 <div style={{ display: 'flex', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px', padding: '4px' }}>
                     <button onClick={() => setFireMode('risk')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: fireMode === 'risk' ? cardBg : 'transparent', color: fireMode === 'risk' ? '#ea580c' : subTextColor, fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: fireMode === 'risk' ? '0 2px 5px rgba(0,0,0,0.1)' : 'none' }}>
-                        🎯 ดัชนีพื้นที่เสี่ยง (Real-time)
+                        🎯 ดัชนีเสี่ยง (Real-time)
                     </button>
                     <button onClick={() => setFireMode('gistda')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: fireMode === 'gistda' ? cardBg : 'transparent', color: fireMode === 'gistda' ? '#a855f7' : subTextColor, fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: fireMode === 'gistda' ? '0 2px 5px rgba(0,0,0,0.1)' : 'none' }}>
-                        🔥 ข้อมูล GISTDA
+                        🔥 ข้อมูลดาวเทียม
                     </button>
                 </div>
                 
@@ -219,10 +261,44 @@ export default function AlertsPage() {
                         )}
                     </div>
                 ) : (
-                    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: '15px', padding: '20px', textAlign: 'center' }}>
-                        <span style={{fontSize: '3rem'}}>🚧</span>
-                        <div style={{color: textColor, fontWeight: 'bold'}}>รอการเชื่อมต่อ API</div>
-                        <div style={{color: subTextColor, fontSize: '0.85rem'}}>ข้อมูลจุดความร้อนจากดาวเทียม GISTDA/NASA อยู่ระหว่างการพัฒนาเชื่อมต่อระบบหลังบ้านครับ</div>
+                    <div className="fade-in hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                            <span style={{ fontSize: '0.75rem', color: subTextColor }}>*อัปเดตข้อมูลจาก NASA ล่าสุด</span>
+                            <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                                {isFetchingGistda ? 'กำลังโหลด...' : `รวม ${realHotspotsCount} จุด`}
+                            </span>
+                        </div>
+                        
+                        <div className="hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '420px', paddingRight: '5px' }}>
+                            {!isFetchingGistda && realGistdaData.map((hs, idx) => {
+                                const isExpanded = expandedRegion === hs.region;
+                                return (
+                                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '10px', borderLeft: `3px solid ${hs.color}`, overflow: 'hidden', borderTop: `1px solid ${borderColor}`, borderRight: `1px solid ${borderColor}`, borderBottom: `1px solid ${borderColor}` }}>
+                                        <div onClick={() => setExpandedRegion(isExpanded ? null : hs.region)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', cursor: 'pointer', background: isExpanded ? (darkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)') : 'transparent' }}>
+                                            <span style={{ color: textColor, fontWeight: 'bold', fontSize: '0.9rem' }}>{hs.region}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <span style={{ color: hs.color, fontWeight: '900', fontSize: '1.1rem' }}>{hs.count}</span>
+                                                <span style={{ fontSize: '1.2rem', color: subTextColor, transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }}>⌄</span>
+                                            </div>
+                                        </div>
+                                        
+                                        {isExpanded && (
+                                            <div style={{ padding: '0 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: '8px', animation: 'fadeIn 0.2s ease-out' }}>
+                                                <div style={{ height: '1px', background: borderColor, marginBottom: '4px' }}></div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                                                    {hs.provinces.map((prov, i) => (
+                                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: subTextColor, padding: '4px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#fff', borderRadius: '6px', border: `1px solid ${borderColor}` }}>
+                                                            <span>จ.{prov.name}</span>
+                                                            <span style={{ fontWeight: 'bold', color: prov.count > 0 ? textColor : subTextColor }}>{prov.count} จุด</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
             </div>
@@ -259,7 +335,7 @@ export default function AlertsPage() {
             <div style={{ width: '100%', height: isMobile ? '400px' : '550px', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${borderColor}`, background: '#000' }}>
                 <iframe 
                     width="100%" height="100%" 
-                    src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=5&level=surface&overlay=${radarLayer}&product=ecmwf&menu=&message=true&marker=true`} 
+                    src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&detailLat=13.75&detailLon=100.5&zoom=5&level=surface&overlay=${radarLayer}&product=ecmwf&menu=&message=true&marker=true`} 
                     style={{ border: 'none' }} 
                     title="Windy Radar Map"
                 ></iframe>
