@@ -286,4 +286,4 @@ export default function ClimatePage() {
       </div>
     </div>
   );
-}
+} //0
