@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { ref, onValue, set } from 'firebase/database';
-import { db } from '../firebase'; // กุญแจ Firebase ที่เราสร้างไว้
-import { provinces77 } from '../provinces77'; // ไฟล์พิกัดจังหวัดที่บอสเพิ่งสร้าง
+import { db } from '../firebase'; 
+import { provinces77 } from '../provinces77'; 
 
 export const WeatherContext = createContext();
 
@@ -10,6 +10,17 @@ export const WeatherProvider = ({ children }) => {
   const [stationTemps, setStationTemps] = useState({});
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  // 🌟 [เพิ่มใหม่] ระบบจัดการโหมดมืด (เริ่มต้นที่ Dark Mode และจำค่าไว้ในเครื่องผู้ใช้)
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return savedTheme ? savedTheme === 'dark' : true; // ถ้าไม่มีค่าเดิม ให้เริ่มที่ true (โหมดมืด)
+  });
+
+  // บันทึกค่าโหมดมืดลงเครื่อง (Local Storage) ทุกครั้งที่มีการกดสลับโหมด
+  useEffect(() => {
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   // --------------------------------------------------------
   // 1. หน้าที่ "ตัวอ่าน" (Reader): ดักฟังข้อมูลจาก Firebase
@@ -21,18 +32,14 @@ export const WeatherProvider = ({ children }) => {
       const data = snapshot.val();
       
       if (data) {
-        // ✅ กรณีมีข้อมูล: อัปเดต State ตาม Firebase
         setStations(data.stations || []);
         setStationTemps(data.stationTemps || {});
         setLastUpdated(data.lastUpdated || null);
       } else {
-        // ⚠️ กรณีโกดังว่างเปล่า: ตั้งค่าเริ่มต้นเพื่อ "กันจอค้าง/จอขาว"
         console.warn("Firebase ว่างเปล่า! กรุณากดปุ่ม Sync ข้อมูลใหม่ครับ");
         setStations([]);
         setStationTemps({});
       }
-      
-      // ปิด Loading ทันทีไม่ว่าจะมีข้อมูลหรือไม่ (เพื่อไม่ให้หน้าจอค้างที่รูปก้อนเมฆ)
       setLoading(false); 
     }, (error) => {
       console.error("Firebase Read Error:", error);
@@ -47,10 +54,10 @@ export const WeatherProvider = ({ children }) => {
   // --------------------------------------------------------
   const syncDataToFirebase = async () => {
     try {
-      setLoading(true); // เปิด Loading ระหว่างสูบข้อมูล
+      setLoading(true); 
       console.log("🚀 กำลังเริ่มมหากาพย์การ Sync ข้อมูล 77 จังหวัด...");
 
-      const chunkSize = 40; // หั่นครึ่งเพื่อความชัวร์ (ไม่ติด Error 400)
+      const chunkSize = 40; 
       let allWData = [];
       let allAData = [];
 
@@ -59,9 +66,8 @@ export const WeatherProvider = ({ children }) => {
         const lats = chunk.map(p => p.lat).join(',');
         const lons = chunk.map(p => p.lon).join(',');
 
-        // เตรียม URL (มัดรวมทุกตัวแปร: อุณหภูมิ, ฝน, ลม, ความชื้น)
         const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m&daily=precipitation_probability_max&timezone=Asia%2FBangkok`;
-        const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm2_5&timezone=Asia%2FBangkok`;
+        const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lons}&current=pm2_5&timezone=Asia%2FBangkok`;
 
         console.log(`📡 กำลังดึง Chunk ที่ ${i/chunkSize + 1}...`);
         const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
@@ -69,23 +75,18 @@ export const WeatherProvider = ({ children }) => {
         if (wRes.ok && aRes.ok) {
           const wJson = await wRes.json();
           const aJson = await aRes.json();
-          
-          // ตรวจสอบว่าเป็น Array หรือไม่ (Open-Meteo จะคืนค่าเป็น Array ถ้าส่งหลายพิกัด)
           allWData = [...allWData, ...(Array.isArray(wJson) ? wJson : [wJson])];
           allAData = [...allAData, ...(Array.isArray(aJson) ? aJson : [aJson])];
         } else {
-          // ถ้าโดนบล็อก 429 ให้หยุดทำงานทันที
-          if (wRes.status === 429) alert("โดน Open-Meteo บล็อกโควต้าชั่วคราว (Rate Limit) รอก่อน 1 ชม. นะครับบอส");
+          if (wRes.status === 429) alert("โดน Open-Meteo บล็อกโควต้าชั่วคราว (Rate Limit) รอก่อน 1 ชม. นะครับ");
           throw new Error(`API Error: ${wRes.status}`);
         }
         
-        // พักเครื่อง 1 วินาที กันโดนแบน IP
         if (i + chunkSize < provinces77.length) {
           await new Promise(r => setTimeout(r, 1000));
         }
       }
 
-      // 3. จัดระเบียบข้อมูล (Data Transformation)
       const newStations = [];
       const newTemps = {};
 
@@ -111,7 +112,6 @@ export const WeatherProvider = ({ children }) => {
         };
       });
 
-      // 4. บันทึกลงตู้คอนเทนเนอร์ Firebase
       const payload = {
         lastUpdated: new Date().toISOString(),
         stations: newStations,
@@ -136,7 +136,9 @@ export const WeatherProvider = ({ children }) => {
       stationTemps, 
       loading, 
       lastUpdated,
-      syncDataToFirebase 
+      syncDataToFirebase,
+      darkMode,        // 🌟 ส่งค่าสถานะโหมดมืดออกไปให้หน้าอื่นใช้
+      setDarkMode      // 🌟 ส่งฟังก์ชันสลับโหมดออกไปให้ปุ่มกดใช้งาน
     }}>
       {children}
     </WeatherContext.Provider>

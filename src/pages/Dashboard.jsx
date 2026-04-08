@@ -530,7 +530,7 @@ export default function Dashboard() {
         </div>
 
         <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>🇹🇭</span> สถิติ Top 5 ระดับประเทศ (Real-time จาก Firebase)
+            <span>🇹🇭</span> สถิติ Top 5 ระดับประเทศ (อัปเดตเรียลไทม์)
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '15px', flexShrink: 0, marginBottom: '20px' }}>
             
@@ -592,7 +592,7 @@ export default function Dashboard() {
 
         <div style={{ textAlign: 'center', marginTop: '10px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7, flexShrink: 0 }}>
            <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold' }}>อุตุนิยมวิทยาโดย Open-Meteo API • พิกัดโดย OpenStreetMap</div>
-           <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px' }}>ข้อมูล Firebase อัปเดตล่าสุด: {lastUpdateText}</div>
+           <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px' }}>อัปเดตข้อมูลระบบล่าสุด: {lastUpdateText}</div>
         </div>
 
         <div style={{ height: isMobile ? '80px' : '0px', flexShrink: 0, width: '100%' }}></div>

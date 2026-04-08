@@ -1,4 +1,3 @@
-// src/pages/MapPage.jsx
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -71,7 +70,6 @@ export default function MapPage() {
   const [flyToPos, setFlyToPos] = useState(null);
   const [showControls, setShowControls] = useState(window.innerWidth >= 1024);
 
-  // 🌟 [แก้บั๊กจอขาว] ย้าย basemapUrls เข้ามาข้างใน Component
   const basemapUrls = {
     default: darkMode ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
     osm: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -90,13 +88,13 @@ export default function MapPage() {
   }, []);
 
   const modes = [
-    { id: 'pm25', name: '😷 ฝุ่น PM2.5', unit: 'µg/m³' },
-    { id: 'heat', name: '🥵 ดัชนีความร้อน', unit: '°C' },
-    { id: 'temp', name: '🌡️ อุณหภูมิ', unit: '°C' },
-    { id: 'uv', name: '☀️ รังสี UV', unit: 'Index' },
-    { id: 'rain', name: '☔ โอกาสฝนตก', unit: '%' },
-    { id: 'humidity', name: '💧 ความชื้น', unit: '%' },
-    { id: 'wind', name: '🌬️ ความเร็วลม', unit: 'km/h' }
+    { id: 'pm25', name: '😷 ฝุ่น PM2.5', unit: 'µg/m³', short: 'ฝุ่น PM2.5' },
+    { id: 'heat', name: '🥵 ดัชนีความร้อน', unit: '°C', short: 'ความร้อน' },
+    { id: 'temp', name: '🌡️ อุณหภูมิ', unit: '°C', short: 'อุณหภูมิ' },
+    { id: 'uv', name: '☀️ รังสี UV', unit: 'Index', short: 'รังสี UV' },
+    { id: 'rain', name: '☔ โอกาสฝนตก', unit: '%', short: 'โอกาสฝนตก' },
+    { id: 'humidity', name: '💧 ความชื้น', unit: '%', short: 'ความชื้น' },
+    { id: 'wind', name: '🌬️ ความเร็วลม', unit: 'km/h', short: 'ความเร็วลม' }
   ];
 
   const getVal = (station) => {
@@ -145,6 +143,7 @@ export default function MapPage() {
     return { fillColor: color, weight: 1.5, opacity: 1, color: '#ffffff', fillOpacity: polyOpacity };
   };
 
+  // 🌟 อัปเกรดระบบคลิกปุ่ม Popup ให้โหลดข้อมูลตรงกับโหมด
   const onEachFeature = (feature, layer) => {
     layer.on({
         click: () => {
@@ -152,10 +151,26 @@ export default function MapPage() {
             let thaiNameFromMap = "";
             for (let p of props) if (provMap[p]) { thaiNameFromMap = provMap[p]; break; }
             const station = stations.find(s => s.areaTH.replace('จังหวัด', '').trim() === thaiNameFromMap);
+            
             if (station) {
-                setSelectedProvForecast({ loading: true, name: station.areaTH });
-                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.long}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=Asia/Bangkok`)
-                .then(res => res.json()).then(data => setSelectedProvForecast({ loading: false, name: station.areaTH, daily: data.daily }))
+                setSelectedProvForecast({ loading: true, name: station.areaTH, mode: activeMode });
+                
+                // ยิง API 2 ตัวพร้อมกัน ทั้งสภาพอากาศและฝุ่น
+                Promise.all([
+                  fetch(`https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.long}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,uv_index_max,wind_speed_10m_max&timezone=Asia/Bangkok`),
+                  fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${station.lat}&longitude=${station.long}&daily=pm2_5_mean&timezone=Asia/Bangkok`)
+                ])
+                .then(async ([wRes, aRes]) => {
+                  const wData = await wRes.json();
+                  const aData = await aRes.json();
+                  setSelectedProvForecast({ 
+                    loading: false, 
+                    name: station.areaTH, 
+                    mode: activeMode, // จำโหมดไว้เผื่อใช้
+                    daily: wData.daily,
+                    aqiDaily: aData.daily
+                  });
+                })
                 .catch(() => setSelectedProvForecast({ loading: false, error: true }));
             }
         }
@@ -178,6 +193,7 @@ export default function MapPage() {
   const textColor = darkMode ? '#f8fafc' : '#0f172a'; 
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
+  const currentModeObj = modes.find(m => m.id === activeMode);
 
   if (!geoData || Object.keys(stationTemps).length === 0) return <div style={{ height: '100vh', background: appBg }} />;
 
@@ -186,7 +202,7 @@ export default function MapPage() {
       
       <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '15px', background: cardBg, borderRadius: '20px', marginBottom: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', flexShrink: 0 }} className="hide-scrollbar">
         {modes.map(m => (
-           <button key={m.id} onClick={() => setActiveMode(m.id)} style={{ padding: '10px 20px', borderRadius: '12px', border: 'none', background: activeMode === m.id ? '#0ea5e9' : (darkMode ? '#1e293b' : '#f1f5f9'), color: activeMode === m.id ? '#fff' : textColor, fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>{m.name}</button>
+           <button key={m.id} onClick={() => setActiveMode(m.id)} style={{ padding: '10px 20px', borderRadius: '12px', border: `1px solid ${activeMode === m.id ? 'transparent' : borderColor}`, background: activeMode === m.id ? '#0ea5e9' : (darkMode ? '#1e293b' : '#f1f5f9'), color: activeMode === m.id ? '#fff' : textColor, fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>{m.name}</button>
         ))}
       </div>
 
@@ -239,14 +255,20 @@ export default function MapPage() {
             </div>
           </div>
 
+          {/* 🌟 การ์ดจัดอันดับฝั่งขวา (อัปเกรดความสวยงาม + หน่วย) */}
           {!isMobile && (
               <div style={{ width: '320px', background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
-                 <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: textColor }}>🏆 จัดอันดับ 77 จังหวัด</h3>
-                 <div style={{ flex: 1, overflowY: 'auto' }} className="hide-scrollbar">
+                 <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🏆 จัดอันดับ{currentModeObj?.short}
+                 </h3>
+                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }} className="hide-scrollbar">
                     {rankedStations.map((st, idx) => (
-                       <div key={st.stationID} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{idx+1}. {st.areaTH.replace('จังหวัด', '')}</span>
-                          <span style={{ fontSize: '0.9rem', fontWeight: '900' }}>{st.val} <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.color, display: 'inline-block' }}></span></span>
+                       <div key={st.stationID} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '15px', marginBottom: '8px', borderLeft: `5px solid ${st.color}` }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: textColor }}>{idx+1}. {st.areaTH.replace('จังหวัด', '')}</span>
+                          <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '1rem', fontWeight: '900', color: st.color }}>{st.val}</div>
+                              <div style={{ fontSize: '0.65rem', color: subTextColor, marginTop: '-3px' }}>{currentModeObj?.unit}</div>
+                          </div>
                        </div>
                     ))}
                  </div>
@@ -254,19 +276,57 @@ export default function MapPage() {
           )}
       </div>
 
+      {/* 🌟 Popup พยากรณ์ 7 วัน (อัปเกรดโชว์ค่าตามโหมด) */}
       {selectedProvForecast && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedProvForecast(null)}>
-              <div style={{ background: cardBg, padding: '20px', borderRadius: '25px', width: '100%', maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
-                  <h3>📍 พยากรณ์ 7 วัน จ.{selectedProvForecast.name.replace('จังหวัด','')}</h3>
-                  {selectedProvForecast.loading ? <div>กำลังโหลด...</div> : (
-                      <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
-                          {selectedProvForecast.daily?.time.map((t, idx) => (
-                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: `1px solid ${borderColor}` }}>
-                                  <span>{new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}</span>
-                                  <span>{selectedProvForecast.daily.weathercode[idx] > 50 ? '🌧️' : '🌤️'}</span>
-                                  <span>{Math.round(selectedProvForecast.daily.temperature_2m_max[idx])}° / {Math.round(selectedProvForecast.daily.temperature_2m_min[idx])}°</span>
-                              </div>
-                          ))}
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedProvForecast(null)}>
+              <div style={{ background: cardBg, padding: '25px', borderRadius: '25px', width: '100%', maxWidth: '400px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: `1px solid ${borderColor}` }}>
+                      <h3 style={{ margin: 0, color: textColor, fontSize: '1.1rem' }}>📍 จ.{selectedProvForecast.name.replace('จังหวัด','')}</h3>
+                      <div style={{ fontSize: '0.8rem', background: '#0ea5e9', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 'bold' }}>พยากรณ์ 7 วัน</div>
+                  </div>
+
+                  {selectedProvForecast.loading ? (
+                      <div style={{ textAlign: 'center', padding: '30px 0', color: subTextColor }}>กำลังดึงข้อมูล...</div>
+                  ) : (
+                      <div style={{ maxHeight: '50vh', overflowY: 'auto' }} className="hide-scrollbar">
+                          {selectedProvForecast.daily?.time.map((t, idx) => {
+                              
+                              // Logic การเลือกข้อมูลมาแสดงใน Popup ตามโหมดปัจจุบัน
+                              let displayContent = null;
+                              const isRain = selectedProvForecast.daily.weathercode[idx] > 50;
+                              
+                              if (activeMode === 'pm25') {
+                                  const pmVal = Math.round(selectedProvForecast.aqiDaily?.pm2_5_mean?.[idx] || 0);
+                                  displayContent = <span style={{ color: getColor(pmVal, 'pm25'), fontWeight: '900' }}>😷 {pmVal} µg/m³</span>;
+                              } else if (activeMode === 'rain') {
+                                  const rainProb = selectedProvForecast.daily.precipitation_probability_max?.[idx] || 0;
+                                  displayContent = <span style={{ color: getColor(rainProb, 'rain'), fontWeight: '900' }}>☔ {rainProb}%</span>;
+                              } else if (activeMode === 'uv') {
+                                  const uvIdx = Math.round(selectedProvForecast.daily.uv_index_max?.[idx] || 0);
+                                  displayContent = <span style={{ color: getColor(uvIdx, 'uv'), fontWeight: '900' }}>☀️ UV {uvIdx}</span>;
+                              } else if (activeMode === 'wind') {
+                                  const windSpd = Math.round(selectedProvForecast.daily.wind_speed_10m_max?.[idx] || 0);
+                                  displayContent = <span style={{ color: getColor(windSpd, 'wind'), fontWeight: '900' }}>🌬️ {windSpd} km/h</span>;
+                              } else {
+                                  // โหมด Temp, Heat, Humidity โชว์อุณหภูมิปกติ
+                                  const tMax = Math.round(selectedProvForecast.daily.temperature_2m_max[idx]);
+                                  const tMin = Math.round(selectedProvForecast.daily.temperature_2m_min[idx]);
+                                  displayContent = <span style={{ fontWeight: '900', color: textColor }}><span style={{color:'#f97316'}}>{tMax}°</span> / <span style={{color:'#3b82f6'}}>{tMin}°</span></span>;
+                              }
+
+                              return (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 5px', borderBottom: idx !== 6 ? `1px solid ${borderColor}` : 'none' }}>
+                                      <span style={{ fontWeight: 'bold', color: textColor, width: '60px' }}>
+                                          {idx === 0 ? 'วันนี้' : new Date(t).toLocaleDateString('th-TH', {weekday:'short'})}
+                                      </span>
+                                      <span style={{ fontSize: '1.4rem' }}>{isRain ? '🌧️' : '🌤️'}</span>
+                                      <div style={{ textAlign: 'right', minWidth: '100px' }}>
+                                          {displayContent}
+                                      </div>
+                                  </div>
+                              );
+                          })}
                       </div>
                   )}
               </div>

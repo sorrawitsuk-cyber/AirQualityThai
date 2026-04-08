@@ -1,9 +1,9 @@
-// src/pages/AlertsPage.jsx (หรือ ClimatePage.jsx)
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function AlertsPage() {
-  const { stations, stationTemps, weatherData, loadingWeather, darkMode, lastUpdateText } = useContext(WeatherContext);
+  // 🌟 ดึงเฉพาะตัวแปรที่มีอยู่ใน Firebase Context ใหม่ (ลบ weatherData ทิ้งไป)
+  const { stations, stationTemps, loading, darkMode, lastUpdated } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [radarLayer, setRadarLayer] = useState('rain');
@@ -18,6 +18,8 @@ export default function AlertsPage() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const lastUpdateText = lastUpdated ? new Date(lastUpdated).toLocaleString('th-TH') : '-';
 
   const { extremeAlerts, fireRisks, nationalSummary } = useMemo(() => {
     let alerts = [];
@@ -65,7 +67,6 @@ export default function AlertsPage() {
     };
   }, [stations, stationTemps]);
 
-  // 🌟 Pro Data: ใส่ครบทั้ง 77 จังหวัด และจัดระบบคำนวณผลรวมอัตโนมัติ
   const mockGistdaHotspots = useMemo(() => [
     { 
       region: 'ภาคเหนือ', color: '#ef4444', trend: 'up', 
@@ -125,7 +126,6 @@ export default function AlertsPage() {
     }
   ].map(region => ({
       ...region,
-      // 🌟 ให้ระบบบวกเลขรวมของทุกจังหวัดในภาคเองอัตโนมัติ
       count: region.provinces.reduce((sum, p) => sum + p.count, 0)
   })), []);
 
@@ -153,7 +153,8 @@ export default function AlertsPage() {
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
-  if (loadingWeather || !weatherData) return (
+  // 🌟 แก้ไขเงื่อนไข Loading ให้เช็คจากสถานะโหลดของ Firebase หรือถ้ายังไม่มีข้อมูลจังหวัด
+  if (loading || stations.length === 0) return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', background: appBg, color: textColor, fontFamily: 'Kanit, sans-serif' }}>
         <style dangerouslySetInlineStyle={{__html: `@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(0.95); } }`}} />
         <div style={{ fontSize: '4rem', animation: 'pulse 1.5s infinite ease-in-out' }}>🚨</div>
@@ -218,7 +219,7 @@ export default function AlertsPage() {
                 
                 {timeMode === 'current' ? (
                     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <div style={{ fontSize: '0.85rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '-5px' }}>อัปเดตล่าสุด: {lastUpdateText}</div>
+                        <div style={{ fontSize: '0.85rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '-5px' }}>อัปเดตระบบล่าสุด: {lastUpdateText}</div>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                             <div style={{ background: darkMode ? '#1e293b' : '#fff7ed', border: `1px solid ${darkMode ? '#7c2d12' : '#fed7aa'}`, padding: '15px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -331,7 +332,6 @@ export default function AlertsPage() {
                                             </div>
                                         </div>
                                         
-                                        {/* 🌟 แสดงแบบ 2 คอลัมน์ถ้าหน้าจอกว้าง (Grid Layout) */}
                                         {isExpanded && (
                                             <div style={{ padding: '0 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: '8px', animation: 'fadeIn 0.2s ease-out' }}>
                                                 <div style={{ height: '1px', background: borderColor, marginBottom: '4px' }}></div>
@@ -404,7 +404,8 @@ export default function AlertsPage() {
                 <iframe 
                     width="100%" height="100%" 
                     src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=5&level=surface&overlay=${radarLayer}&product=ecmwf&menu=&message=true&marker=true`} 
-                    frameBorder="0" title="Windy Radar Map"
+                    style={{ border: 'none' }} 
+                    title="Windy Radar Map"
                 ></iframe>
             </div>
             
