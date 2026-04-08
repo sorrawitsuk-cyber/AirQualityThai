@@ -22,6 +22,9 @@ export default function ClimatePage() {
   const [timeMode, setTimeMode] = useState('current'); 
   const [fireMode, setFireMode] = useState('risk'); 
   const [expandedRegion, setExpandedRegion] = useState(null);
+  
+  // 🌟 เพิ่ม State สำหรับตัวกรองจังหวัดในหน้าไฟป่า
+  const [selectedFireProv, setSelectedFireProv] = useState('');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -31,10 +34,10 @@ export default function ClimatePage() {
 
   const lastUpdateText = lastUpdated ? new Date(lastUpdated).toLocaleString('th-TH') : '-';
 
-  // 🌟 ระบบคำนวณความเสี่ยงไฟป่า (Fire Weather Index - FWI)
-  const { extremeAlerts, fireRisks, nationalSummary } = useMemo(() => {
+  const { extremeAlerts, fireRisks, allProvinceFires, nationalSummary } = useMemo(() => {
     let alerts = [];
     let fires = [];
+    let allFires = []; // 🌟 เก็บข้อมูลไฟป่าทั้ง 77 จังหวัด
     let maxTemp = { val: -99, prov: '-' };
     let maxFeelsLike = { val: -99, prov: '-' };
     let maxRain = { val: -1, prov: '-' };
@@ -67,30 +70,36 @@ export default function ClimatePage() {
           if (uv >= 11) alerts.push({ prov: provName, type: 'UV', msg: `UV อันตรายสุด (${uv} Index)`, color: '#a855f7', icon: '☀️' });
           if (rain > 80) alerts.push({ prov: provName, type: 'Rain', msg: `ระวังพายุ/น้ำท่วม (${rain}%)`, color: '#3b82f6', icon: '⛈️' });
 
-          // 🧮 สมการ FWI (Fire Weather Index) เต็มรูปแบบ
+          // 🧮 สมการ FWI สำหรับทุกจังหวัด
           let fireScore = 0;
-          if (temp > 35) fireScore += 40; else if (temp >= 32) fireScore += 20; // ร้อนมาก ยิ่งเสี่ยง
-          if (humidity < 40) fireScore += 40; else if (humidity < 50) fireScore += 20; // แห้งมาก ยิ่งเสี่ยง
-          if (windSpeed > 15) fireScore += 20; else if (windSpeed > 8) fireScore += 10; // ลมแรง ลามเร็ว
-          if (rain > 20) fireScore -= 50; // ฝนตก ความเสี่ยงลดฮวบ
+          if (temp > 35) fireScore += 40; else if (temp >= 32) fireScore += 20; 
+          if (humidity < 40) fireScore += 40; else if (humidity < 50) fireScore += 20; 
+          if (windSpeed > 15) fireScore += 20; else if (windSpeed > 8) fireScore += 10; 
+          if (rain > 20) fireScore -= 50; 
+          if (fireScore < 0) fireScore = 0;
 
-          if (fireScore > 50) {
-            fires.push({ 
-                prov: provName, temp, humidity, windSpeed, windDir, score: fireScore,
-                riskLevel: fireScore >= 80 ? 'วิกฤต' : 'สูง'
-            });
-          }
+          // 🌟 จัดระดับสีและความเสี่ยง
+          let riskLevel = 'ต่ำ';
+          let riskColor = '#22c55e'; // เขียว
+          if (fireScore >= 80) { riskLevel = 'วิกฤต'; riskColor = '#ef4444'; } // แดง
+          else if (fireScore >= 50) { riskLevel = 'สูง'; riskColor = '#ea580c'; } // ส้ม
+          else if (fireScore >= 30) { riskLevel = 'ปานกลาง'; riskColor = '#eab308'; } // เหลือง
+
+          const fireData = { prov: provName, temp, humidity, windSpeed, windDir, score: fireScore, riskLevel, riskColor };
+          
+          allFires.push(fireData);
+          if (fireScore >= 50) fires.push(fireData); // คัดเฉพาะสูง-วิกฤต ไปโชว์ใน Top 10
         });
     }
 
     return { 
       extremeAlerts: alerts.sort((a, b) => b.val - a.val).slice(0, 8), 
-      fireRisks: fires.sort((a, b) => b.score - a.score), 
+      fireRisks: fires.sort((a, b) => b.score - a.score),
+      allProvinceFires: allFires.sort((a, b) => a.prov.localeCompare(b.prov, 'th')), // เรียง ก-ฮ สำหรับ Dropdown
       nationalSummary: { maxTemp, maxFeelsLike, maxRain, maxPm25, maxUv }
     };
   }, [stations, stationTemps]);
 
-  // 🌟 สถิติ GISTDA ประจำวัน (สามารถเปลี่ยนตัวเลขได้รายวัน)
   const dailyGistdaSummary = useMemo(() => [
     { region: 'ภาคเหนือ', color: '#ef4444', trend: 'up', count: 541, provinces: [{name: 'เชียงใหม่', count: 145}, {name: 'แม่ฮ่องสอน', count: 122}, {name: 'เชียงราย', count: 85}, {name: 'ลำปาง', count: 54}, {name: 'น่าน', count: 48}, {name: 'พะเยา', count: 32}, {name: 'แพร่', count: 27}, {name: 'อุตรดิตถ์', count: 21}, {name: 'ลำพูน', count: 7}] },
     { region: 'ภาคตะวันตก', color: '#f97316', trend: 'up', count: 250, provinces: [{name: 'กาญจนบุรี', count: 110}, {name: 'ตาก', count: 95}, {name: 'ราชบุรี', count: 25}, {name: 'เพชรบุรี', count: 12}, {name: 'ประจวบคีรีขันธ์', count: 8}] },
@@ -123,6 +132,26 @@ export default function ClimatePage() {
   const textColor = darkMode ? '#f8fafc' : '#0f172a'; 
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
+
+  // 🌟 ฟังก์ชัน Render การ์ดไฟป่า (สร้างแยกไว้จะได้เรียกใช้ง่ายๆ)
+  const renderFireCard = (fire, idx, showRank = false) => (
+    <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: darkMode ? `${fire.riskColor}15` : `${fire.riskColor}10`, border: `1px solid ${fire.riskColor}`, padding: '12px', borderRadius: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ color: fire.riskColor, fontWeight: 'bold', fontSize: '0.95rem' }}>
+                {showRank ? `${idx+1}. ` : ''}จ.{fire.prov}
+            </span>
+            <span style={{ background: fire.riskColor, color: '#fff', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>เสี่ยง{fire.riskLevel}</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', fontSize: '0.75rem', fontWeight: 'bold', color: textColor }}>
+            <span style={{background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)', padding:'3px 8px', borderRadius:'6px'}}>🔥 {fire.temp}°</span>
+            <span style={{background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)', padding:'3px 8px', borderRadius:'6px'}}>💧 {fire.humidity}%</span>
+            <span style={{background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)', padding:'3px 8px', borderRadius:'6px'}}>🌬️ {fire.windSpeed} km/h</span>
+        </div>
+        <div style={{ fontSize: '0.7rem', color: fire.riskColor, marginTop: '8px', borderTop: `1px dashed ${fire.riskColor}50`, paddingTop: '8px', opacity: 0.9 }}>
+            * ลมพัดไปทางทิศ<b>{getWindDirectionTH(fire.windDir)}</b> ระวังควันและไฟลามไปยังพื้นที่ท้ายลม
+        </div>
+    </div>
+  );
 
   if (loading || stations.length === 0) return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', background: appBg, color: textColor, fontFamily: 'Kanit, sans-serif' }}>
@@ -223,7 +252,7 @@ export default function ClimatePage() {
                 </div>
                 
                 <div style={{ display: 'flex', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px', padding: '4px' }}>
-                    <button onClick={() => setFireMode('risk')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: fireMode === 'risk' ? cardBg : 'transparent', color: fireMode === 'risk' ? '#ea580c' : subTextColor, fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: fireMode === 'risk' ? '0 2px 5px rgba(0,0,0,0.1)' : 'none' }}>
+                    <button onClick={() => { setFireMode('risk'); setSelectedFireProv(''); }} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: fireMode === 'risk' ? cardBg : 'transparent', color: fireMode === 'risk' ? '#ea580c' : subTextColor, fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: fireMode === 'risk' ? '0 2px 5px rgba(0,0,0,0.1)' : 'none' }}>
                         🎯 ดัชนี FWI (Real-time)
                     </button>
                     <button onClick={() => setFireMode('gistda')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: fireMode === 'gistda' ? cardBg : 'transparent', color: fireMode === 'gistda' ? '#a855f7' : subTextColor, fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: fireMode === 'gistda' ? '0 2px 5px rgba(0,0,0,0.1)' : 'none' }}>
@@ -233,25 +262,34 @@ export default function ClimatePage() {
                 
                 {fireMode === 'risk' ? (
                     <div className="fade-in hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
+                        
+                        {/* 🌟 ตัวกรองจังหวัด (Dropdown) */}
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                            <select 
+                                value={selectedFireProv} 
+                                onChange={e => setSelectedFireProv(e.target.value)} 
+                                style={{ width: '100%', padding: '10px', borderRadius: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, outline: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                                <option value="">-- ดู Top 10 พื้นที่เสี่ยงสูงสุด --</option>
+                                {allProvinceFires.map(f => (
+                                    <option key={f.prov} value={f.prov}>จ.{f.prov}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <p style={{ margin: '0 0 5px 0', fontSize: '0.75rem', color: subTextColor }}>*วิเคราะห์จาก ความร้อน + ความชื้น + ลมพัด ณ ปัจจุบัน</p>
-                        {fireRisks.length > 0 ? fireRisks.slice(0, 10).map((fire, idx) => (
-                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: darkMode ? '#451a03' : '#fff7ed', border: `1px solid ${fire.score >= 80 ? '#ef4444' : '#ea580c'}`, padding: '12px', borderRadius: '10px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                    <span style={{ color: fire.score >= 80 ? '#ef4444' : '#ea580c', fontWeight: 'bold', fontSize: '0.95rem' }}>{idx+1}. จ.{fire.prov}</span>
-                                    <span style={{ background: fire.score >= 80 ? '#ef4444' : '#ea580c', color: '#fff', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>เสี่ยง{fire.riskLevel}</span>
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', fontSize: '0.75rem', fontWeight: 'bold', color: darkMode ? '#fdba74' : '#9a3412' }}>
-                                    <span style={{background: 'rgba(255,255,255,0.3)', padding:'3px 8px', borderRadius:'6px'}}>🔥 {fire.temp}°</span>
-                                    <span style={{background: 'rgba(255,255,255,0.3)', padding:'3px 8px', borderRadius:'6px'}}>💧 {fire.humidity}%</span>
-                                    <span style={{background: 'rgba(255,255,255,0.3)', padding:'3px 8px', borderRadius:'6px'}}>🌬️ {fire.windSpeed} km/h</span>
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: darkMode ? '#fca5a5' : '#b91c1c', marginTop: '8px', borderTop: `1px dashed rgba(234, 88, 12, 0.3)`, paddingTop: '8px' }}>
-                                    * ลมพัดไปทางทิศ<b>{getWindDirectionTH(fire.windDir)}</b> ระวังควันและไฟลามไปยังพื้นที่ท้ายลม
-                                </div>
-                            </div>
-                        )) : (
-                            <div style={{ textAlign: 'center', padding: '30px 0', color: '#22c55e', fontWeight: 'bold', fontSize: '0.9rem' }}>✅ ไม่พบพื้นที่เสี่ยงไฟป่ารุนแรง (FWI) ในขณะนี้</div>
+                        
+                        {/* 🌟 โชว์จังหวัดที่เลือก หรือ โชว์ Top 10 */}
+                        {selectedFireProv ? (
+                            allProvinceFires.filter(f => f.prov === selectedFireProv).map((fire, idx) => renderFireCard(fire, idx, false))
+                        ) : (
+                            fireRisks.length > 0 ? (
+                                fireRisks.slice(0, 10).map((fire, idx) => renderFireCard(fire, idx, true))
+                            ) : (
+                                <div style={{ textAlign: 'center', padding: '30px 0', color: '#22c55e', fontWeight: 'bold', fontSize: '0.9rem' }}>✅ ไม่พบพื้นที่เสี่ยงไฟป่ารุนแรง (FWI) ในขณะนี้</div>
+                            )
                         )}
+
                     </div>
                 ) : (
                     <div className="fade-in hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
