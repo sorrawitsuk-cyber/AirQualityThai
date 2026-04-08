@@ -3,15 +3,49 @@ import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function AIPage() {
-  const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode } = useContext(WeatherContext);
+  // 🌟 ดึงเฉพาะตัวแปรที่มีอยู่ใน Context ใหม่
+  const { stations, darkMode } = useContext(WeatherContext);
   
   // --- 1. States (Hooks) ---
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
-  const [locationName, setLocationName] = useState('กรุงเทพมหานคร');
+  const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
   const [selectedProv, setSelectedProv] = useState('');
   const [targetDateIdx, setTargetDateIdx] = useState(0); 
   const [activeTab, setActiveTab] = useState('summary'); 
   const [showFilters, setShowFilters] = useState(window.innerWidth >= 1024);
+
+  // 🌟 สร้าง State สำหรับข้อมูลสภาพอากาศของหน้านี้โดยเฉพาะ
+  const [weatherData, setWeatherData] = useState(null);
+  const [loadingWeather, setLoadingWeather] = useState(true);
+
+  // --- 📡 ฟังก์ชันดึง API อากาศเฉพาะจุด (เหมือนของ Dashboard) ---
+  const fetchWeatherByCoords = async (lat, lon) => {
+    try {
+      setLoadingWeather(true);
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,pm2_5&daily=temperature_2m_max,precipitation_probability_max&timezone=Asia%2FBangkok`;
+      const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5&timezone=Asia%2FBangkok`;
+
+      const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
+      const wData = await wRes.json();
+      const aData = await aRes.json();
+
+      if (wRes.ok && aRes.ok) {
+        setWeatherData({
+          current: { pm25: aData.current.pm2_5 },
+          daily: {
+            time: wData.daily.time,
+            temperature_2m_max: wData.daily.temperature_2m_max,
+            precipitation_probability_max: wData.daily.precipitation_probability_max,
+            pm25_max: new Array(7).fill(aData.current.pm2_5), // จำลองค่าฝุ่น 7 วัน
+          }
+        });
+      }
+    } catch (err) {
+      console.error("AI fetch error:", err);
+    } finally {
+      setLoadingWeather(false);
+    }
+  };
 
   // --- 2. Effects ---
   useEffect(() => {
@@ -22,17 +56,34 @@ export default function AIPage() {
     };
     window.addEventListener('resize', handleResize);
 
+    // ดึงพิกัด GPS ตอนเปิดหน้าครั้งแรก
     if (!weatherData && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
         fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
         setLocationName('ตำแหน่งปัจจุบัน');
       }, () => {
-        if (!weatherData) fetchWeatherByCoords(13.75, 100.5); 
+        fetchWeatherByCoords(13.75, 100.5); 
+        setLocationName('กรุงเทพมหานคร');
       }, { timeout: 5000 });
+    } else if (!weatherData) {
+      fetchWeatherByCoords(13.75, 100.5); 
+      setLocationName('กรุงเทพมหานคร');
     }
+
     return () => window.removeEventListener('resize', handleResize);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // --- ฟังก์ชันเปลี่ยนจังหวัด ---
+  const handleProvChange = (e) => {
+    const pName = e.target.value;
+    setSelectedProv(pName); 
+    const found = stations?.find(s => s.areaTH === pName);
+    if (found) { 
+      fetchWeatherByCoords(found.lat, found.long); 
+      setLocationName(pName); 
+    }
+  };
 
   // --- 3. AI Logic Engine ---
   const aiReport = useMemo(() => {
@@ -102,29 +153,9 @@ export default function AIPage() {
   </div>;
 
   return (
-    /* 🌟 1. แก้ไข Container หลักให้ล็อค 100% แล้ว Scroll ภายในตัวมันเอง */
-    <div style={{ 
-      position: 'relative',
-      height: '100%', 
-      width: '100%', 
-      background: appBg, 
-      overflowY: 'auto', 
-      WebkitOverflowScrolling: 'touch', 
-      fontFamily: 'Kanit, sans-serif',
-      boxSizing: 'border-box' // 🌟 ป้องกันการหลุดกรอบ
-    }} className="hide-scrollbar">
+    <div style={{ position: 'relative', height: '100%', width: '100%', background: appBg, overflowY: 'auto', WebkitOverflowScrolling: 'touch', fontFamily: 'Kanit, sans-serif', boxSizing: 'border-box' }} className="hide-scrollbar">
       
-      <div style={{ 
-        width: '100%', 
-        maxWidth: '1100px', 
-        margin: '0 auto', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '20px', 
-        padding: isMobile ? '15px' : '30px', 
-        paddingBottom: '150px', // เผื่อที่ให้เมนูด้านล่างเยอะขึ้น
-        boxSizing: 'border-box' // 🌟 ป้องกันการทะลุขอบ
-      }}>
+      <div style={{ width: '100%', maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '150px', boxSizing: 'border-box' }}>
 
         {/* 1. FILTER SECTION */}
         <div style={{ width: '100%', background: cardBg, borderRadius: '24px', padding: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)', boxSizing: 'border-box' }}>
@@ -135,15 +166,15 @@ export default function AIPage() {
             {showFilters && (
                 <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px', width: '100%', boxSizing: 'border-box' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr auto', gap: '10px' }}>
-                        <select value={selectedProv} onChange={(e) => { setSelectedProv(e.target.value); setLocationName(e.target.value); }} style={{ width: '100%', padding: '12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', boxSizing: 'border-box' }}>
-                            <option value="">เลือกจังหวัด</option>
-                            {stations.map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
+                        <select value={selectedProv} onChange={handleProvChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', boxSizing: 'border-box' }}>
+                            <option value="">-- เลือกจังหวัด --</option>
+                            {stations.sort((a,b)=>a.areaTH.localeCompare(b.areaTH,'th')).map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
                         </select>
                         <button onClick={() => window.location.reload()} style={{ width: '100%', background: '#0ea5e9', color: '#fff', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', boxSizing: 'border-box' }}>อัปเดต GPS</button>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', width: '100%', boxSizing: 'border-box' }} className="hide-scrollbar">
                         {[0,1,2,3,4,5,6].map(idx => (
-                            <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ flexShrink: 0, minWidth: '70px', padding: '10px', borderRadius: '12px', border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, background: targetDateIdx === idx ? activeColor : 'transparent', color: targetDateIdx === idx ? '#fff' : textColor, fontWeight: 'bold', fontSize: '0.8rem' }}>
+                            <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ flexShrink: 0, minWidth: '70px', padding: '10px', borderRadius: '12px', border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, background: targetDateIdx === idx ? activeColor : 'transparent', color: targetDateIdx === idx ? '#fff' : textColor, fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}>
                                 {idx === 0 ? 'วันนี้' : idx === 1 ? 'พรุ่งนี้' : `+${idx} วัน`}
                             </button>
                         ))}
@@ -155,17 +186,8 @@ export default function AIPage() {
         {/* 2. MAIN LAYOUT (Tabs + Content) */}
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', alignItems: 'flex-start', width: '100%', boxSizing: 'border-box' }}>
             
-            {/* TABS (โหมดต่างๆ) */}
-            <div style={{ 
-                display: 'flex', 
-                flexDirection: isMobile ? 'row' : 'column', 
-                gap: '10px', 
-                width: isMobile ? '100%' : '240px',
-                overflowX: isMobile ? 'auto' : 'visible',
-                order: isMobile ? 1 : 2,
-                boxSizing: 'border-box',
-                paddingBottom: isMobile ? '5px' : '0' // กัน Scrollbar บังปุ่ม
-            }} className="hide-scrollbar">
+            {/* TABS */}
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: '10px', width: isMobile ? '100%' : '240px', overflowX: isMobile ? 'auto' : 'visible', order: isMobile ? 1 : 2, boxSizing: 'border-box', paddingBottom: isMobile ? '5px' : '0' }} className="hide-scrollbar">
                 {tabConfigs.map(tab => {
                     const isActive = activeTab === tab.id;
                     return (
