@@ -70,7 +70,7 @@ export default function ClimatePage() {
   }, [stations, stationTemps]);
 
   const { groupedAlerts, fireRisks, allProvinceFires } = useMemo(() => {
-    let alerts = { heat: [], pm25: [], uv: [], rain: [] };
+    let alerts = { heat: [], pm25: [], rain: [] };
     let fires = [];
     let allFires = [];
 
@@ -83,7 +83,6 @@ export default function ClimatePage() {
           const temp = Math.round(data.temp || 0);
           const feelsLike = Math.round(data.feelsLike || temp || 0); 
           const rain = data.rainProb || 0;
-          const uv = data.uv || 0; 
           const humidity = Math.round(data.humidity || 0);
           const windSpeed = Math.round(data.windSpeed || 0);
           const provName = st.areaTH.replace('จังหวัด', '');
@@ -91,7 +90,6 @@ export default function ClimatePage() {
           // Alerts (ใช้เกณฑ์เตือนภัย)
           if (feelsLike >= 35) alerts.heat.push({ prov: provName, val: feelsLike, unit: '°C' });
           if (pm25 > 15) alerts.pm25.push({ prov: provName, val: pm25, unit: 'µg' });
-          if (uv >= 3) alerts.uv.push({ prov: provName, val: uv, unit: 'Index' });
           if (rain > 30) alerts.rain.push({ prov: provName, val: rain, unit: '%' });
 
           // Fire Risk
@@ -114,6 +112,17 @@ export default function ClimatePage() {
     { region: 'ภาคกลาง', color: '#eab308', count: 173, provinces: [{name: 'นครสวรรค์', count: 35}, {name: 'เพชรบูรณ์', count: 32}, {name: 'อุทัยธานี', count: 28}] }
   ], []);
   const totalHotspots = 1208;
+
+  // 🌟 แปลงข้อมูล GISTDA ให้เป็นรายการรายจังหวัดทั้งหมด เพื่อแสดงในกล่องเตือนภัย
+  const gistdaAlerts = useMemo(() => {
+    let list = [];
+    dailyGistdaSummary.forEach(region => {
+      region.provinces.forEach(p => {
+        list.push({ prov: p.name, val: p.count, unit: 'จุด' });
+      });
+    });
+    return list.sort((a, b) => b.val - a.val); // เรียงจากมากไปน้อย
+  }, [dailyGistdaSummary]);
 
   // หาวันที่ของเมื่อวาน
   const yesterday = new Date();
@@ -217,12 +226,12 @@ export default function ClimatePage() {
             </div>
         )}
 
-        {/* 3. Top Summary Cards (Emojis) */}
+        {/* 3. Top Summary Cards (เปลี่ยน UV เป็น GISTDA) */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '15px' }}>
             {[
                 { label: 'วิกฤตความร้อน', icon: '🥵', count: groupedAlerts.heat.length, color: '#ef4444' },
                 { label: 'ฝุ่นเกินมาตรฐาน', icon: '😷', count: groupedAlerts.pm25.length, color: '#f97316' },
-                { label: 'UV ระดับสูง', icon: '☀️', count: groupedAlerts.uv.length, color: '#a855f7' },
+                { label: 'จุดความร้อนสะสม', icon: '🛰️', count: gistdaAlerts.length, color: '#a855f7' },
                 { label: 'ระวังฝนหนัก', icon: '⛈️', count: groupedAlerts.rain.length, color: '#3b82f6' }
             ].map((item, idx) => (
                 <div key={idx} style={{ background: darkMode ? 'rgba(30, 41, 59, 0.5)' : 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(10px)', padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -233,7 +242,7 @@ export default function ClimatePage() {
             ))}
         </div>
 
-        {/* 4. สถิติข้อมูลของเมื่อวาน (ตามที่รีเควส) */}
+        {/* 4. สถิติข้อมูลของเมื่อวาน */}
         <div style={{ marginTop: '10px' }}>
             <h2 style={{ fontSize: '1.1rem', color: textColor, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 📅 สถิติย้อนหลัง <span style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'normal' }}>(ประเมินจากข้อมูลวันที่ {yesterdayText})</span>
@@ -286,17 +295,17 @@ export default function ClimatePage() {
             </button>
         </div>
 
-        {/* 6. Alert Detail Tables */}
+        {/* 6. Alert Detail Tables (เปลี่ยน UV เป็น GISTDA) */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '25px' }}>
             <AlertBox title="ดัชนีความร้อน (Feels Like)" icon="🥵" data={groupedAlerts.heat} color="#ef4444" />
             <AlertBox title="ฝุ่น PM2.5 (คุณภาพอากาศ)" icon="😷" data={groupedAlerts.pm25} color="#f97316" />
-            <AlertBox title="รังสี UV (UV Index)" icon="☀️" data={groupedAlerts.uv} color="#a855f7" />
+            {/* นำ GISTDA มาใส่แทน UV */}
+            <AlertBox title="จุดความร้อนสะสม (GISTDA)" icon="🛰️" data={gistdaAlerts} color="#a855f7" />
             <AlertBox title="โอกาสฝนตกหนัก" icon="⛈️" data={groupedAlerts.rain} color="#3b82f6" />
         </div>
 
-        {/* 7. Windy Radar & Fire Risks (มีระบบสลับ GISTDA) */}
+        {/* 7. Windy Radar & Fire Risks */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1.2fr', gap: '20px', marginTop: '10px' }}>
-            {/* Radar */}
             <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h2 style={{ margin: 0, color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -308,13 +317,11 @@ export default function ClimatePage() {
                 </div>
             </div>
 
-            {/* Fire Risk & GISTDA */}
             <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
                 <h2 style={{ margin: '0 0 15px 0', color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   🔥 ศูนย์ความเสี่ยงไฟป่า
                 </h2>
                 
-                {/* ปุ่มสลับโหมด */}
                 <div style={{ display: 'flex', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px', padding: '4px', marginBottom: '15px' }}>
                     <button onClick={() => setFireMode('risk')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: fireMode === 'risk' ? cardBg : 'transparent', color: fireMode === 'risk' ? '#ea580c' : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' }}>
                         🎯 ดัชนีเรียลไทม์
