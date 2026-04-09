@@ -2,19 +2,22 @@ import React, { useContext, useState, useEffect, useMemo, useCallback } from 're
 import { WeatherContext } from '../context/WeatherContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 
-// 🌟 Component ลูกศรบอกแนวโน้ม (Trend Indicator)
-const TrendIndicator = ({ current, prev, mode }) => {
+// 🌟 Component ลูกศรบอกแนวโน้ม (Trend Indicator) - อิงตามหลักสีเตือนภัย
+const TrendIndicator = ({ current, prev, mode, hideText = false }) => {
     if (current == null || prev == null || current === '-' || prev === '-') return null;
     const diff = Math.round(current - prev);
-    if (diff === 0) return <span style={{fontSize:'0.75em', opacity:0.8, color:'#94a3b8', marginLeft:'6px', whiteSpace:'nowrap'}}>➖ คงที่</span>;
+    if (diff === 0) return <span style={{fontSize:'0.75em', opacity:0.6, color:'#94a3b8', marginLeft:'6px', whiteSpace:'nowrap'}}>➖</span>;
     
-    let color = diff > 0 ? '#ef4444' : '#22c55e'; 
-    if (mode === 'rain') color = diff > 0 ? '#3b82f6' : '#94a3b8'; 
-    if (mode === 'pm25') color = diff > 0 ? '#f97316' : '#22c55e';
+    let color = diff > 0 ? '#ef4444' : '#22c55e'; // แดง = เพิ่ม (แย่ลง), เขียว = ลด (ดีขึ้น)
+    if (mode === 'rain') color = diff > 0 ? '#3b82f6' : '#94a3b8'; // ฝนเพิ่ม = น้ำเงิน
+    if (mode === 'pm25') color = diff > 0 ? '#f97316' : '#22c55e'; // ฝุ่นเพิ่ม = ส้ม/แดง
 
     const arrow = diff > 0 ? '🔺' : '🔻';
-    const sign = diff > 0 ? '+' : '';
-    return <span style={{fontSize:'0.75em', color: color, opacity: 0.9, marginLeft: '6px', whiteSpace:'nowrap', fontWeight:'bold'}}>{arrow}{sign}{Math.abs(diff)}</span>;
+    return (
+        <span style={{fontSize:'0.8em', color: color, opacity: 0.9, marginLeft: '6px', whiteSpace:'nowrap', fontWeight:'bold'}}>
+            {arrow} {Math.abs(diff)} {hideText ? '' : <span style={{fontSize:'0.7em', fontWeight:'normal'}}></span>}
+        </span>
+    );
 };
 
 export default function ClimatePage() {
@@ -29,7 +32,6 @@ export default function ClimatePage() {
   const [isLocating, setIsLocating] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // 🌟 หาวันที่ของเมื่อวาน
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayDateText = yesterdayDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -107,10 +109,20 @@ export default function ClimatePage() {
 
   useEffect(() => { if (stations && stations.length > 0) fetchUserLocation(); }, [stations, fetchUserLocation]);
 
-  // 🌟 [แก้ไขใหม่] แยก Data เป็น 2 ชุด (Live = เฉพาะพื้นที่เสี่ยง, Yesterday = 77 จังหวัด)
-  const { liveData, yesterdayData } = useMemo(() => {
+  // 🌟 ฟังก์ชันเช็คว่าค่าถึงเกณฑ์ "พื้นที่เสี่ยง" หรือไม่
+  const isRisky = useCallback((mode, val) => {
+      if(mode === 'heat') return val >= 35;
+      if(mode === 'pm25') return val > 15;
+      if(mode === 'uv') return val >= 3;
+      if(mode === 'rain') return val > 30;
+      if(mode === 'wind') return val > 15;
+      return false;
+  }, []);
+
+  const { liveData, yesterdayData, riskyCounts } = useMemo(() => {
     let lData = { heat: [], pm25: [], uv: [], rain: [], wind: [], fire: [] };
     let yData = { heat: [], pm25: [], uv: [], rain: [], wind: [], fire: [] };
+    let counts = { heat: {live: 0, yest: 0}, pm25: {live: 0, yest: 0}, uv: {live: 0, yest: 0}, rain: {live: 0, yest: 0}, wind: {live: 0, yest: 0}, fire: {live: 3, yest: 4} };
     
     if (stations?.length > 0 && stationTemps) {
         stations.forEach(st => {
@@ -129,17 +141,29 @@ export default function ClimatePage() {
           const currWind = Math.round(data.windSpeed || 0);
           const prevWind = yObj.wind !== undefined ? yObj.wind : currWind;
 
-          // โหมด LIVE: คัดเฉพาะจังหวัดที่เกินเกณฑ์อันตราย
+          // นับจำนวนพื้นที่เสี่ยง
+          if (isRisky('heat', currTemp)) counts.heat.live++;
+          if (isRisky('heat', prevTemp)) counts.heat.yest++;
+          if (isRisky('pm25', currPM)) counts.pm25.live++;
+          if (isRisky('pm25', prevPM)) counts.pm25.yest++;
+          if (isRisky('uv', currUV)) counts.uv.live++;
+          if (isRisky('uv', prevUV)) counts.uv.yest++;
+          if (isRisky('rain', currRain)) counts.rain.live++;
+          if (isRisky('rain', prevRain)) counts.rain.yest++;
+          if (isRisky('wind', currWind)) counts.wind.live++;
+          if (isRisky('wind', prevWind)) counts.wind.yest++;
+
+          // โหมด LIVE: คัดเฉพาะจังหวัดที่เกินเกณฑ์
           if (currTemp >= 35) lData.heat.push({ prov: provName, val: currTemp, prevVal: prevTemp, unit: '°C' });
-          if (currPM > 15) lData.pm25.push({ prov: provName, val: currPM, prevVal: prevPM, unit: 'µg/m³' });
-          if (currUV >= 3) lData.uv.push({ prov: provName, val: currUV, prevVal: prevUV, unit: 'Index' });
+          if (currPM > 15) lData.pm25.push({ prov: provName, val: currPM, prevVal: prevPM, unit: 'µg' });
+          if (currUV >= 3) lData.uv.push({ prov: provName, val: currUV, prevVal: prevUV, unit: 'Idx' });
           if (currRain > 30) lData.rain.push({ prov: provName, val: currRain, prevVal: prevRain, unit: '%' });
           if (currWind > 15) lData.wind.push({ prov: provName, val: currWind, prevVal: prevWind, unit: 'km/h' });
 
-          // โหมด YESTERDAY: เอาสถิติลงทั้ง 77 จังหวัดเพื่อจัดอันดับ
+          // โหมด YESTERDAY: เอาสถิติลงทั้ง 77 จังหวัด
           yData.heat.push({ prov: provName, val: prevTemp, currVal: currTemp, unit: '°C' });
-          yData.pm25.push({ prov: provName, val: prevPM, currVal: currPM, unit: 'µg/m³' });
-          yData.uv.push({ prov: provName, val: prevUV, currVal: currUV, unit: 'Index' });
+          yData.pm25.push({ prov: provName, val: prevPM, currVal: currPM, unit: 'µg' });
+          yData.uv.push({ prov: provName, val: prevUV, currVal: currUV, unit: 'Idx' });
           yData.rain.push({ prov: provName, val: prevRain, currVal: currRain, unit: '%' });
           yData.wind.push({ prov: provName, val: prevWind, currVal: currWind, unit: 'km/h' });
         });
@@ -152,8 +176,8 @@ export default function ClimatePage() {
     Object.keys(lData).forEach(key => { if(key !== 'fire') lData[key].sort((a, b) => b.val - a.val) });
     Object.keys(yData).forEach(key => { if(key !== 'fire') yData[key].sort((a, b) => b.val - a.val) });
     
-    return { liveData: lData, yesterdayData: yData };
-  }, [stations, stationTemps, stationYesterday, getSafePrev]);
+    return { liveData: lData, yesterdayData: yData, riskyCounts: counts };
+  }, [stations, stationTemps, stationYesterday, getSafePrev, isRisky]);
 
   const appBg = darkMode ? '#020617' : '#f8fafc'; 
   const cardBg = darkMode ? '#0f172a' : '#ffffff';
@@ -183,20 +207,25 @@ export default function ClimatePage() {
   const activeBriefing = modeBriefings[activeTab];
   const filteredData = activeTabData.data.filter(item => item.prov.includes(searchTerm));
 
-  const getWindyOverlay = (tabId) => {
-      if (tabId === 'rain') return 'rain';
-      if (tabId === 'pm25') return 'pm2p5';
-      if (tabId === 'uv') return 'uvindex';
-      if (tabId === 'wind') return 'wind'; 
-      return 'temp';
-  };
-
-  // ข้อมูลสำหรับกราฟ BarChart (เฉพาะโหมดเมื่อวาน)
   const chartData = yesterdayData[activeTab].slice(0, 10).map(item => ({
       name: item.prov,
       'เมื่อวาน': item.val,
       'วันนี้': item.currVal
   }));
+
+  // 🌟 คำนวณสรุปแนวโน้ม (Trend Summary) ใต้กราฟ
+  const riskyDiff = riskyCounts[activeTab].live - riskyCounts[activeTab].yest;
+  let trendSummaryColor = subTextColor;
+  let trendSummaryText = `สถานการณ์คงที่: จำนวนพื้นที่เสี่ยงเท่ากับเมื่อวาน (${riskyCounts[activeTab].live} จังหวัด)`;
+  
+  if (riskyDiff > 0) {
+      trendSummaryColor = '#ef4444'; // เพิ่มขึ้น = แย่ลง (แดง)
+      if(activeTab === 'rain') trendSummaryColor = '#3b82f6';
+      trendSummaryText = `สถานการณ์แย่ลง 🔺: พบพื้นที่เสี่ยงเพิ่มขึ้น ${Math.abs(riskyDiff)} จังหวัด (วันนี้ ${riskyCounts[activeTab].live} จ. / เมื่อวาน ${riskyCounts[activeTab].yest} จ.)`;
+  } else if (riskyDiff < 0) {
+      trendSummaryColor = '#22c55e'; // ลดลง = ดีขึ้น (เขียว)
+      trendSummaryText = `สถานการณ์ดีขึ้น 🔻: พื้นที่เสี่ยงลดลง ${Math.abs(riskyDiff)} จังหวัด (วันนี้ ${riskyCounts[activeTab].live} จ. / เมื่อวาน ${riskyCounts[activeTab].yest} จ.)`;
+  }
 
   let locSummary = { text: 'สถานการณ์ปกติ', color: '#22c55e', bg: darkMode ? '#052e16' : '#dcfce7', icon: '✅', desc: 'ไม่มีการแจ้งเตือนภัยพิบัติรุนแรงในพื้นที่ของคุณ' };
   if (userData && userData.temp !== '-') {
@@ -270,21 +299,24 @@ export default function ClimatePage() {
                     👆 แผงควบคุม <span style={{fontWeight: 'normal', opacity: 0.8}}>(สลับโหมดข้อมูล)</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', flex: 1 }}>
-                    {tabs.map((tab, idx) => (
-                        <div key={idx} onClick={() => setActiveTab(tab.id)} style={{ background: cardBg, padding: '12px 5px', borderRadius: '20px', border: `2px solid ${activeTab === tab.id ? tab.color : borderColor}`, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px', boxShadow: activeTab === tab.id ? `0 10px 20px ${tab.color}15` : 'none', transform: activeTab === tab.id ? 'translateY(-3px)' : 'none' }}>
-                            <span style={{ fontSize: '1.6rem' }}>{tab.icon}</span>
-                            <span style={{ fontSize: '0.7rem', color: subTextColor, fontWeight: 'bold', whiteSpace: 'nowrap' }}>{tab.label}</span>
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
-                                <span style={{ fontSize: '1.2rem', fontWeight: '900', color: tab.color }}>{timeMode === 'live' ? tab.data.length : '77'}</span>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: tab.color }}>จ.</span>
+                    {tabs.map((tab, idx) => {
+                        const count = timeMode === 'live' ? riskyCounts[tab.id].live : riskyCounts[tab.id].yest;
+                        return (
+                            <div key={idx} onClick={() => setActiveTab(tab.id)} style={{ background: cardBg, padding: '12px 5px', borderRadius: '20px', border: `2px solid ${activeTab === tab.id ? tab.color : borderColor}`, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px', boxShadow: activeTab === tab.id ? `0 10px 20px ${tab.color}15` : 'none', transform: activeTab === tab.id ? 'translateY(-3px)' : 'none', opacity: timeMode === 'yesterday' && activeTab !== tab.id ? 0.5 : 1 }}>
+                                <span style={{ fontSize: '1.6rem' }}>{tab.icon}</span>
+                                <span style={{ fontSize: '0.7rem', color: subTextColor, fontWeight: 'bold', whiteSpace: 'nowrap' }}>{tab.label}</span>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+                                    <span style={{ fontSize: '1.2rem', fontWeight: '900', color: tab.color }}>{count}</span>
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: tab.color }}>จ.</span>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>
 
-        {/* ส่วนล่าง: เปลี่ยน Layout ตามโหมดเวลา */}
+        {/* ส่วนล่าง: เลย์เอาต์ตามโหมดเวลา */}
         {timeMode === 'live' ? (
             /* =================== โหมด LIVE (วันนี้) =================== */
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr', gap: '20px', marginTop: '20px' }}>
@@ -320,7 +352,7 @@ export default function ClimatePage() {
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <TrendIndicator current={item.val} prev={item.prevVal} mode={activeTab} />
-                                        <span style={{ color: activeTabData.color, fontWeight: '900', fontSize: '1rem', width: '70px', textAlign: 'right' }}>{item.val} <small style={{fontSize: '0.6rem'}}>{item.unit}</small></span>
+                                        <span style={{ color: activeTabData.color, fontWeight: '900', fontSize: '1rem', width: '60px', textAlign: 'right' }}>{item.val} <small style={{fontSize: '0.6rem'}}>{item.unit}</small></span>
                                     </div>
                                 </div>
                             )) : ( <div style={{ textAlign: 'center', padding: '50px 0', color: subTextColor }}>✅ สถานการณ์ปกติ</div> )}
@@ -337,24 +369,31 @@ export default function ClimatePage() {
                     <h2 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         📊 กราฟเปรียบเทียบแนวโน้ม Top 10 (เมื่อวาน vs วันนี้)
                     </h2>
-                    <p style={{ margin: '0 0 20px 0', color: subTextColor, fontSize: '0.85rem' }}>หมวดหมู่: {activeTabData.label}</p>
+                    <p style={{ margin: '0 0 15px 0', color: subTextColor, fontSize: '0.85rem' }}>หมวดหมู่: {activeTabData.label}</p>
                     
-                    <div style={{ width: '100%', height: '300px' }}>
+                    <div style={{ width: '100%', height: '250px' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                            <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke={borderColor} vertical={false} />
-                                <XAxis dataKey="name" stroke={subTextColor} tick={{fontSize: 12, fill: subTextColor, fontFamily: 'Kanit'}} axisLine={false} tickLine={false} />
-                                <YAxis stroke={subTextColor} tick={{fontSize: 12, fill: subTextColor}} axisLine={false} tickLine={false} />
+                                <XAxis dataKey="name" stroke={subTextColor} tick={{fontSize: 10, fill: subTextColor, fontFamily: 'Kanit'}} axisLine={false} tickLine={false} interval={0} />
+                                <YAxis stroke={subTextColor} tick={{fontSize: 10, fill: subTextColor}} axisLine={false} tickLine={false} />
                                 <Tooltip cursor={{fill: darkMode ? '#1e293b' : '#f1f5f9'}} contentStyle={{background: cardBg, borderRadius: '12px', border: `1px solid ${borderColor}`, color: textColor, fontFamily: 'Kanit'}} />
-                                <Legend wrapperStyle={{fontFamily: 'Kanit', fontSize: '0.85rem', paddingTop: '10px'}} />
-                                <Bar dataKey="เมื่อวาน" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                <Bar dataKey="วันนี้" fill={activeTabData.color} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                <Legend wrapperStyle={{fontFamily: 'Kanit', fontSize: '0.85rem'}} />
+                                <Bar dataKey="เมื่อวาน" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                                <Bar dataKey="วันนี้" fill={activeTabData.color} radius={[4, 4, 0, 0]} maxBarSize={30} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
+
+                    {/* 🌟 สรุปแนวโน้มใต้กราฟ */}
+                    <div style={{ marginTop: '15px', padding: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px', textAlign: 'center', border: `1px dashed ${trendSummaryColor}50` }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: trendSummaryColor }}>
+                            {trendSummaryText}
+                        </span>
+                    </div>
                 </div>
 
-                {/* 🌟 ตาราง 77 จังหวัดเต็มๆ */}
+                {/* 🌟 ตาราง 77 จังหวัดเต็มๆ ของเมื่อวาน */}
                 <div style={{ background: cardBg, borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <div style={{ padding: '20px 25px', borderBottom: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                         <div>
@@ -375,9 +414,13 @@ export default function ClimatePage() {
                                     <span style={{ color: subTextColor, fontSize: '0.9rem', width: '25px', fontWeight: 'bold' }}>{i+1}.</span>
                                     <span style={{ color: textColor, fontWeight: '600', fontSize: '1rem' }}>จ.{item.prov}</span>
                                 </div>
-                                <span style={{ color: activeTabData.color, fontWeight: '900', fontSize: '1.2rem' }}>
-                                    {item.val} <small style={{fontSize: '0.7rem', color: subTextColor}}>{item.unit}</small>
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {/* 🌟 ลูกศรเทียบแนวโน้ม วันนี้ vs เมื่อวาน ในรายละเอียด */}
+                                    <TrendIndicator current={item.currVal} prev={item.val} mode={activeTab} hideText={false} />
+                                    <span style={{ color: activeTabData.color, fontWeight: '900', fontSize: '1.2rem', minWidth: '60px', textAlign: 'right' }}>
+                                        {item.val} <small style={{fontSize: '0.7rem', color: subTextColor}}>{item.unit}</small>
+                                    </span>
+                                </div>
                             </div>
                         )) : ( <div style={{ textAlign: 'center', padding: '50px 0', color: subTextColor, background: cardBg, gridColumn: '1 / -1' }}>ไม่พบข้อมูลจังหวัดที่ค้นหา</div> )}
                     </div>
