@@ -7,10 +7,10 @@ export const WeatherContext = createContext();
 export const WeatherProvider = ({ children }) => {
   const [stations, setStations] = useState([]);
   const [stationTemps, setStationTemps] = useState({});
+  const [stationYesterday, setStationYesterday] = useState({}); // 🌟 ท่อรับข้อมูลอดีต
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // ระบบโหมดมืด
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
     return savedTheme ? savedTheme === 'dark' : true; 
@@ -20,7 +20,6 @@ export const WeatherProvider = ({ children }) => {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
-  // ดักฟังข้อมูลจาก Firebase อย่างเดียว (ไม่ต้องสูบเองแล้ว Vercel ทำให้)
   useEffect(() => {
     const weatherRef = ref(db, 'weather_data');
 
@@ -30,10 +29,12 @@ export const WeatherProvider = ({ children }) => {
       if (data) {
         setStations(data.stations || []);
         setStationTemps(data.stationTemps || {});
+        setStationYesterday(data.stationYesterday || {}); // 🌟 รับของเข้า
         setLastUpdated(data.lastUpdated || null);
       } else {
         setStations([]);
         setStationTemps({});
+        setStationYesterday({});
       }
       setLoading(false); 
     }, (error) => {
@@ -48,6 +49,7 @@ export const WeatherProvider = ({ children }) => {
     <WeatherContext.Provider value={{ 
       stations, 
       stationTemps, 
+      stationYesterday, // 🌟 ส่งต่อให้ ClimatePage เอาไปใช้
       loading, 
       lastUpdated,
       darkMode,        
