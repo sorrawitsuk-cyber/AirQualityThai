@@ -2,23 +2,21 @@ import React, { useContext, useState, useEffect, useMemo, useCallback } from 're
 import { WeatherContext } from '../context/WeatherContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 
-// 🌟 ลูกศรบอกแนวโน้ม (บังคับสีแดง/เขียวเป๊ะๆ)
 const TrendIndicator = ({ current, prev, mode, hideText = false }) => {
     if (current == null || prev == null || current === '-' || prev === '-') return null;
     const diff = Math.round(current - prev);
     if (diff === 0) return <span title="ไม่มีการเปลี่ยนแปลง" style={{fontSize:'0.75em', opacity:0.6, color:'#94a3b8', marginLeft:'6px', whiteSpace:'nowrap'}}>➖</span>;
     
-    // ตั้งค่าสีพื้นฐาน
-    let color = '#22c55e'; // ลง = เขียว (ดี)
+    let color = '#22c55e'; 
     let arrow = '▼';
 
-    if (diff > 0) { // ขึ้น = แดง/ส้ม (แย่)
+    if (diff > 0) { 
         arrow = '▲';
-        color = '#ef4444'; // แดง
-        if (mode === 'rain') color = '#3b82f6'; // ฝนเพิ่ม=น้ำเงิน
-        if (mode === 'pm25') color = '#f97316'; // ฝุ่นเพิ่ม=ส้ม
+        color = '#ef4444'; 
+        if (mode === 'rain') color = '#3b82f6'; 
+        if (mode === 'pm25') color = '#f97316'; 
     } else {
-        if (mode === 'rain') color = '#94a3b8'; // ฝนลด=เทา
+        if (mode === 'rain') color = '#94a3b8'; 
     }
 
     return (
@@ -29,7 +27,6 @@ const TrendIndicator = ({ current, prev, mode, hideText = false }) => {
 };
 
 export default function ClimatePage() {
-  // 🌟 ดึง stationMaxYesterday มาใช้ด้วย
   const { stations, stationTemps, loading, darkMode, stationYesterday = {}, stationMaxYesterday = {} } = useContext(WeatherContext);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,7 +66,6 @@ export default function ClimatePage() {
               const prov = (closest.areaTH || closest.nameTH || 'กรุงเทพมหานคร').replace('จังหวัด', '');
               setUserProv(prov);
               const curr = stationTemps[closest.stationID] || {};
-              // 🌟 กล่องข้อมูลส่วนตัว ดึง stationYesterday (เวลาเดียวกัน)
               const prev = stationYesterday[closest.stationID] || {};
               setUserData({
                   temp: Math.round(curr.temp || 0), prevTemp: prev.temp !== undefined ? prev.temp : getSafePrev(curr.temp),
@@ -132,11 +128,12 @@ export default function ClimatePage() {
     if (stations?.length > 0 && stationTemps) {
         stations.forEach(st => {
           const data = stationTemps[st.stationID] || {};
-          const yObj = stationYesterday[st.stationID] || {}; // เวลาเดียวกัน
-          const maxObj = stationMaxYesterday[st.stationID] || yObj; // 🌟 ค่าสูงสุด
+          const yObj = stationYesterday[st.stationID] || {}; 
+          const maxObj = stationMaxYesterday[st.stationID] || yObj; 
           const provName = (st.areaTH || st.nameTH || '').replace('จังหวัด', '');
 
-          const currTemp = Math.round(data.feelsLike || data.temp || 0);
+          // 🌟 เปลี่ยนมาใช้อุณหภูมิจริง (data.temp) ทั้งหมด ไม่ใช้ feelsLike แล้ว
+          const currTemp = Math.round(data.temp || 0); 
           const prevTempSameHour = yObj.temp !== undefined ? yObj.temp : getSafePrev(currTemp);
           const maxTemp = maxObj.temp !== undefined ? maxObj.temp : getSafePrev(currTemp);
           
@@ -167,14 +164,12 @@ export default function ClimatePage() {
           if (isRisky('wind', currWind)) counts.wind.live++;
           if (isRisky('wind', prevWindSameHour)) counts.wind.yest++;
 
-          // โหมด Live: คัดเฉพาะที่เสี่ยง (ใช้ Same-Hour เทียบ)
           if (currTemp >= 35) lData.heat.push({ prov: provName, val: currTemp, prevVal: prevTempSameHour, unit: '°C' });
           if (currPM > 15) lData.pm25.push({ prov: provName, val: currPM, prevVal: prevPMSameHour, unit: 'µg' });
           if (currUV >= 3) lData.uv.push({ prov: provName, val: currUV, prevVal: prevUVSameHour, unit: 'Idx' });
           if (currRain > 30) lData.rain.push({ prov: provName, val: currRain, prevVal: prevRainSameHour, unit: '%' });
           if (currWind > 15) lData.wind.push({ prov: provName, val: currWind, prevVal: prevWindSameHour, unit: 'km/h' });
 
-          // โหมด Yesterday: เอาลงทั้ง 77 จังหวัด (🌟 ใช้ค่า Daily Max)
           yData.heat.push({ prov: provName, val: maxTemp, currVal: currTemp, unit: '°C' });
           yData.pm25.push({ prov: provName, val: maxPM, currVal: currPM, unit: 'µg' });
           yData.uv.push({ prov: provName, val: maxUV, currVal: currUV, unit: 'Idx' });
@@ -229,7 +224,6 @@ export default function ClimatePage() {
       return 'temp';
   };
 
-  // กราฟเปรียบเทียบ ดึงจาก Top 10 วันนี้
   const chartData = liveData[activeTab].slice(0, 10).map(item => ({
       name: item.prov,
       'เมื่อวาน': item.prevVal,
@@ -268,7 +262,6 @@ export default function ClimatePage() {
     <div style={{ height: '100%', width: '100%', background: timeMode === 'yesterday' ? (darkMode ? '#000000' : '#f1f5f9') : appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif', transition: 'background 0.3s' }} className="hide-scrollbar">
       <div style={{ width: '100%', maxWidth: '1200px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '100px' }}>
         
-        {/* Header & สวิตช์เวลา */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
             <div>
                 <h1 style={{ margin: 0, color: textColor, fontSize: '1.8rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px' }}>🚨 ศูนย์ปฏิบัติการเฝ้าระวัง</h1>
@@ -283,10 +276,15 @@ export default function ClimatePage() {
                     <button onClick={() => setTimeMode('live')} style={{ background: timeMode === 'live' ? '#22c55e' : 'transparent', color: timeMode === 'live' ? '#fff' : subTextColor, border: 'none', padding: '6px 15px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>🟢 วันนี้ (Live)</button>
                     <button onClick={() => setTimeMode('yesterday')} style={{ background: timeMode === 'yesterday' ? '#8b5cf6' : 'transparent', color: timeMode === 'yesterday' ? '#fff' : subTextColor, border: 'none', padding: '6px 15px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>🟣 สถิติเมื่อวาน</button>
                 </div>
+                
+                {timeMode === 'live' && (
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '4px', fontWeight: 'normal', color: subTextColor }}>
+                        💡 ลูกศร <span style={{color:'#ef4444', fontWeight:'bold'}}>▲</span> <span style={{color:'#22c55e', fontWeight:'bold'}}>▼</span> แสดงแนวโน้มเทียบกับเมื่อวาน <span style={{color:'#0ea5e9', fontWeight:'bold'}}>(เวลาเดียวกัน)</span>
+                    </div>
+                )}
             </div>
         </div>
 
-        {/* ส่วนบน: Area กล่องส่วนตัว + 6 Tabs */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr', gap: '20px', alignItems: 'start' }}>
             <div style={{ background: locSummary.bg, border: `1px solid ${locSummary.color}50`, borderRadius: '24px', padding: '25px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', transition: '0.3s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -344,12 +342,6 @@ export default function ClimatePage() {
                                 {timeMode === 'live' && <TrendIndicator current={userData.pm25} prev={userData.prevPm25} mode="pm25" />}
                             </div>
                         </div>
-                        {/* 🌟 อธิบายเรื่องเวลาเดียวกัน */}
-                        {timeMode === 'live' && (
-                            <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '10px', fontWeight: 'normal', color: textColor }}>
-                                💡 ลูกศรแสดงแนวโน้มเปรียบเทียบกับ <span style={{color:'#0ea5e9', fontWeight:'bold'}}>เวลาเดียวกัน</span> ของเมื่อวาน
-                            </div>
-                        )}
                     </div>
                 ) : ( <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: subTextColor, marginTop: '20px' }}>กำลังโหลด...</div> )}
             </div>
@@ -376,12 +368,11 @@ export default function ClimatePage() {
             </div>
         </div>
 
-        {/* ส่วนล่าง */}
         {timeMode === 'live' ? (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr', gap: '20px', marginTop: '20px' }}>
                 <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h2 style={{ margin: 0, color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>{activeTabData.icon} แผนที่ Nowcast: {activeTabData.label}</h2>
+                        <h2 style={{ margin: '0 0 10px 0', color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>{activeTabData.icon} แผนที่ Nowcast: {activeTabData.label}</h2>
                     </div>
                     <div style={{ flex: 1, minHeight: isMobile ? '350px' : '550px', borderRadius: '16px', overflow: 'hidden', background: '#000' }}>
                         <iframe width="100%" height="100%" src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=5&level=surface&overlay=${getWindyOverlay(activeTab)}&product=ecmwf`} style={{ border: 'none' }}></iframe>
@@ -452,12 +443,12 @@ export default function ClimatePage() {
                 <div style={{ background: cardBg, borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <div style={{ padding: '20px 25px', borderBottom: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                         <div>
-                            <h3 style={{ margin: 0, color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 📋 สรุปสถิติสูงสุด 77 จังหวัด
                             </h3>
-                            <div style={{ fontSize: '0.75rem', color: '#8b5cf6', fontWeight: 'bold', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#8b5cf6', fontWeight: 'bold', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#8b5cf6', borderRadius: '50%' }}></span>
-                                Historical - สถิติสูงสุดของเมื่อวาน 
+                                Historical - สถิติสูงสุดของเมื่อวาน (ไม่มีลูกศรเทียบ)
                             </div>
                         </div>
                         <input type="text" placeholder={`🔍 ค้นหาจังหวัด...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: isMobile ? '100%' : '250px', padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
