@@ -268,47 +268,13 @@ export default function MapPage() {
             { c: '#22c55e', l: 'สถานการณ์ปกติ', r: '0-3.9' }
         ];
     }
-    
     switch (activeBasicMode) {
-        case 'pm25':
-            return [
-                { c: '#ef4444', l: 'มีผลกระทบฯ', r: '> 75' },
-                { c: '#f97316', l: 'เริ่มมีผลกระทบฯ', r: '38-75' },
-                { c: '#eab308', l: 'ปานกลาง', r: '26-37' },
-                { c: '#22c55e', l: 'ดี', r: '16-25' },
-                { c: '#0ea5e9', l: 'ดีมาก', r: '0-15' }
-            ];
+        case 'pm25': return [{ c: '#ef4444', l: 'มีผลกระทบฯ', r: '> 75' }, { c: '#f97316', l: 'เริ่มมีผลกระทบฯ', r: '38-75' }, { c: '#eab308', l: 'ปานกลาง', r: '26-37' }, { c: '#22c55e', l: 'ดี', r: '16-25' }, { c: '#0ea5e9', l: 'ดีมาก', r: '0-15' }];
         case 'temp':
-        case 'heat':
-            return [
-                { c: '#ef4444', l: 'ร้อนจัด', r: '> 39' },
-                { c: '#f97316', l: 'ร้อน', r: '35-39' },
-                { c: '#eab308', l: 'อบอ้าว', r: '29-34' },
-                { c: '#22c55e', l: 'ปกติ/อบอุ่น', r: '23-28' },
-                { c: '#3b82f6', l: 'เย็นสบาย', r: '< 23' }
-            ];
-        case 'rain':
-            return [
-                { c: '#1e3a8a', l: 'ตกหนัก/พายุ', r: '> 70%' },
-                { c: '#3b82f6', l: 'โอกาสตกสูง', r: '41-70%' },
-                { c: '#60a5fa', l: 'โอกาสตกต่ำ', r: '11-40%' },
-                { c: '#94a3b8', l: 'ไม่มีฝน', r: '0-10%' }
-            ];
-        case 'wind':
-            return [
-                { c: '#ef4444', l: 'พายุ/อันตราย', r: '> 40' },
-                { c: '#f97316', l: 'ลมแรง', r: '21-40' },
-                { c: '#eab308', l: 'ลมกำลังดี', r: '11-20' },
-                { c: '#22c55e', l: 'ลมสงบ', r: '0-10' }
-            ];
-        case 'uv':
-            return [
-                { c: '#a855f7', l: 'อันตรายรุนแรง', r: '> 10' },
-                { c: '#ef4444', l: 'สูงมาก', r: '8-10' },
-                { c: '#ea580c', l: 'สูง', r: '6-7' },
-                { c: '#eab308', l: 'ปานกลาง', r: '3-5' },
-                { c: '#22c55e', l: 'ต่ำ', r: '0-2' }
-            ];
+        case 'heat': return [{ c: '#ef4444', l: 'ร้อนจัด', r: '> 39' }, { c: '#f97316', l: 'ร้อน', r: '35-39' }, { c: '#eab308', l: 'อบอ้าว', r: '29-34' }, { c: '#22c55e', l: 'ปกติ/อบอุ่น', r: '23-28' }, { c: '#3b82f6', l: 'เย็นสบาย', r: '< 23' }];
+        case 'rain': return [{ c: '#1e3a8a', l: 'ตกหนัก/พายุ', r: '> 70%' }, { c: '#3b82f6', l: 'โอกาสตกสูง', r: '41-70%' }, { c: '#60a5fa', l: 'โอกาสตกต่ำ', r: '11-40%' }, { c: '#94a3b8', l: 'ไม่มีฝน', r: '0-10%' }];
+        case 'wind': return [{ c: '#ef4444', l: 'พายุ/อันตราย', r: '> 40' }, { c: '#f97316', l: 'ลมแรง', r: '21-40' }, { c: '#eab308', l: 'ลมกำลังดี', r: '11-20' }, { c: '#22c55e', l: 'ลมสงบ', r: '0-10' }];
+        case 'uv': return [{ c: '#a855f7', l: 'อันตรายรุนแรง', r: '> 10' }, { c: '#ef4444', l: 'สูงมาก', r: '8-10' }, { c: '#ea580c', l: 'สูง', r: '6-7' }, { c: '#eab308', l: 'ปานกลาง', r: '3-5' }, { c: '#22c55e', l: 'ต่ำ', r: '0-2' }];
         default: return [];
     }
   };
@@ -324,10 +290,8 @@ export default function MapPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${darkMode ? '#334155' : '#cbd5e1'}; border-radius: 10px; }
       `}} />
 
-      {/* 🌟 1. Header (Desktop: Top-Down Compact Layout) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '15px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', marginBottom: '15px', flexShrink: 0 }}>
           {isMobile ? (
-              // 📱 Mobile Header
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>🗺️ แผนที่เฝ้าระวังภัย</h2>
@@ -350,32 +314,29 @@ export default function MapPage() {
                   </div>
               </div>
           ) : (
-              // 💻 Desktop Header (Top-Down Layout)
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                  {/* แถว 1: Title + Main Toggles + Reference */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <h2 style={{ margin: 0, color: textColor, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>🗺️ แผนที่สภาพอากาศ</h2>
-                          <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px' }}>
-                              <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>📊 ข้อมูลทั่วไป</button>
-                              <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🧠 วิเคราะห์ความเสี่ยง</button>
-                          </div>
+              <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                          <h2 style={{ margin: 0, color: textColor, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🗺️ แผนที่สภาพอากาศ</h2>
+                          {mapCategory === 'risk' && (
+                              <button onClick={() => setShowReferenceModal(true)} style={{ background: 'transparent', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '4px 12px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  📚 แหล่งอ้างอิงทางวิชาการ
+                              </button>
+                          )}
                       </div>
-                      {mapCategory === 'risk' && (
-                          <button onClick={() => setShowReferenceModal(true)} style={{ background: darkMode ? '#1e293b' : '#f1f5f9', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '6px 15px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
-                              📚 แหล่งอ้างอิงทางวิชาการ
-                          </button>
-                      )}
+                      <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px', width: 'fit-content' }}>
+                          <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>📊 ข้อมูลทั่วไป</button>
+                          <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🧠 วิเคราะห์ความเสี่ยง</button>
+                      </div>
                   </div>
-                  {/* แถว 2: Sub-Modes กางออกเต็มความกว้าง (Flex-Wrap) */}
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', maxWidth: '600px' }} className="custom-scrollbar">
                     {mapCategory === 'basic' ? basicModes.map(m => (
-                        <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.9rem' }}>{m.name}</button>
+                        <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.85rem' }}>{m.name}</button>
                     )) : riskModes.map(m => (
-                        <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.9rem' }}>{m.name}</button>
+                        <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.85rem' }}>{m.name}</button>
                     ))}
                   </div>
-              </div>
+              </>
           )}
       </div>
 
@@ -391,18 +352,33 @@ export default function MapPage() {
                     
                     {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${polyOpacity}-${basemapStyle}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
                     
-                    {rankedData.map(st => {
-                        const zoomThreshold = isMobile ? 6 : 7;
+                    {/* 🌟 ปรับ Logic การโชว์ Label แบบ Progressive Disclosure */}
+                    {allMapData.map(st => {
                         let isVisible = false;
-                        if (mapZoom >= zoomThreshold) {
+
+                        if (mapZoom >= 8) { 
+                            // ซูมระดับ 8 ขึ้นไป โชว์หมดทั้งประเทศ
                             isVisible = true; 
-                        } else {
+                        } else if (mapZoom >= 6) {
+                            // ซูมระดับ 6-7 (เห็นเป็นภาค)
                             if (mapCategory === 'risk') {
-                                isVisible = st.displayVal >= 6; 
+                                isVisible = st.displayVal >= 6; // สีส้ม/แดง
                             } else {
-                                isVisible = rankedSidebarData.some(r => r.stationID === st.stationID);
+                                isVisible = rankedSidebarData.some(r => r.stationID === st.stationID); // โหมดทั่วไป โชว์ Top 15
+                            }
+                        } else {
+                            // Zoom 5 (เห็นทั้งประเทศ ตอนเปิดแอป)
+                            if (mapCategory === 'risk') {
+                                isVisible = st.displayVal >= 8; // สีแดงเท่านั้น
+                                // ถ้าไม่มีแดงเลย เอาแค่ 3 อันดับแรก จะได้ไม่โล่งเกินไป
+                                if (!allMapData.some(d => d.displayVal >= 8)) {
+                                    isVisible = rankedData.slice(0, 3).some(r => r.stationID === st.stationID);
+                                }
+                            } else {
+                                isVisible = rankedData.slice(0, 5).some(r => r.stationID === st.stationID); // โหมดทั่วไป โชว์แค่ Top 5
                             }
                         }
+
                         if (!isVisible) return null;
                         return <Marker key={st.stationID} position={[st.lat, st.long]} icon={createMapIcon(st.areaTH.replace('จังหวัด',''), st.displayVal, st.color)} interactive={false} />;
                     })}
