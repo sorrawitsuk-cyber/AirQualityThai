@@ -2,22 +2,16 @@ import React, { useContext, useState, useEffect, useMemo, useCallback } from 're
 import { WeatherContext } from '../context/WeatherContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 
-const TrendIndicator = ({ current, prev, mode, hideText = false }) => {
+// 🌟 ปรับให้ลูกศรมีแค่สี แดง (เพิ่ม) และ เขียว (ลด) ในทุกโหมด
+const TrendIndicator = ({ current, prev, hideText = false }) => {
     if (current == null || prev == null || current === '-' || prev === '-') return null;
     const diff = Math.round(current - prev);
     if (diff === 0) return <span title="ไม่มีการเปลี่ยนแปลง" style={{fontSize:'0.75em', opacity:0.6, color:'#94a3b8', marginLeft:'6px', whiteSpace:'nowrap'}}>➖</span>;
     
-    let color = '#22c55e'; 
-    let arrow = '▼';
-
-    if (diff > 0) { 
-        arrow = '▲';
-        color = '#ef4444'; 
-        if (mode === 'rain') color = '#3b82f6'; 
-        if (mode === 'pm25') color = '#f97316'; 
-    } else {
-        if (mode === 'rain') color = '#94a3b8'; 
-    }
+    // แดง = ค่าเพิ่มขึ้น (แย่ลง), เขียว = ค่าลดลง (ดีขึ้น)
+    const isWorse = diff > 0;
+    const color = isWorse ? '#ef4444' : '#22c55e'; 
+    const arrow = isWorse ? '▲' : '▼';
 
     return (
         <span title="แนวโน้มเปรียบเทียบกับเวลาเดียวกันของเมื่อวาน" style={{fontSize:'0.8em', color: color, opacity: 0.9, marginLeft: '6px', whiteSpace:'nowrap', fontWeight:'bold', cursor:'help'}}>
@@ -132,7 +126,6 @@ export default function ClimatePage() {
           const maxObj = stationMaxYesterday[st.stationID] || yObj; 
           const provName = (st.areaTH || st.nameTH || '').replace('จังหวัด', '');
 
-          // 🌟 เปลี่ยนมาใช้อุณหภูมิจริง (data.temp) ทั้งหมด ไม่ใช้ feelsLike แล้ว
           const currTemp = Math.round(data.temp || 0); 
           const prevTempSameHour = yObj.temp !== undefined ? yObj.temp : getSafePrev(currTemp);
           const maxTemp = maxObj.temp !== undefined ? maxObj.temp : getSafePrev(currTemp);
@@ -230,16 +223,16 @@ export default function ClimatePage() {
       'วันนี้': item.val
   }));
 
+  // 🌟 บังคับสีสรุปแนวโน้มใต้กราฟ ให้แดง/เขียวเป๊ะๆ
   const riskyDiff = riskyCounts[activeTab].live - riskyCounts[activeTab].yest;
   let trendSummaryColor = subTextColor;
   let trendSummaryText = `สถานการณ์คงที่: จำนวนพื้นที่เสี่ยงเท่ากับเมื่อวาน (${riskyCounts[activeTab].live} จังหวัด)`;
   
   if (riskyDiff > 0) {
-      trendSummaryColor = '#ef4444'; 
-      if(activeTab === 'rain') trendSummaryColor = '#3b82f6';
+      trendSummaryColor = '#ef4444'; // แดง = แย่ลง
       trendSummaryText = `สถานการณ์แย่ลง ▲: พบพื้นที่เสี่ยงเพิ่มขึ้น ${Math.abs(riskyDiff)} จังหวัด (วันนี้ ${riskyCounts[activeTab].live} จ. / เมื่อวาน ${riskyCounts[activeTab].yest} จ.)`;
   } else if (riskyDiff < 0) {
-      trendSummaryColor = '#22c55e'; 
+      trendSummaryColor = '#22c55e'; // เขียว = ดีขึ้น
       trendSummaryText = `สถานการณ์ดีขึ้น ▼: พื้นที่เสี่ยงลดลง ${Math.abs(riskyDiff)} จังหวัด (วันนี้ ${riskyCounts[activeTab].live} จ. / เมื่อวาน ${riskyCounts[activeTab].yest} จ.)`;
   }
 
@@ -335,11 +328,11 @@ export default function ClimatePage() {
                         <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap', justifyContent: 'center' }}>
                             <div style={{ background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)', border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', color: textColor, display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 🌡️ <span style={{color: userData.temp >= 38 ? '#ef4444' : textColor}}>{userData.temp}°C</span>
-                                {timeMode === 'live' && <TrendIndicator current={userData.temp} prev={userData.prevTemp} mode="temp" />}
+                                {timeMode === 'live' && <TrendIndicator current={userData.temp} prev={userData.prevTemp} />}
                             </div>
                             <div style={{ background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)', border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', color: textColor, display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 😷 <span style={{color: userData.pm25 >= 37.5 ? '#f97316' : textColor}}>{userData.pm25} µg</span>
-                                {timeMode === 'live' && <TrendIndicator current={userData.pm25} prev={userData.prevPm25} mode="pm25" />}
+                                {timeMode === 'live' && <TrendIndicator current={userData.pm25} prev={userData.prevPm25} />}
                             </div>
                         </div>
                     </div>
@@ -405,7 +398,7 @@ export default function ClimatePage() {
                                         <span style={{ color: textColor, fontWeight: '600', fontSize: '0.9rem' }}>จ.{item.prov}</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <TrendIndicator current={item.val} prev={item.prevVal} mode={activeTab} />
+                                        <TrendIndicator current={item.val} prev={item.prevVal} />
                                         <span style={{ color: activeTabData.color, fontWeight: '900', fontSize: '1rem', width: '60px', textAlign: 'right' }}>{item.val} <small style={{fontSize: '0.6rem'}}>{item.unit}</small></span>
                                     </div>
                                 </div>
