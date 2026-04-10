@@ -37,8 +37,13 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState(window.innerWidth < 1024 ? 5 : 6);
   const [polyOpacity, setPolyOpacity] = useState(0.85);
   
+  // 🌟 1. State สำหรับระบบ 2 โหมด (Basic vs Risk)
+  const [mapCategory, setMapCategory] = useState('risk'); // 'basic' | 'risk'
+  const [activeBasicMode, setActiveBasicMode] = useState('pm25');
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
+  
   const [selectedHotspot, setSelectedHotspot] = useState(null); 
+  const [showReferenceModal, setShowReferenceModal] = useState(false); // 🌟 Modal วิชาการ
   
   const [basemapStyle, setBasemapStyle] = useState('dark'); 
   const [flyToPos, setFlyToPos] = useState(null);
@@ -51,9 +56,7 @@ export default function MapPage() {
     satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
   };
 
-  useEffect(() => {
-    setBasemapStyle(darkMode ? 'dark' : 'light');
-  }, [darkMode]);
+  useEffect(() => { setBasemapStyle(darkMode ? 'dark' : 'light'); }, [darkMode]);
 
   useEffect(() => {
     const handleResize = () => { setIsMobile(window.innerWidth < 1024); if (window.innerWidth >= 1024) setShowControls(true); };
@@ -62,7 +65,16 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 ปรับภาษาให้เข้าใจง่าย ไม่ซับซ้อน
+  // 🌟 ข้อมูลโหมดต่างๆ
+  const basicModes = [
+    { id: 'pm25', name: '😷 PM2.5', color: '#f97316', unit: 'µg/m³', desc: 'ความหนาแน่นของฝุ่นละอองขนาดเล็ก' },
+    { id: 'temp', name: '🌡️ อุณหภูมิ', color: '#ef4444', unit: '°C', desc: 'อุณหภูมิอากาศปัจจุบัน' },
+    { id: 'heat', name: '🥵 ดัชนีความร้อน', color: '#ea580c', unit: '°C', desc: 'อุณหภูมิที่ร่างกายรู้สึกจริง (รวมความชื้น)' },
+    { id: 'rain', name: '☔ โอกาสฝน', color: '#3b82f6', unit: '%', desc: 'ความน่าจะเป็นในการเกิดฝนตก' },
+    { id: 'wind', name: '🌬️ ลมกระโชก', color: '#0ea5e9', unit: 'km/h', desc: 'ความเร็วลมกระโชกสูงสุด' },
+    { id: 'uv', name: '☀️ รังสี UV', color: '#a855f7', unit: 'Idx', desc: 'ดัชนีรังสีอัลตราไวโอเลต' }
+  ];
+
   const riskModes = [
     { id: 'respiratory', name: '🫁 สุขภาพและทางเดินหายใจ', color: '#ec4899', desc: 'คำนวณจาก: ฝุ่น PM2.5 (70%) และ ความร้อน (30%)' },
     { id: 'outdoor', name: '🏕️ กิจกรรมกลางแจ้ง', color: '#3b82f6', desc: 'คำนวณจาก: ฝน (40%), ลม (30%), และความร้อน/UV (30%)' },
@@ -70,6 +82,32 @@ export default function MapPage() {
     { id: 'heatstroke', name: '🥵 เฝ้าระวังโรคลมแดด', color: '#ef4444', desc: 'คำนวณจาก: อุณหภูมิความร้อน (60%) และ รังสี UV (40%)' }
   ];
 
+  // 🌟 ฟังก์ชันดึงค่าสำหรับโหมด Basic
+  const getBasicVal = useCallback((station, mode) => {
+    if (!station || !stationTemps[station.stationID]) return null;
+    const data = stationTemps[station.stationID];
+    switch(mode) {
+        case 'pm25': return station.AQILast?.PM25?.value || 0;
+        case 'temp': return Math.round(data.temp || 0);
+        case 'heat': return Math.round(data.feelsLike || 0);
+        case 'rain': return data.rainProb || 0;
+        case 'wind': return Math.round(data.windSpeed || 0);
+        case 'uv': return Math.round(data.uv || 0);
+        default: return 0;
+    }
+  }, [stationTemps]);
+
+  const getBasicColor = useCallback((val, mode) => {
+    if (val === null || val === undefined) return darkMode ? '#334155' : '#cbd5e1';
+    if (mode === 'pm25') return val > 75 ? '#ef4444' : val > 37.5 ? '#f97316' : val > 25 ? '#eab308' : val > 15 ? '#22c55e' : '#0ea5e9';
+    if (mode === 'temp' || mode === 'heat') return val > 39 ? '#ef4444' : val > 34 ? '#f97316' : val > 28 ? '#eab308' : val > 22 ? '#22c55e' : '#3b82f6';
+    if (mode === 'rain') return val > 70 ? '#1e3a8a' : val > 40 ? '#3b82f6' : val > 10 ? '#60a5fa' : '#94a3b8';
+    if (mode === 'wind') return val > 40 ? '#ef4444' : val > 20 ? '#f97316' : val > 10 ? '#eab308' : '#22c55e';
+    if (mode === 'uv') return val > 10 ? '#a855f7' : val > 7 ? '#ef4444' : val > 5 ? '#ea580c' : val > 2 ? '#eab308' : '#22c55e';
+    return darkMode ? '#334155' : '#cbd5e1';
+  }, [darkMode]);
+
+  // 🌟 ฟังก์ชันดึงค่าสำหรับโหมด Risk
   const calculateRisk = useCallback((station) => {
       const data = stationTemps[station.stationID] || {};
       const pm25 = station.AQILast?.PM25?.value || 0;
@@ -91,43 +129,28 @@ export default function MapPage() {
 
       if (activeRiskMode === 'respiratory') {
           score = (nPm * 0.7) + (nTemp * 0.3);
-          factors = [
-              { label: 'มลพิษฝุ่น PM2.5', val: pm25, unit: 'µg', risk: nPm, weight: 70, color: '#f97316' },
-              { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 30, color: '#ef4444' }
-          ];
+          factors = [{ label: 'มลพิษฝุ่น PM2.5', val: pm25, unit: 'µg', risk: nPm, weight: 70, color: '#f97316' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 30, color: '#ef4444' }];
       } else if (activeRiskMode === 'outdoor') {
           score = (nRain * 0.4) + (nWind * 0.3) + (nTemp * 0.2) + (nUv * 0.1);
-          factors = [
-              { label: 'โอกาสเกิดฝนตก', val: rain, unit: '%', risk: nRain, weight: 40, color: '#3b82f6' },
-              { label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 30, color: '#0ea5e9' },
-              { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' },
-              { label: 'ความเข้มรังสี UV', val: uv, unit: 'Idx', risk: nUv, weight: 10, color: '#a855f7' }
-          ];
+          factors = [{ label: 'โอกาสเกิดฝนตก', val: rain, unit: '%', risk: nRain, weight: 40, color: '#3b82f6' }, { label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 30, color: '#0ea5e9' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'Idx', risk: nUv, weight: 10, color: '#a855f7' }];
       } else if (activeRiskMode === 'wildfire') {
           score = (nWind * 0.45) + (nHumDry * 0.35) + (nTemp * 0.20);
-          factors = [
-              { label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 45, color: '#0ea5e9' },
-              { label: 'ความแห้งแล้งของอากาศ', val: hum, unit: '%', risk: nHumDry, weight: 35, color: '#eab308' },
-              { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }
-          ];
+          factors = [{ label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 45, color: '#0ea5e9' }, { label: 'ความแห้งแล้งของอากาศ', val: hum, unit: '%', risk: nHumDry, weight: 35, color: '#eab308' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }];
       } else if (activeRiskMode === 'heatstroke') {
           score = (nTemp * 0.6) + (nUv * 0.4);
-          factors = [
-              { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 60, color: '#ef4444' },
-              { label: 'ความเข้มรังสี UV', val: uv, unit: 'Idx', risk: nUv, weight: 40, color: '#a855f7' }
-          ];
+          factors = [{ label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 60, color: '#ef4444' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'Idx', risk: nUv, weight: 40, color: '#a855f7' }];
       }
 
       return { score: Math.min(Math.round(score * 10) / 10, 10), factors };
   }, [activeRiskMode, stationTemps]);
 
-  const getRiskColor = (score) => {
+  const getRiskColor = useCallback((score) => {
       if (score >= 8) return '#ef4444'; 
       if (score >= 6) return '#f97316'; 
       if (score >= 4) return '#eab308'; 
       if (score > 0)  return '#22c55e'; 
       return darkMode ? '#334155' : '#cbd5e1'; 
-  };
+  }, [darkMode]);
 
   const getRiskLabel = (score) => {
       if (score >= 8) return 'ความเสี่ยงสูงมาก';
@@ -136,15 +159,27 @@ export default function MapPage() {
       return 'สถานการณ์ปกติ';
   };
 
-  const rankedHotspots = useMemo(() => {
-    return (stations || [])
-      .map(st => {
-          const risk = calculateRisk(st);
-          return { ...st, riskScore: risk.score, factors: risk.factors, color: getRiskColor(risk.score) };
-      })
-      .sort((a, b) => b.riskScore - a.riskScore)
-      .slice(0, 15); 
-  }, [stations, calculateRisk]);
+  // 🌟 รวม Data สำหรับ Sidebar
+  const rankedData = useMemo(() => {
+    if (mapCategory === 'basic') {
+        return (stations || [])
+          .map(st => {
+              const val = getBasicVal(st, activeBasicMode);
+              return { ...st, displayVal: val, color: getBasicColor(val, activeBasicMode) };
+          })
+          .filter(st => st.displayVal !== null)
+          .sort((a, b) => b.displayVal - a.displayVal)
+          .slice(0, 15);
+    } else {
+        return (stations || [])
+          .map(st => {
+              const risk = calculateRisk(st);
+              return { ...st, displayVal: risk.score, factors: risk.factors, color: getRiskColor(risk.score) };
+          })
+          .sort((a, b) => b.displayVal - a.displayVal)
+          .slice(0, 15); 
+    }
+  }, [stations, mapCategory, activeBasicMode, calculateRisk, getBasicVal, getBasicColor, getRiskColor]);
 
   const styleGeoJSON = (feature) => {
     const props = Object.values(feature.properties || {}).map(v => String(v).trim());
@@ -156,15 +191,20 @@ export default function MapPage() {
         return cleanName === thaiNameFromMap || props.includes(cleanName);
     });
 
-    const risk = station ? calculateRisk(station) : { score: 0 };
-    const color = station ? getRiskColor(risk.score) : (darkMode ? '#1e293b' : '#e2e8f0');
+    let color = darkMode ? '#1e293b' : '#e2e8f0';
+    if (station) {
+        if (mapCategory === 'basic') color = getBasicColor(getBasicVal(station, activeBasicMode), activeBasicMode);
+        else color = getRiskColor(calculateRisk(station).score);
+    }
     
     return { fillColor: color, weight: 1, opacity: 1, color: darkMode ? '#0f172a' : '#ffffff', fillOpacity: polyOpacity };
   };
 
   const handleRegionClick = (station) => {
-      const risk = calculateRisk(station);
-      setSelectedHotspot({ station, riskScore: risk.score, factors: risk.factors, color: getRiskColor(risk.score) });
+      if (mapCategory === 'risk') {
+          const risk = calculateRisk(station);
+          setSelectedHotspot({ station, riskScore: risk.score, factors: risk.factors, color: getRiskColor(risk.score) });
+      }
       setFlyToPos([station.lat, station.long]);
   };
 
@@ -180,12 +220,12 @@ export default function MapPage() {
     });
   };
 
-  const createRiskIcon = (stationName, score, color) => {
+  const createMapIcon = (stationName, val, color) => {
     return L.divIcon({
         className: 'custom-risk-icon',
-        html: `<div style="background: ${color}; color: #fff; font-weight: 900; font-size: 12px; padding: 4px 8px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; line-height: 1.1;">
+        html: `<div style="background: ${color}; color: ${color === '#eab308' || color === '#cbd5e1' ? '#0f172a' : '#fff'}; font-weight: 900; font-size: 12px; padding: 4px 8px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; line-height: 1.1;">
                  <span style="font-size: 0.7em; opacity: 0.9;">${stationName}</span>
-                 <span>${score}</span>
+                 <span>${val}</span>
                </div>`,
         iconSize: [60, 40], iconAnchor: [30, 20]
     });
@@ -197,9 +237,9 @@ export default function MapPage() {
   const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
   const subTextColor = darkMode ? '#94a3b8' : '#64748b'; 
 
-  const activeModeObj = riskModes.find(m => m.id === activeRiskMode);
+  const activeModeObj = mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) : riskModes.find(m => m.id === activeRiskMode);
 
-  if (!geoData || Object.keys(stationTemps).length === 0) return <div style={{ height: '100vh', background: appBg, display: 'flex', justifyContent:'center', alignItems:'center', color: subTextColor, fontFamily: 'Kanit' }}>กำลังโหลดแผนที่เฝ้าระวังภัย...</div>;
+  if (!geoData || Object.keys(stationTemps).length === 0) return <div style={{ height: '100vh', background: appBg, display: 'flex', justifyContent:'center', alignItems:'center', color: subTextColor, fontFamily: 'Kanit' }}>กำลังโหลดแผนที่สภาพอากาศ...</div>;
 
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '10px' : '20px', boxSizing: 'border-box' }}>
@@ -210,17 +250,44 @@ export default function MapPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${darkMode ? '#334155' : '#cbd5e1'}; border-radius: 10px; }
       `}} />
 
+      {/* 🌟 Header & Navigation */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', marginBottom: '15px', flexShrink: 0 }}>
-          <div>
-              <h2 style={{ margin: 0, color: textColor, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>🗺️ แผนที่เฝ้าระวังภัยสภาพอากาศ</h2>
-              <div style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '2px' }}>วิเคราะห์พื้นที่เสี่ยงเชิงลึกจากหลายปัจจัย</div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <h2 style={{ margin: 0, color: textColor, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>🗺️ แผนที่สภาพอากาศ</h2>
+              
+              {/* 🌟 1. ปุ่มสลับโหมดหลัก (Basic / Risk) */}
+              <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px', width: 'fit-content' }}>
+                  <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>
+                      📊 ข้อมูลทั่วไป
+                  </button>
+                  <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>
+                      🧠 วิเคราะห์ความเสี่ยง
+                  </button>
+              </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="custom-scrollbar">
-            {riskModes.map(m => (
-                <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ flexShrink: 0, padding: '10px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit' }}>
-                    {m.name}
-                </button>
-            ))}
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', maxWidth: isMobile ? '100vw' : '600px' }} className="custom-scrollbar">
+                
+                {/* 🌟 2. แสดงปุ่มย่อยตามโหมดหลัก */}
+                {mapCategory === 'basic' ? basicModes.map(m => (
+                    <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit' }}>
+                        {m.name}
+                    </button>
+                )) : riskModes.map(m => (
+                    <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit' }}>
+                        {m.name}
+                    </button>
+                ))}
+              </div>
+
+              {/* 🌟 3. ปุ่มดูทฤษฎีอ้างอิง (โชว์เฉพาะโหมด Risk) */}
+              {mapCategory === 'risk' && (
+                  <button onClick={() => setShowReferenceModal(true)} style={{ background: 'transparent', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '4px 12px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      📚 แหล่งอ้างอิงทางวิชาการ
+                  </button>
+              )}
           </div>
       </div>
 
@@ -232,11 +299,16 @@ export default function MapPage() {
                 <MapZoomListener setMapZoom={setMapZoom} />
                 <MapChangeView center={flyToPos} zoom={8} />
                 
-                {geoData && <GeoJSON key={`${activeRiskMode}-${polyOpacity}-${basemapStyle}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
+                {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${polyOpacity}-${basemapStyle}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
                 
-                {mapZoom >= 6 && rankedHotspots.filter(st => st.riskScore >= 4).map(st => (
-                    <Marker key={st.stationID} position={[st.lat, st.long]} icon={createRiskIcon(st.areaTH.replace('จังหวัด',''), st.riskScore, st.color)} interactive={false} />
-                ))}
+                {/* วาง Marker (โหมด Basic โชว์ถ้าค่าเยอะ, โหมด Risk โชว์คะแนน >= 4) */}
+                {mapZoom >= 6 && rankedData.map(st => {
+                    const shouldShow = mapCategory === 'basic' ? st.displayVal > 0 : st.displayVal >= 4;
+                    if (shouldShow) {
+                        return <Marker key={st.stationID} position={[st.lat, st.long]} icon={createMapIcon(st.areaTH.replace('จังหวัด',''), st.displayVal, st.color)} interactive={false} />
+                    }
+                    return null;
+                })}
             </MapContainer>
 
             <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
@@ -259,34 +331,49 @@ export default function MapPage() {
                 )}
             </div>
 
+            {/* Legend (เปลี่ยนตามโหมด) */}
             <div style={{ position: 'absolute', bottom: '20px', left: '20px', zIndex: 1000, background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: subTextColor, marginBottom: '2px' }}>ระดับความเสี่ยง (0-10)</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#ef4444', borderRadius:'50%'}}></span> 8-10 (สูงมาก)</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#f97316', borderRadius:'50%'}}></span> 6-7.9 (เฝ้าระวัง)</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#eab308', borderRadius:'50%'}}></span> 4-5.9 (ปานกลาง)</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#22c55e', borderRadius:'50%'}}></span> 0-3.9 (ปกติ)</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: subTextColor, marginBottom: '2px' }}>
+                    {mapCategory === 'risk' ? 'ระดับความเสี่ยง (0-10)' : `ระดับความเข้มข้น`}
+                </div>
+                {mapCategory === 'risk' ? (
+                    <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#ef4444', borderRadius:'50%'}}></span> 8-10 (สูงมาก)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#f97316', borderRadius:'50%'}}></span> 6-7.9 (เฝ้าระวัง)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#eab308', borderRadius:'50%'}}></span> 4-5.9 (ปานกลาง)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#22c55e', borderRadius:'50%'}}></span> 0-3.9 (ปกติ)</div>
+                    </>
+                ) : (
+                    <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#ef4444', borderRadius:'50%'}}></span> ระดับรุนแรง / สูงมาก</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#f97316', borderRadius:'50%'}}></span> ระดับปานกลางค่อนข้างสูง</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#3b82f6', borderRadius:'50%'}}></span> ระดับปกติ / ดี</div>
+                    </>
+                )}
             </div>
           </div>
 
           <div style={{ width: isMobile ? '100%' : '340px', background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0 }}>
-             <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: textColor }}>📍 พื้นที่เสี่ยงสูงสุด (Top 15)</h3>
+             <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: textColor }}>
+                📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 15)' : 'จัดอันดับค่าสูงสุด (Top 15)'}
+             </h3>
              <p style={{ margin: '0 0 15px 0', fontSize: '0.8rem', color: activeModeObj?.color, fontWeight: 'bold' }}>{activeModeObj?.desc}</p>
              
              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }} className="custom-scrollbar">
-                {rankedHotspots.map((st, idx) => (
+                {rankedData.map((st, idx) => (
                    <div 
                        key={st.stationID} 
                        onClick={() => handleRegionClick(st)} 
-                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', marginBottom: '10px', borderLeft: `6px solid ${st.color}`, cursor: 'pointer', transition: 'all 0.1s', border: `1px solid ${borderColor}` }}
-                       onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.1)'; }}
-                       onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', marginBottom: '10px', borderLeft: `6px solid ${st.color}`, cursor: mapCategory === 'risk' ? 'pointer' : 'default', transition: 'all 0.1s', border: `1px solid ${borderColor}` }}
+                       onMouseEnter={(e) => { if(mapCategory==='risk') { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.1)'; } }}
+                       onMouseLeave={(e) => { if(mapCategory==='risk') { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; } }}
                    >
                       <div>
                           <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor }}>{idx+1}. จ.{st.areaTH.replace('จังหวัด', '')}</div>
-                          <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '2px' }}>สถานะ: {getRiskLabel(st.riskScore)}</div>
+                          {mapCategory === 'risk' && <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '2px' }}>สถานะ: {getRiskLabel(st.displayVal)}</div>}
                       </div>
                       <div style={{ background: cardBg, padding: '5px 12px', borderRadius: '12px', textAlign: 'center', border: `1px solid ${borderColor}` }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: '900', color: st.color }}>{st.riskScore}</div>
+                          <div style={{ fontSize: '1.1rem', fontWeight: '900', color: st.color }}>{st.displayVal} <span style={{fontSize:'0.6rem', color: subTextColor, fontWeight:'normal'}}>{mapCategory==='basic' ? activeModeObj?.unit : ''}</span></div>
                       </div>
                    </div>
                 ))}
@@ -294,7 +381,8 @@ export default function MapPage() {
           </div>
       </div>
 
-      {selectedHotspot && (
+      {/* 🌟 POPUP 1: DIAGNOSTIC MODAL (เฉพาะโหมด Risk) */}
+      {selectedHotspot && mapCategory === 'risk' && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
             <div className="fade-in" style={{ background: cardBg, padding: '25px', borderRadius: '25px', width: '100%', maxWidth: '450px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
                 <button onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: darkMode ? '#1e293b' : '#f1f5f9', border: 'none', width: '35px', height: '35px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
@@ -333,6 +421,46 @@ export default function MapPage() {
                     ))}
                 </div>
 
+            </div>
+        </div>
+      )}
+
+      {/* 🌟 POPUP 2: แหล่งอ้างอิงทางวิชาการ */}
+      {showReferenceModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setShowReferenceModal(false)}>
+            <div className="fade-in custom-scrollbar" style={{ background: cardBg, padding: '30px', borderRadius: '25px', width: '100%', maxWidth: '600px', maxHeight: '85vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                <button onClick={() => setShowReferenceModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: darkMode ? '#1e293b' : '#f1f5f9', border: 'none', width: '35px', height: '35px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                
+                <h2 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>📚 หลักการและทฤษฎีอ้างอิง</h2>
+                <p style={{ color: subTextColor, fontSize: '0.9rem', marginBottom: '25px', lineHeight: 1.5 }}>การประเมินดัชนีความเสี่ยงในระบบ อ้างอิงจากแบบจำลองและมาตรฐานทางวิทยาศาสตร์ระดับสากล เพื่อความแม่นยำในการเตือนภัย</p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #ec4899' }}>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🫁 ภัยทางเดินหายใจ (Respiratory Threat)</div>
+                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> งานวิจัยอาชีวเวชศาสตร์ และ EPA Air Quality Index</div>
+                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>การสัมผัสความร้อนสูงจะทำให้เยื่อบุทางเดินหายใจระคายเคือง กลไกการกรองฝุ่นตามธรรมชาติลดลง ดัชนีนี้จึงนำความเข้มข้นของ PM2.5 (70%) มาคูณร่วมกับ อุณหภูมิความร้อน (30%) เพื่อสะท้อนผลกระทบต่อปอดที่แท้จริง</div>
+                    </div>
+
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #3b82f6' }}>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🏕️ อุปสรรคกลางแจ้ง (Outdoor Disruption)</div>
+                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> มาตรฐานความปลอดภัย OSHA (Occupational Safety)</div>
+                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>การดำเนินกิจกรรมหรืองานกลางแจ้ง ไม่ได้ขึ้นอยู่กับฝนเพียงอย่างเดียว ดัชนีนี้ประเมินความปลอดภัยครอบคลุมทั้งอุปสรรคทางกายภาพ (ฝน 40%, ลม 30%) และภัยคุกคามทางสุขภาพ (ความร้อน 20%, UV 10%)</div>
+                    </div>
+
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #ea580c' }}>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🔥 ความเสี่ยงไฟป่า (Wildfire Risk Index)</div>
+                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> แบบจำลอง Canadian Forest Fire Weather Index (FWI)</div>
+                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>ประเมินสภาวะที่เอื้อต่อการลุกลามของไฟ โดยคำนวณจากความเร็วลมที่เป็นตัวพัดพา (45%) ผสานกับสภาพอากาศที่ทำให้เชื้อเพลิงแห้งติดไฟง่าย คือ ความชื้นสัมพัทธ์ต่ำ (35%) และอุณหภูมิสูง (20%)</div>
+                    </div>
+
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #ef4444' }}>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🥵 เฝ้าระวังโรคลมแดด (Heatstroke Risk)</div>
+                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> องค์การอนามัยโลก (WHO) และดัชนี WBGT</div>
+                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>การประเมินโรคลมแดดที่แม่นยำ ต้องคำนวณ <b>"ภาระความร้อนรวม"</b> ที่ร่างกายได้รับ ดัชนีนี้จึงผสานอุณหภูมิอากาศ (60%) เข้ากับรังสีความร้อนจากดวงอาทิตย์หรือ UV (40%) เพื่อประเมินความเสี่ยงต่อภาวะหน้ามืดเฉียบพลัน</div>
+                    </div>
+
+                </div>
             </div>
         </div>
       )}
