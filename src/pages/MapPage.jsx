@@ -37,13 +37,12 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState(window.innerWidth < 1024 ? 5 : 6);
   const [polyOpacity, setPolyOpacity] = useState(0.85);
   
-  // 🌟 1. State สำหรับระบบ 2 โหมด (Basic vs Risk)
-  const [mapCategory, setMapCategory] = useState('risk'); // 'basic' | 'risk'
+  const [mapCategory, setMapCategory] = useState('risk'); 
   const [activeBasicMode, setActiveBasicMode] = useState('pm25');
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
   
   const [selectedHotspot, setSelectedHotspot] = useState(null); 
-  const [showReferenceModal, setShowReferenceModal] = useState(false); // 🌟 Modal วิชาการ
+  const [showReferenceModal, setShowReferenceModal] = useState(false); 
   
   const [basemapStyle, setBasemapStyle] = useState('dark'); 
   const [flyToPos, setFlyToPos] = useState(null);
@@ -65,7 +64,6 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🌟 ข้อมูลโหมดต่างๆ
   const basicModes = [
     { id: 'pm25', name: '😷 PM2.5', color: '#f97316', unit: 'µg/m³', desc: 'ความหนาแน่นของฝุ่นละอองขนาดเล็ก' },
     { id: 'temp', name: '🌡️ อุณหภูมิ', color: '#ef4444', unit: '°C', desc: 'อุณหภูมิอากาศปัจจุบัน' },
@@ -82,7 +80,6 @@ export default function MapPage() {
     { id: 'heatstroke', name: '🥵 เฝ้าระวังโรคลมแดด', color: '#ef4444', desc: 'คำนวณจาก: อุณหภูมิความร้อน (60%) และ รังสี UV (40%)' }
   ];
 
-  // 🌟 ฟังก์ชันดึงค่าสำหรับโหมด Basic
   const getBasicVal = useCallback((station, mode) => {
     if (!station || !stationTemps[station.stationID]) return null;
     const data = stationTemps[station.stationID];
@@ -107,7 +104,6 @@ export default function MapPage() {
     return darkMode ? '#334155' : '#cbd5e1';
   }, [darkMode]);
 
-  // 🌟 ฟังก์ชันดึงค่าสำหรับโหมด Risk
   const calculateRisk = useCallback((station) => {
       const data = stationTemps[station.stationID] || {};
       const pm25 = station.AQILast?.PM25?.value || 0;
@@ -159,7 +155,6 @@ export default function MapPage() {
       return 'สถานการณ์ปกติ';
   };
 
-  // 🌟 รวม Data สำหรับ Sidebar
   const rankedData = useMemo(() => {
     if (mapCategory === 'basic') {
         return (stations || [])
@@ -250,50 +245,43 @@ export default function MapPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${darkMode ? '#334155' : '#cbd5e1'}; border-radius: 10px; }
       `}} />
 
-      {/* 🌟 Header & Navigation */}
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', marginBottom: '15px', flexShrink: 0 }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <h2 style={{ margin: 0, color: textColor, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>🗺️ แผนที่สภาพอากาศ</h2>
-              
-              {/* 🌟 1. ปุ่มสลับโหมดหลัก (Basic / Risk) */}
-              <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px', width: 'fit-content' }}>
-                  <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>
+      {/* 🌟 Header ถูกบีบให้เหลือ 2 แถว และย้ายปุ่ม "อ้างอิง" มาไว้บนสุด */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '15px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                  <h2 style={{ margin: 0, color: textColor, fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🗺️ แผนที่สภาพอากาศ</h2>
+                  {mapCategory === 'risk' && (
+                      <button onClick={() => setShowReferenceModal(true)} style={{ background: darkMode ? '#1e293b' : '#f1f5f9', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '4px 10px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.2s' }} title="หลักการทางวิชาการ">
+                          📚 <span style={{display: isMobile ? 'none' : 'inline'}}>อ้างอิงวิชาการ</span>
+                      </button>
+                  )}
+              </div>
+              <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px' }}>
+                  <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 15px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>
                       📊 ข้อมูลทั่วไป
                   </button>
-                  <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>
+                  <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 15px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>
                       🧠 วิเคราะห์ความเสี่ยง
                   </button>
               </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', maxWidth: isMobile ? '100vw' : '600px' }} className="custom-scrollbar">
-                
-                {/* 🌟 2. แสดงปุ่มย่อยตามโหมดหลัก */}
-                {mapCategory === 'basic' ? basicModes.map(m => (
-                    <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit' }}>
-                        {m.name}
-                    </button>
-                )) : riskModes.map(m => (
-                    <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit' }}>
-                        {m.name}
-                    </button>
-                ))}
-              </div>
-
-              {/* 🌟 3. ปุ่มดูทฤษฎีอ้างอิง (โชว์เฉพาะโหมด Risk) */}
-              {mapCategory === 'risk' && (
-                  <button onClick={() => setShowReferenceModal(true)} style={{ background: 'transparent', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '4px 12px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      📚 แหล่งอ้างอิงทางวิชาการ
-                  </button>
-              )}
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="custom-scrollbar">
+            {mapCategory === 'basic' ? basicModes.map(m => (
+                <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.85rem' }}>
+                    {m.name}
+                </button>
+            )) : riskModes.map(m => (
+                <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.85rem' }}>
+                    {m.name}
+                </button>
+            ))}
           </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, gap: '15px', overflow: 'hidden' }}>
           
-          <div style={{ flex: 1, borderRadius: '25px', overflow: 'hidden', border: `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? '450px' : 'auto', background: cardBg }}>
+          <div style={{ flex: 1, borderRadius: '20px', overflow: 'hidden', border: `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? '450px' : 'auto', background: cardBg }}>
             <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 5 : 6} style={{ height: '100%', width: '100%', background: appBg }} zoomControl={false}>
                 <TileLayer url={basemapUrls[basemapStyle]} />
                 <MapZoomListener setMapZoom={setMapZoom} />
@@ -301,7 +289,6 @@ export default function MapPage() {
                 
                 {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${polyOpacity}-${basemapStyle}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
                 
-                {/* วาง Marker (โหมด Basic โชว์ถ้าค่าเยอะ, โหมด Risk โชว์คะแนน >= 4) */}
                 {mapZoom >= 6 && rankedData.map(st => {
                     const shouldShow = mapCategory === 'basic' ? st.displayVal > 0 : st.displayVal >= 4;
                     if (shouldShow) {
@@ -313,67 +300,67 @@ export default function MapPage() {
 
             <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
                 {isMobile && (
-                    <button onClick={() => setShowControls(!showControls)} style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#1e293b', color: '#fff', border: `1px solid ${borderColor}`, fontSize: '1.2rem', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>{showControls ? '✕' : '⚙️'}</button>
+                    <button onClick={() => setShowControls(!showControls)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#1e293b', color: '#fff', border: `1px solid ${borderColor}`, fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>{showControls ? '✕' : '⚙️'}</button>
                 )}
 
                 {(showControls || !isMobile) && (
                     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
-                        <button onClick={() => { if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setFlyToPos([p.coords.latitude, p.coords.longitude])); }} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '10px 15px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', fontFamily: 'Kanit' }}>📍 พิกัดของฉัน</button>
-                        <div style={{ background: darkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', padding: '15px', borderRadius: '16px', border: `1px solid ${borderColor}`, width: '160px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>รูปแบบแผนที่</div>
-                            <select value={basemapStyle} onChange={(e) => setBasemapStyle(e.target.value)} style={{ width: '100%', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', padding: '8px', borderRadius: '8px', fontSize: '0.8rem', outline: 'none', fontFamily: 'Kanit' }}>
+                        <button onClick={() => { if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setFlyToPos([p.coords.latitude, p.coords.longitude])); }} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', fontFamily: 'Kanit' }}>📍 พิกัดของฉัน</button>
+                        <div style={{ background: darkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, width: '150px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>รูปแบบแผนที่</div>
+                            <select value={basemapStyle} onChange={(e) => setBasemapStyle(e.target.value)} style={{ width: '100%', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', padding: '6px', borderRadius: '8px', fontSize: '0.75rem', outline: 'none', fontFamily: 'Kanit' }}>
                                 <option value="dark">สีเข้ม (Dark)</option><option value="light">สีสว่าง (Light)</option><option value="osm">ถนน (Street)</option><option value="satellite">ดาวเทียม</option>
                             </select>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginTop: '15px', marginBottom: '8px' }}>ความทึบเลเยอร์</div>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: textColor, marginTop: '12px', marginBottom: '8px' }}>ความทึบเลเยอร์</div>
                             <input type="range" min="0.1" max="1" step="0.1" value={polyOpacity} onChange={(e) => setPolyOpacity(parseFloat(e.target.value))} style={{ width: '100%', accentColor: activeModeObj?.color }} />
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Legend (เปลี่ยนตามโหมด) */}
-            <div style={{ position: 'absolute', bottom: '20px', left: '20px', zIndex: 1000, background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {/* 🌟 ดัน Legend ขึ้นเพื่อกันการโดนตัดขอบ */}
+            <div style={{ position: 'absolute', bottom: '30px', left: '15px', zIndex: 1000, background: cardBg, padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: subTextColor, marginBottom: '2px' }}>
                     {mapCategory === 'risk' ? 'ระดับความเสี่ยง (0-10)' : `ระดับความเข้มข้น`}
                 </div>
                 {mapCategory === 'risk' ? (
                     <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#ef4444', borderRadius:'50%'}}></span> 8-10 (สูงมาก)</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#f97316', borderRadius:'50%'}}></span> 6-7.9 (เฝ้าระวัง)</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#eab308', borderRadius:'50%'}}></span> 4-5.9 (ปานกลาง)</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#22c55e', borderRadius:'50%'}}></span> 0-3.9 (ปกติ)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor }}><span style={{display:'inline-block', width:'10px', height:'10px', background:'#ef4444', borderRadius:'50%'}}></span> 8-10 (สูงมาก)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor }}><span style={{display:'inline-block', width:'10px', height:'10px', background:'#f97316', borderRadius:'50%'}}></span> 6-7.9 (เฝ้าระวัง)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor }}><span style={{display:'inline-block', width:'10px', height:'10px', background:'#eab308', borderRadius:'50%'}}></span> 4-5.9 (ปานกลาง)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor }}><span style={{display:'inline-block', width:'10px', height:'10px', background:'#22c55e', borderRadius:'50%'}}></span> 0-3.9 (ปกติ)</div>
                     </>
                 ) : (
                     <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#ef4444', borderRadius:'50%'}}></span> ระดับรุนแรง / สูงมาก</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#f97316', borderRadius:'50%'}}></span> ระดับปานกลางค่อนข้างสูง</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: textColor }}><span style={{display:'inline-block', width:'12px', height:'12px', background:'#3b82f6', borderRadius:'50%'}}></span> ระดับปกติ / ดี</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor }}><span style={{display:'inline-block', width:'10px', height:'10px', background:'#ef4444', borderRadius:'50%'}}></span> ระดับรุนแรง / สูงมาก</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor }}><span style={{display:'inline-block', width:'10px', height:'10px', background:'#f97316', borderRadius:'50%'}}></span> ระดับปานกลางค่อนข้างสูง</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor }}><span style={{display:'inline-block', width:'10px', height:'10px', background:'#3b82f6', borderRadius:'50%'}}></span> ระดับปกติ / ดี</div>
                     </>
                 )}
             </div>
           </div>
 
-          <div style={{ width: isMobile ? '100%' : '340px', background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0 }}>
-             <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: textColor }}>
+          <div style={{ width: isMobile ? '100%' : '320px', background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0 }}>
+             <h3 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: textColor }}>
                 📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 15)' : 'จัดอันดับค่าสูงสุด (Top 15)'}
              </h3>
-             <p style={{ margin: '0 0 15px 0', fontSize: '0.8rem', color: activeModeObj?.color, fontWeight: 'bold' }}>{activeModeObj?.desc}</p>
+             <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: activeModeObj?.color, fontWeight: 'bold' }}>{activeModeObj?.desc}</p>
              
              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }} className="custom-scrollbar">
                 {rankedData.map((st, idx) => (
                    <div 
                        key={st.stationID} 
                        onClick={() => handleRegionClick(st)} 
-                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', marginBottom: '10px', borderLeft: `6px solid ${st.color}`, cursor: mapCategory === 'risk' ? 'pointer' : 'default', transition: 'all 0.1s', border: `1px solid ${borderColor}` }}
+                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', marginBottom: '8px', borderLeft: `5px solid ${st.color}`, cursor: mapCategory === 'risk' ? 'pointer' : 'default', transition: 'all 0.1s', border: `1px solid ${borderColor}` }}
                        onMouseEnter={(e) => { if(mapCategory==='risk') { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.1)'; } }}
                        onMouseLeave={(e) => { if(mapCategory==='risk') { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; } }}
                    >
                       <div>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor }}>{idx+1}. จ.{st.areaTH.replace('จังหวัด', '')}</div>
-                          {mapCategory === 'risk' && <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '2px' }}>สถานะ: {getRiskLabel(st.displayVal)}</div>}
+                          <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: textColor }}>{idx+1}. จ.{st.areaTH.replace('จังหวัด', '')}</div>
+                          {mapCategory === 'risk' && <div style={{ fontSize: '0.65rem', color: subTextColor, marginTop: '2px' }}>สถานะ: {getRiskLabel(st.displayVal)}</div>}
                       </div>
-                      <div style={{ background: cardBg, padding: '5px 12px', borderRadius: '12px', textAlign: 'center', border: `1px solid ${borderColor}` }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: '900', color: st.color }}>{st.displayVal} <span style={{fontSize:'0.6rem', color: subTextColor, fontWeight:'normal'}}>{mapCategory==='basic' ? activeModeObj?.unit : ''}</span></div>
+                      <div style={{ background: cardBg, padding: '4px 10px', borderRadius: '10px', textAlign: 'center', border: `1px solid ${borderColor}` }}>
+                          <div style={{ fontSize: '1rem', fontWeight: '900', color: st.color }}>{st.displayVal} <span style={{fontSize:'0.6rem', color: subTextColor, fontWeight:'normal'}}>{mapCategory==='basic' ? activeModeObj?.unit : ''}</span></div>
                       </div>
                    </div>
                 ))}
@@ -381,40 +368,39 @@ export default function MapPage() {
           </div>
       </div>
 
-      {/* 🌟 POPUP 1: DIAGNOSTIC MODAL (เฉพาะโหมด Risk) */}
       {selectedHotspot && mapCategory === 'risk' && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
-            <div className="fade-in" style={{ background: cardBg, padding: '25px', borderRadius: '25px', width: '100%', maxWidth: '450px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: darkMode ? '#1e293b' : '#f1f5f9', border: 'none', width: '35px', height: '35px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+            <div className="fade-in" style={{ background: cardBg, padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '420px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                <button onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: darkMode ? '#1e293b' : '#f1f5f9', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                 
-                <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
-                    <div style={{ fontSize: '0.85rem', color: subTextColor, fontWeight: 'bold', marginBottom: '5px' }}>ข้อมูลวิเคราะห์ความเสี่ยงรายพื้นที่</div>
-                    <h2 style={{ margin: 0, color: textColor, fontSize: '1.4rem' }}>📍 จ.{selectedHotspot.station.areaTH.replace('จังหวัด','')}</h2>
+                <div style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
+                    <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold', marginBottom: '5px' }}>ข้อมูลวิเคราะห์ความเสี่ยงรายพื้นที่</div>
+                    <h2 style={{ margin: 0, color: textColor, fontSize: '1.3rem' }}>📍 จ.{selectedHotspot.station.areaTH.replace('จังหวัด','')}</h2>
                 </div>
 
-                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '25px' }}>
-                    <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: selectedHotspot.color, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: `5px solid ${cardBg}`, outline: `2px solid ${selectedHotspot.color}`, flexShrink: 0 }}>
-                        <span style={{ fontSize: '2.2rem', fontWeight: '900', lineHeight: 1 }}>{selectedHotspot.riskScore}</span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>คะแนน</span>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: selectedHotspot.color, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: `4px solid ${cardBg}`, outline: `2px solid ${selectedHotspot.color}`, flexShrink: 0 }}>
+                        <span style={{ fontSize: '1.8rem', fontWeight: '900', lineHeight: 1 }}>{selectedHotspot.riskScore}</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>คะแนน</span>
                     </div>
                     <div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: selectedHotspot.color }}>{activeModeObj?.name}</div>
-                        <div style={{ fontSize: '0.9rem', color: textColor, marginTop: '5px' }}>สถานะ: <span style={{fontWeight:'bold'}}>{getRiskLabel(selectedHotspot.riskScore)}</span></div>
-                        <div style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '5px', lineHeight: 1.5 }}>
+                        <div style={{ fontSize: '1rem', fontWeight: 'bold', color: selectedHotspot.color }}>{activeModeObj?.name}</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, marginTop: '5px' }}>สถานะ: <span style={{fontWeight:'bold'}}>{getRiskLabel(selectedHotspot.riskScore)}</span></div>
+                        <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '5px', lineHeight: 1.4 }}>
                             {selectedHotspot.riskScore >= 6 ? 'หากคะแนนตั้งแต่ 6 ขึ้นไป แนะนำให้เตรียมรับมือและดูแลสุขภาพเป็นพิเศษ' : 'สภาพอากาศอยู่ในเกณฑ์ปกติ สามารถทำกิจกรรมได้ตามความเหมาะสม'}
                         </div>
                     </div>
                 </div>
 
-                <h4 style={{ margin: '0 0 15px 0', color: textColor, fontSize: '1rem' }}>🔬 ปัจจัยหลักที่ส่งผลต่อความเสี่ยง:</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: textColor, fontSize: '0.95rem' }}>🔬 ปัจจัยหลักที่ส่งผลต่อความเสี่ยง:</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {selectedHotspot.factors.map((factor, i) => (
                         <div key={i}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '5px', color: textColor }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '5px', color: textColor }}>
                                 <span style={{fontWeight: 'bold'}}>{factor.label} <span style={{color:subTextColor, fontWeight:'normal'}}>(สัดส่วน {factor.weight}%)</span></span>
                                 <span>{factor.val} <span style={{color:subTextColor}}>{factor.unit}</span></span>
                             </div>
-                            <div style={{ width: '100%', height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                            <div style={{ width: '100%', height: '6px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
                                 <div style={{ width: `${(factor.risk / 10) * 100}%`, height: '100%', background: factor.color, borderRadius: '10px', transition: 'width 1s ease-out' }}></div>
                             </div>
                         </div>
@@ -425,39 +411,38 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* 🌟 POPUP 2: แหล่งอ้างอิงทางวิชาการ */}
       {showReferenceModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setShowReferenceModal(false)}>
-            <div className="fade-in custom-scrollbar" style={{ background: cardBg, padding: '30px', borderRadius: '25px', width: '100%', maxWidth: '600px', maxHeight: '85vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => setShowReferenceModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: darkMode ? '#1e293b' : '#f1f5f9', border: 'none', width: '35px', height: '35px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+            <div className="fade-in custom-scrollbar" style={{ background: cardBg, padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '550px', maxHeight: '85vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                <button onClick={() => setShowReferenceModal(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: darkMode ? '#1e293b' : '#f1f5f9', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                 
-                <h2 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>📚 หลักการและทฤษฎีอ้างอิง</h2>
-                <p style={{ color: subTextColor, fontSize: '0.9rem', marginBottom: '25px', lineHeight: 1.5 }}>การประเมินดัชนีความเสี่ยงในระบบ อ้างอิงจากแบบจำลองและมาตรฐานทางวิทยาศาสตร์ระดับสากล เพื่อความแม่นยำในการเตือนภัย</p>
+                <h2 style={{ margin: '0 0 5px 0', color: textColor, fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>📚 หลักการและทฤษฎีอ้างอิง</h2>
+                <p style={{ color: subTextColor, fontSize: '0.85rem', marginBottom: '20px', lineHeight: 1.5 }}>การประเมินดัชนีความเสี่ยงในระบบ อ้างอิงจากแบบจำลองและมาตรฐานทางวิทยาศาสตร์ระดับสากล เพื่อความแม่นยำในการเตือนภัย</p>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     
-                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #ec4899' }}>
-                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🫁 ภัยทางเดินหายใจ (Respiratory Threat)</div>
-                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> งานวิจัยอาชีวเวชศาสตร์ และ EPA Air Quality Index</div>
-                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>การสัมผัสความร้อนสูงจะทำให้เยื่อบุทางเดินหายใจระคายเคือง กลไกการกรองฝุ่นตามธรรมชาติลดลง ดัชนีนี้จึงนำความเข้มข้นของ PM2.5 (70%) มาคูณร่วมกับ อุณหภูมิความร้อน (30%) เพื่อสะท้อนผลกระทบต่อปอดที่แท้จริง</div>
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #ec4899' }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🫁 สุขภาพและทางเดินหายใจ</div>
+                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> งานวิจัยอาชีวเวชศาสตร์ และ EPA Air Quality Index</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>การสัมผัสความร้อนสูงจะทำให้เยื่อบุทางเดินหายใจระคายเคือง กลไกการกรองฝุ่นตามธรรมชาติลดลง ดัชนีนี้จึงนำความเข้มข้นของ PM2.5 (70%) มาคูณร่วมกับ อุณหภูมิความร้อน (30%) เพื่อสะท้อนผลกระทบต่อปอดที่แท้จริง</div>
                     </div>
 
-                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #3b82f6' }}>
-                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🏕️ อุปสรรคกลางแจ้ง (Outdoor Disruption)</div>
-                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> มาตรฐานความปลอดภัย OSHA (Occupational Safety)</div>
-                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>การดำเนินกิจกรรมหรืองานกลางแจ้ง ไม่ได้ขึ้นอยู่กับฝนเพียงอย่างเดียว ดัชนีนี้ประเมินความปลอดภัยครอบคลุมทั้งอุปสรรคทางกายภาพ (ฝน 40%, ลม 30%) และภัยคุกคามทางสุขภาพ (ความร้อน 20%, UV 10%)</div>
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🏕️ กิจกรรมกลางแจ้ง</div>
+                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> มาตรฐานความปลอดภัย OSHA (Occupational Safety)</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>การดำเนินกิจกรรมหรืองานกลางแจ้ง ไม่ได้ขึ้นอยู่กับฝนเพียงอย่างเดียว ดัชนีนี้ประเมินความปลอดภัยครอบคลุมทั้งอุปสรรคทางกายภาพ (ฝน 40%, ลม 30%) และภัยคุกคามทางสุขภาพ (ความร้อน 20%, UV 10%)</div>
                     </div>
 
-                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #ea580c' }}>
-                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🔥 ความเสี่ยงไฟป่า (Wildfire Risk Index)</div>
-                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> แบบจำลอง Canadian Forest Fire Weather Index (FWI)</div>
-                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>ประเมินสภาวะที่เอื้อต่อการลุกลามของไฟ โดยคำนวณจากความเร็วลมที่เป็นตัวพัดพา (45%) ผสานกับสภาพอากาศที่ทำให้เชื้อเพลิงแห้งติดไฟง่าย คือ ความชื้นสัมพัทธ์ต่ำ (35%) และอุณหภูมิสูง (20%)</div>
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #ea580c' }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🔥 ความเสี่ยงไฟป่า</div>
+                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> แบบจำลอง Canadian Forest Fire Weather Index (FWI)</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>ประเมินสภาวะที่เอื้อต่อการลุกลามของไฟ โดยคำนวณจากความเร็วลมที่เป็นตัวพัดพา (45%) ผสานกับสภาพอากาศที่ทำให้เชื้อเพลิงแห้งติดไฟง่าย คือ ความชื้นสัมพัทธ์ต่ำ (35%) และอุณหภูมิสูง (20%)</div>
                     </div>
 
-                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '16px', borderLeft: '5px solid #ef4444' }}>
-                        <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🥵 เฝ้าระวังโรคลมแดด (Heatstroke Risk)</div>
-                        <div style={{ fontSize: '0.85rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> องค์การอนามัยโลก (WHO) และดัชนี WBGT</div>
-                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.6 }}>การประเมินโรคลมแดดที่แม่นยำ ต้องคำนวณ <b>"ภาระความร้อนรวม"</b> ที่ร่างกายได้รับ ดัชนีนี้จึงผสานอุณหภูมิอากาศ (60%) เข้ากับรังสีความร้อนจากดวงอาทิตย์หรือ UV (40%) เพื่อประเมินความเสี่ยงต่อภาวะหน้ามืดเฉียบพลัน</div>
+                    <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #ef4444' }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🥵 เฝ้าระวังโรคลมแดด</div>
+                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> องค์การอนามัยโลก (WHO) และดัชนี WBGT</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>การประเมินโรคลมแดดที่แม่นยำ ต้องคำนวณ <b>"ภาระความร้อนรวม"</b> ที่ร่างกายได้รับ ดัชนีนี้จึงผสานอุณหภูมิอากาศ (60%) เข้ากับรังสีความร้อนจากดวงอาทิตย์หรือ UV (40%) เพื่อประเมินความเสี่ยงต่อภาวะหน้ามืดเฉียบพลัน</div>
                     </div>
 
                 </div>

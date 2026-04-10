@@ -180,7 +180,6 @@ export default function AIPage() {
     };
   }, [activeTab, targetDateIdx, weatherData]);
 
-  // 🌟 ปรับคำอธิบายหมวดหมู่ให้เข้าใจง่ายขึ้น
   const tabConfigs = [
     { id: 'summary', icon: '📋', label: 'ภาพรวมทั่วไป', color: '#8b5cf6', desc: 'ภาพรวมความเหมาะสมของสภาพอากาศวันนี้' },
     { id: 'travel', icon: '🎒', label: 'การท่องเที่ยว', color: '#ec4899', desc: 'ความราบรื่นในการเดินทางและทำกิจกรรม' },
@@ -218,37 +217,37 @@ export default function AIPage() {
         @media (max-width: 1024px) { .custom-scrollbar::-webkit-scrollbar { display: none; } .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } }
       `}} />
 
-      <div style={{ width: '100%', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '100px', boxSizing: 'border-box' }}>
+      <div style={{ width: '100%', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '15px', padding: isMobile ? '15px' : '25px', paddingBottom: '100px', boxSizing: 'border-box' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
             <div>
-                <h1 style={{ margin: 0, color: textColor, fontSize: '1.8rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px' }}>🧠 ผู้ช่วยวางแผนกิจกรรม</h1>
-                <p style={{ margin: '5px 0 0 0', color: subTextColor, fontSize: '0.9rem' }}>ประเมินสภาพอากาศให้เหมาะกับไลฟ์สไตล์ของคุณ (ล่วงหน้า 7 วัน)</p>
+                <h1 style={{ margin: 0, color: textColor, fontSize: '1.5rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px' }}>🧠 ผู้ช่วยวางแผนกิจกรรม</h1>
+                <p style={{ margin: '5px 0 0 0', color: subTextColor, fontSize: '0.85rem' }}>ประเมินสภาพอากาศให้เหมาะกับไลฟ์สไตล์ของคุณ (ล่วงหน้า 7 วัน)</p>
             </div>
         </div>
 
-        <div style={{ width: '100%', background: cardBg, borderRadius: '24px', padding: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)', boxSizing: 'border-box' }}>
+        <div style={{ width: '100%', background: cardBg, borderRadius: '20px', padding: '15px 18px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)', boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', color: textColor }}>📍 พื้นที่ของคุณ: <span style={{color: '#0ea5e9'}}>{locationName}</span></h3>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', color: textColor }}>📍 พื้นที่ของคุณ: <span style={{color: '#0ea5e9'}}>{locationName}</span></h3>
                 {isMobile && <button onClick={() => setShowFilters(!showFilters)} style={{ background: 'rgba(14,165,233,0.1)', color: '#0ea5e9', border: 'none', padding: '6px 15px', borderRadius: '50px', fontWeight: 'bold', fontSize: '0.75rem' }}>{showFilters ? '▲ ปิด' : '▼ ปรับแต่ง'}</button>}
             </div>
             {showFilters && (
-                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px', width: '100%', boxSizing: 'border-box' }}>
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px', width: '100%', boxSizing: 'border-box' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr auto', gap: '10px' }}>
-                        <select value={selectedProv} onChange={handleProvChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', boxSizing: 'border-box', outline: 'none', fontFamily: 'Kanit' }}>
+                        <select value={selectedProv} onChange={handleProvChange} style={{ width: '100%', padding: '10px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', boxSizing: 'border-box', outline: 'none', fontFamily: 'Kanit' }}>
                             <option value="">-- พิมพ์ชื่อจังหวัดเพื่อเปลี่ยนพื้นที่ --</option>
                             {stations.sort((a,b)=>a.areaTH.localeCompare(b.areaTH,'th')).map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
                         </select>
-                        <button onClick={() => window.location.reload()} style={{ width: '100%', background: '#0ea5e9', color: '#fff', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', boxSizing: 'border-box', fontFamily: 'Kanit' }}>📍 อัปเดตพิกัดอัตโนมัติ</button>
+                        <button onClick={() => window.location.reload()} style={{ width: '100%', background: '#0ea5e9', color: '#fff', border: 'none', padding: '10px 12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', boxSizing: 'border-box', fontFamily: 'Kanit' }}>📍 อัปเดตพิกัดอัตโนมัติ</button>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', width: '100%', boxSizing: 'border-box' }} className="custom-scrollbar">
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', width: '100%', boxSizing: 'border-box' }} className="custom-scrollbar">
                         {[0,1,2,3,4,5,6].map(idx => {
                             const btnDate = new Date();
                             btnDate.setDate(btnDate.getDate() + idx);
                             const dateLabel = idx === 0 ? 'วันนี้' : idx === 1 ? 'พรุ่งนี้' : btnDate.toLocaleDateString('th-TH', {day:'numeric', month:'short'});
                             return (
-                                <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ flexShrink: 0, minWidth: '80px', padding: '10px', borderRadius: '12px', border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, background: targetDateIdx === idx ? activeColor : (darkMode ? '#1e293b' : '#f8fafc'), color: targetDateIdx === idx ? '#fff' : textColor, fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit' }}>
+                                <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ flexShrink: 0, minWidth: '75px', padding: '8px', borderRadius: '12px', border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, background: targetDateIdx === idx ? activeColor : (darkMode ? '#1e293b' : '#f8fafc'), color: targetDateIdx === idx ? '#fff' : textColor, fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit' }}>
                                     {dateLabel}
                                 </button>
                             );
@@ -258,72 +257,72 @@ export default function AIPage() {
             )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', alignItems: 'flex-start', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', alignItems: 'flex-start', width: '100%', boxSizing: 'border-box' }}>
             
-            <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: '10px', width: isMobile ? '100%' : '280px', overflowX: isMobile ? 'auto' : 'visible', order: isMobile ? 1 : 2, boxSizing: 'border-box', paddingBottom: isMobile ? '10px' : '0' }} className="custom-scrollbar">
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: '10px', width: isMobile ? '100%' : '260px', overflowX: isMobile ? 'auto' : 'visible', order: isMobile ? 1 : 2, boxSizing: 'border-box', paddingBottom: isMobile ? '5px' : '0' }} className="custom-scrollbar">
                 {tabConfigs.map(tab => {
                     const isActive = activeTab === tab.id;
                     return (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                            flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: '15px', padding: '15px', borderRadius: '16px', border: `1px solid ${isActive ? tab.color : borderColor}`,
+                            flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px', borderRadius: '16px', border: `1px solid ${isActive ? tab.color : borderColor}`,
                             background: isActive ? (darkMode ? `${tab.color}15` : `${tab.color}10`) : (darkMode ? '#0f172a' : '#ffffff'),
                             color: isActive ? (darkMode ? '#fff' : tab.color) : textColor,
                             cursor: 'pointer', textAlign: 'left', width: isMobile ? 'auto' : '100%', transition: 'all 0.2s', boxSizing: 'border-box', fontFamily: 'Kanit'
                         }}>
-                            <span style={{ fontSize: '1.6rem', marginTop: '-2px' }}>{tab.icon}</span>
+                            <span style={{ fontSize: '1.4rem', marginTop: '-2px' }}>{tab.icon}</span>
                             <div style={{ display: isMobile ? 'none' : 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{tab.label}</span>
-                                <span style={{ fontSize: '0.75rem', color: subTextColor, marginTop: '2px', lineHeight: 1.4 }}>{tab.desc}</span>
+                                <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{tab.label}</span>
+                                <span style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '2px', lineHeight: 1.3 }}>{tab.desc}</span>
                             </div>
-                            {isMobile && <span style={{ fontWeight: 'bold', fontSize: '0.9rem', alignSelf: 'center' }}>{tab.label}</span>}
+                            {isMobile && <span style={{ fontWeight: 'bold', fontSize: '0.85rem', alignSelf: 'center' }}>{tab.label}</span>}
                         </button>
                     );
                 })}
             </div>
 
-            <div className="fade-in" key={activeTab} style={{ flex: 1, width: '100%', background: cardBg, borderRadius: '24px', padding: isMobile ? '20px' : '35px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', order: isMobile ? 2 : 1, boxSizing: 'border-box', overflow: 'hidden' }}>
+            <div className="fade-in" key={activeTab} style={{ flex: 1, width: '100%', background: cardBg, borderRadius: '24px', padding: isMobile ? '15px' : '25px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', order: isMobile ? 2 : 1, boxSizing: 'border-box', overflow: 'hidden' }}>
                 {insights && (
                     <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px', marginBottom: '30px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px', marginBottom: '25px' }}>
                             <div style={{ maxWidth: '70%' }}>
-                                <h2 style={{ margin: 0, fontSize: '1.2rem', color: subTextColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h2 style={{ margin: 0, fontSize: '1.1rem', color: subTextColor, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'normal' }}>
                                     {activeTabInfo.desc}
                                 </h2>
-                                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>{activeTabInfo.label}</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>{activeTabInfo.label}</div>
                             </div>
                             
-                            <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', padding: '12px 20px', borderRadius: '20px', border: `1px solid ${borderColor}`, textAlign: 'center', flexShrink: 0, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontSize: '0.7rem', color: subTextColor, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>คะแนนความเหมาะสม</div>
-                                <div style={{ fontSize: '2rem', fontWeight: '900', color: insights.score > 7 ? '#22c55e' : insights.score > 4 ? '#f97316' : '#ef4444', lineHeight: 1.1, marginTop: '5px' }}>
-                                    {insights.score} <span style={{fontSize:'1rem', color: subTextColor}}>/ 10</span>
+                            <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', padding: '10px 15px', borderRadius: '16px', border: `1px solid ${borderColor}`, textAlign: 'center', flexShrink: 0, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
+                                <div style={{ fontSize: '0.7rem', color: subTextColor, fontWeight: 'bold' }}>คะแนนความเหมาะสม</div>
+                                <div style={{ fontSize: '1.6rem', fontWeight: '900', color: insights.score > 7 ? '#22c55e' : insights.score > 4 ? '#f97316' : '#ef4444', lineHeight: 1.1, marginTop: '2px' }}>
+                                    {insights.score} <span style={{fontSize:'0.85rem', color: subTextColor}}>/ 10</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div style={{ padding: '25px', background: insights.score > 7 ? (darkMode ? 'rgba(34,197,94,0.1)' : '#f0fdf4') : insights.score > 4 ? (darkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed') : (darkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2'), borderRadius: '20px', borderLeft: `6px solid ${insights.score > 7 ? '#22c55e' : insights.score > 4 ? '#f97316' : '#ef4444'}`, marginBottom: '35px', boxSizing: 'border-box' }}>
-                            <div style={{ fontSize: '0.85rem', color: insights.score > 7 ? '#22c55e' : insights.score > 4 ? '#f97316' : '#ef4444', fontWeight: 'bold', marginBottom: '8px' }}>คำแนะนำสำหรับคุณ:</div>
-                            <p style={{ margin: 0, fontSize: '1.1rem', color: textColor, lineHeight: 1.6, fontWeight: '600' }}>
+                        <div style={{ padding: '20px', background: insights.score > 7 ? (darkMode ? 'rgba(34,197,94,0.1)' : '#f0fdf4') : insights.score > 4 ? (darkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed') : (darkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2'), borderRadius: '16px', borderLeft: `6px solid ${insights.score > 7 ? '#22c55e' : insights.score > 4 ? '#f97316' : '#ef4444'}`, marginBottom: '25px', boxSizing: 'border-box' }}>
+                            <div style={{ fontSize: '0.8rem', color: insights.score > 7 ? '#22c55e' : insights.score > 4 ? '#f97316' : '#ef4444', fontWeight: 'bold', marginBottom: '6px' }}>คำแนะนำสำหรับคุณ:</div>
+                            <p style={{ margin: 0, fontSize: '1rem', color: textColor, lineHeight: 1.5, fontWeight: '600' }}>
                                 {insights.text}
                             </p>
                         </div>
 
-                        <h4 style={{ margin: '0 0 20px 0', color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{fontSize: '1.4rem'}}>⏱️</span> คาดการณ์สภาพอากาศรายช่วงเวลา
+                        <h4 style={{ margin: '0 0 15px 0', color: textColor, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{fontSize: '1.2rem'}}>⏱️</span> คาดการณ์สภาพอากาศรายช่วงเวลา
                         </h4>
                         
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
                             {insights.timeline.map((item, i) => (
                                 <div key={i} style={{ display: 'flex', gap: '15px', position: 'relative', width: '100%', boxSizing: 'border-box' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, marginTop: '10px' }}>
-                                        <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: activeColor, zIndex: 1, border: `3px solid ${cardBg}` }}></div>
-                                        {i < 2 && <div style={{ width: '2px', flex: 1, background: borderColor, marginTop: '-2px', marginBottom: '-10px' }}></div>}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, marginTop: '8px' }}>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: activeColor, zIndex: 1, border: `3px solid ${cardBg}` }}></div>
+                                        {i < 2 && <div style={{ width: '2px', flex: 1, background: borderColor, marginTop: '-2px', marginBottom: '-8px' }}></div>}
                                     </div>
-                                    <div style={{ flex: 1, background: darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', padding: '20px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxSizing: 'border-box' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '5px' }}>
-                                            <span style={{ fontWeight: 'bold', color: activeColor, fontSize: '1.05rem' }}>{item.icon} {item.label}</span>
-                                            <span style={{ fontSize: '0.8rem', background: darkMode ? '#0f172a' : '#e2e8f0', padding: '4px 10px', borderRadius: '50px', color: subTextColor, fontWeight: 'bold' }}>{item.time}</span>
+                                    <div style={{ flex: 1, background: darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', padding: '15px', borderRadius: '16px', border: `1px solid ${borderColor}`, boxSizing: 'border-box' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '5px' }}>
+                                            <span style={{ fontWeight: 'bold', color: activeColor, fontSize: '0.95rem' }}>{item.icon} {item.label}</span>
+                                            <span style={{ fontSize: '0.75rem', background: darkMode ? '#0f172a' : '#e2e8f0', padding: '4px 10px', borderRadius: '50px', color: subTextColor, fontWeight: 'bold' }}>{item.time}</span>
                                         </div>
-                                        <div style={{ fontSize: '0.95rem', color: textColor, lineHeight: 1.6 }}>{item.text}</div>
+                                        <div style={{ fontSize: '0.9rem', color: textColor, lineHeight: 1.5 }}>{item.text}</div>
                                     </div>
                                 </div>
                             ))}
