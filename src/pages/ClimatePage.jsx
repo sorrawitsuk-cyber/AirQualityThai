@@ -2,7 +2,8 @@ import React, { useContext, useState, useEffect, useMemo, useCallback } from 're
 import { WeatherContext } from '../context/WeatherContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 
-const TrendIndicator = ({ current, prev, mode, hideText = false }) => {
+// 🌟 Component ลูกศรบอกแนวโน้ม (บังคับสี: แดง=เพิ่ม/แย่ลง, เขียว=ลด/ดีขึ้น)
+const TrendIndicator = ({ current, prev, hideText = false }) => {
     if (current == null || prev == null || current === '-' || prev === '-') return null;
     const diff = Math.round(current - prev);
     if (diff === 0) return <span title="ไม่มีการเปลี่ยนแปลง" style={{fontSize:'0.75em', opacity:0.6, color:'#94a3b8', marginLeft:'6px', whiteSpace:'nowrap'}}>➖</span>;
@@ -26,7 +27,6 @@ export default function ClimatePage() {
   const [timeMode, setTimeMode] = useState('live'); 
 
   const [sortOrder, setSortOrder] = useState('alpha'); 
-
   const [isMapInteractive, setIsMapInteractive] = useState(false);
 
   const [userProv, setUserProv] = useState('');
@@ -159,14 +159,16 @@ export default function ClimatePage() {
           if (isRisky('wind', currWind)) counts.wind.live++;
           if (isRisky('wind', prevWindSameHour)) counts.wind.yest++;
 
+          // โหมด Live: คัดเฉพาะที่เสี่ยง
           if (currTemp >= 35) lData.heat.push({ prov: provName, val: currTemp, prevVal: prevTempSameHour, unit: '°C' });
-          if (currPM > 15) lData.pm25.push({ prov: provName, val: currPM, prevVal: prevPMSameHour, unit: 'µg' });
+          if (currPM > 15) lData.pm25.push({ prov: provName, val: currPM, prevVal: prevPMSameHour, unit: 'µg/m³' });
           if (currUV >= 3) lData.uv.push({ prov: provName, val: currUV, prevVal: prevUVSameHour, unit: 'Idx' });
           if (currRain > 30) lData.rain.push({ prov: provName, val: currRain, prevVal: prevRainSameHour, unit: '%' });
           if (currWind > 15) lData.wind.push({ prov: provName, val: currWind, prevVal: prevWindSameHour, unit: 'km/h' });
 
+          // โหมด Yesterday: เก็บทั้งหมด
           yData.heat.push({ prov: provName, val: maxTemp, currVal: currTemp, unit: '°C' });
-          yData.pm25.push({ prov: provName, val: maxPM, currVal: currPM, unit: 'µg' });
+          yData.pm25.push({ prov: provName, val: maxPM, currVal: currPM, unit: 'µg/m³' });
           yData.uv.push({ prov: provName, val: maxUV, currVal: currUV, unit: 'Idx' });
           yData.rain.push({ prov: provName, val: maxRain, currVal: currRain, unit: '%' });
           yData.wind.push({ prov: provName, val: maxWind, currVal: currWind, unit: 'km/h' });
@@ -275,6 +277,7 @@ export default function ClimatePage() {
 
       <div style={{ width: '100%', maxWidth: '1400px', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '100px' }}>
         
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
             <div>
                 <h1 style={{ margin: 0, color: textColor, fontSize: '1.8rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px' }}>🚨 ศูนย์ปฏิบัติการเฝ้าระวัง</h1>
@@ -289,23 +292,18 @@ export default function ClimatePage() {
                     <button onClick={() => setTimeMode('live')} style={{ background: timeMode === 'live' ? '#22c55e' : 'transparent', color: timeMode === 'live' ? '#fff' : subTextColor, border: 'none', padding: '6px 15px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>🟢 วันนี้ (Live)</button>
                     <button onClick={() => setTimeMode('yesterday')} style={{ background: timeMode === 'yesterday' ? '#8b5cf6' : 'transparent', color: timeMode === 'yesterday' ? '#fff' : subTextColor, border: 'none', padding: '6px 15px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>🟣 สถิติเมื่อวาน</button>
                 </div>
-                
-                {timeMode === 'live' && (
-                    <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '4px', fontWeight: 'normal', color: subTextColor }}>
-                        💡 ลูกศร <span style={{color:'#ef4444', fontWeight:'bold'}}>▲</span> <span style={{color:'#22c55e', fontWeight:'bold'}}>▼</span> แสดงแนวโน้มเทียบกับเมื่อวาน <span style={{color:'#0ea5e9', fontWeight:'bold'}}>(เวลาเดียวกัน)</span>
-                    </div>
-                )}
             </div>
         </div>
 
+        {/* ส่วนบน: Area กล่องส่วนตัว + 6 Tabs */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr', gap: '20px', alignItems: 'start' }}>
             <div style={{ background: locSummary.bg, border: `1px solid ${locSummary.color}50`, borderRadius: '24px', padding: '25px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', transition: '0.3s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                        <div style={{ fontSize: '1.3rem', fontWeight: '900', color: textColor }}>{isLocating ? 'กำลังตรวจสอบ...' : (userProv === 'กรุงเทพมหานคร' ? userProv : `จ.${userProv}`)}</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '900', color: textColor }}>{isLocating ? 'กำลังประมวลผล...' : (userProv === 'กรุงเทพมหานคร' ? userProv : `จ.${userProv}`)}</div>
                         <div style={{ fontSize: '0.8rem', color: subTextColor, marginTop: '2px' }}>📍 พื้นที่เฝ้าระวังของคุณ</div>
                     </div>
-                    <button onClick={() => setShowLocFilter(!showLocFilter)} style={{ background: 'transparent', border: 'none', color: locSummary.color, cursor: 'pointer', fontSize: '1.2rem', transition: '0.2s' }} title="ค้นหา/เปลี่ยนจังหวัด">🔍</button>
+                    <button onClick={() => setShowLocFilter(!showLocFilter)} style={{ background: 'transparent', border: 'none', color: locSummary.color, cursor: 'pointer', fontSize: '1.2rem', transition: '0.2s' }} title="ระบุตำแหน่ง">🔍</button>
                 </div>
 
                 {showLocFilter && (
@@ -331,12 +329,12 @@ export default function ClimatePage() {
                             }}
                             style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#fff', color: textColor, fontFamily: 'Kanit', outline: 'none' }}
                         >
-                            <option value="">-- ระบุตำแหน่งที่ต้องการ... --</option>
+                            <option value="">-- พิมพ์ชื่อจังหวัดเพื่อค้นหา... --</option>
                             {[...stations].sort((a,b)=>a.areaTH.localeCompare(b.areaTH,'th')).map(st => (
                                 <option key={st.stationID} value={st.areaTH}>{st.areaTH}</option>
                             ))}
                         </select>
-                        <button onClick={() => { setShowLocFilter(false); fetchUserLocation(); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '12px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold' }} title="อัปเดตตำแหน่งของฉัน">📍 GPS</button>
+                        <button onClick={() => { setShowLocFilter(false); fetchUserLocation(); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '12px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }} title="อัปเดตตำแหน่งของฉัน">📍 อัปเดต</button>
                     </div>
                 )}
 
@@ -348,11 +346,11 @@ export default function ClimatePage() {
                         <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap', justifyContent: 'center' }}>
                             <div style={{ background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)', border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', color: textColor, display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 🌡️ <span style={{color: userData.temp >= 38 ? '#ef4444' : textColor}}>{userData.temp}°C</span>
-                                {timeMode === 'live' && <TrendIndicator current={userData.temp} prev={userData.prevTemp} mode="temp" />}
+                                {timeMode === 'live' && <TrendIndicator current={userData.temp} prev={userData.prevTemp} />}
                             </div>
                             <div style={{ background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)', border: `1px solid ${borderColor}`, padding: '8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', color: textColor, display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 😷 <span style={{color: userData.pm25 >= 37.5 ? '#f97316' : textColor}}>{userData.pm25} µg</span>
-                                {timeMode === 'live' && <TrendIndicator current={userData.pm25} prev={userData.prevPm25} mode="pm25" />}
+                                {timeMode === 'live' && <TrendIndicator current={userData.pm25} prev={userData.prevPm25} />}
                             </div>
                         </div>
                     </div>
@@ -381,6 +379,7 @@ export default function ClimatePage() {
             </div>
         </div>
 
+        {/* ส่วนล่าง */}
         {timeMode === 'live' ? (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr', gap: '20px', marginTop: '20px' }}>
                 <div style={{ background: cardBg, padding: '20px', borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column' }}>
@@ -389,22 +388,12 @@ export default function ClimatePage() {
                     </div>
                     <div style={{ flex: 1, minHeight: isMobile ? '350px' : '550px', borderRadius: '16px', overflow: 'hidden', background: '#000', position: 'relative' }}>
                         {isMobile && !isMapInteractive && (
-                            <div 
-                                onClick={() => setIsMapInteractive(true)}
-                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 10, display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', backdropFilter: 'blur(2px)' }}
-                            >
-                                <div style={{ background: '#0ea5e9', color: '#fff', padding: '10px 20px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
-                                    👆 แตะเพื่อเลื่อนแผนที่
-                                </div>
+                            <div onClick={() => setIsMapInteractive(true)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 10, display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', backdropFilter: 'blur(2px)' }}>
+                                <div style={{ background: '#0ea5e9', color: '#fff', padding: '10px 20px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>👆 แตะเพื่อเลื่อนแผนที่</div>
                             </div>
                         )}
                         {isMobile && isMapInteractive && (
-                            <button 
-                                onClick={() => setIsMapInteractive(false)}
-                                style={{ position: 'absolute', top: '10px', right: '10px', background: '#ef4444', color: '#fff', padding: '5px 15px', borderRadius: '50px', border: 'none', zIndex: 10, fontWeight: 'bold', boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
-                            >
-                                🔒 ล็อคแผนที่
-                            </button>
+                            <button onClick={() => setIsMapInteractive(false)} style={{ position: 'absolute', top: '10px', right: '10px', background: '#ef4444', color: '#fff', padding: '5px 15px', borderRadius: '50px', border: 'none', zIndex: 10, fontWeight: 'bold', boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>🔒 ล็อคแผนที่</button>
                         )}
                         <iframe width="100%" height="100%" src={`https://embed.windy.com/embed2.html?lat=13.75&lon=100.5&zoom=5&level=surface&overlay=${getWindyOverlay(activeTab)}&product=ecmwf`} style={{ border: 'none', pointerEvents: (isMobile && !isMapInteractive) ? 'none' : 'auto' }}></iframe>
                     </div>
@@ -482,17 +471,16 @@ export default function ClimatePage() {
                                 บันทึกสถิติสูงสุดตลอดวันของเมื่อวาน
                             </div>
                         </div>
-                        
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
                             <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit', cursor: 'pointer' }}>
                                 <option value="alpha">🔤 เรียงตามชื่อ (ก-ฮ)</option>
                                 <option value="desc">🔥 เรียงตามความรุนแรง</option>
                             </select>
-                            <input type="text" placeholder={`พิมพ์ชื่อจังหวัดเพื่อค้นหา...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
+                            <input type="text" placeholder={`พิมพ์ชื่อจังหวัด...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
                         </div>
                     </div>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1px', background: borderColor, padding: '1px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1px', background: borderColor, padding: '1px', paddingBottom: '20px' }}>
                         {sortedFilteredData.length > 0 ? sortedFilteredData.map((item, i) => (
                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: cardBg }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
