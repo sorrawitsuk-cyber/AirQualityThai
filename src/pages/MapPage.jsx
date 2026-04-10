@@ -29,6 +29,7 @@ function MapZoomListener({ setMapZoom }) {
   return null;
 }
 
+// ฟังก์ชันแปลองศาลมเป็นชื่อทิศและลูกศร
 const getWindDirection = (degree) => {
     if (degree === undefined || degree === null) return { name: '-', arrow: '🌀' };
     const val = Math.floor((degree / 45) + 0.5);
@@ -80,6 +81,7 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // เคลียร์ Popup เวลาเปลี่ยนโหมดหลัก จะได้ไม่ค้างข้อมูลเก่า
   useEffect(() => { setSelectedHotspot(null); }, [mapCategory]);
 
   const basicModes = [
@@ -173,28 +175,25 @@ export default function MapPage() {
       return 'สถานการณ์ปกติ';
   };
 
-  const rankedData = useMemo(() => {
-    if (mapCategory === 'basic') {
-        return (stations || [])
-          .map(st => {
-              const val = getBasicVal(st, activeBasicMode);
-              return { ...st, displayVal: val, color: getBasicColor(val, activeBasicMode) };
-          })
-          .filter(st => st.displayVal !== null)
-          .sort((a, b) => b.displayVal - a.displayVal);
-    } else {
-        return (stations || [])
-          .map(st => {
-              const risk = calculateRisk(st);
-              return { ...st, displayVal: risk.score, factors: risk.factors, color: getRiskColor(risk.score) };
-          })
-          .sort((a, b) => b.displayVal - a.displayVal);
-    }
+  const allMapData = useMemo(() => {
+    return (stations || []).map(st => {
+        let val, color;
+        if (mapCategory === 'basic') {
+            val = getBasicVal(st, activeBasicMode);
+            color = getBasicColor(val, activeBasicMode);
+        } else {
+            const risk = calculateRisk(st);
+            val = risk.score;
+            color = getRiskColor(risk.score);
+        }
+        return { ...st, displayVal: val, color };
+    }).filter(st => st.displayVal !== null && st.displayVal !== undefined);
   }, [stations, mapCategory, activeBasicMode, calculateRisk, getBasicVal, getBasicColor, getRiskColor]);
 
+  // คัดเฉพาะ Top 15 ไปโชว์ Sidebar ขวามือ
   const rankedSidebarData = useMemo(() => {
-    return rankedData.slice(0, 15);
-  }, [rankedData]);
+    return [...allMapData].sort((a, b) => b.displayVal - a.displayVal).slice(0, 15);
+  }, [allMapData]);
 
   const styleGeoJSON = (feature) => {
     const props = Object.values(feature.properties || {}).map(v => String(v).trim());
@@ -220,6 +219,7 @@ export default function MapPage() {
           const risk = calculateRisk(station);
           setSelectedHotspot({ type: 'risk', station, riskScore: risk.score, factors: risk.factors, color: getRiskColor(risk.score) });
       } else {
+          // โหมดข้อมูลทั่วไป (Basic) - เก็บข้อมูลทั้งหมดเพื่อนำไปโชว์ใน Popup
           const data = stationTemps[station.stationID] || {};
           const pm25 = station.AQILast?.PM25?.value || 0;
           setSelectedHotspot({ type: 'basic', station, data, pm25 });
@@ -259,6 +259,7 @@ export default function MapPage() {
 
   const activeModeObj = mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) : riskModes.find(m => m.id === activeRiskMode);
 
+  // ฟังก์ชันสร้างกล่อง Legend แบบเจาะจงแต่ละข้อมูล
   const getDynamicLegendContent = () => {
     if (mapCategory === 'risk') {
         return [
@@ -268,13 +269,47 @@ export default function MapPage() {
             { c: '#22c55e', l: 'สถานการณ์ปกติ', r: '0-3.9' }
         ];
     }
+    
     switch (activeBasicMode) {
-        case 'pm25': return [{ c: '#ef4444', l: 'มีผลกระทบฯ', r: '> 75' }, { c: '#f97316', l: 'เริ่มมีผลกระทบฯ', r: '38-75' }, { c: '#eab308', l: 'ปานกลาง', r: '26-37' }, { c: '#22c55e', l: 'ดี', r: '16-25' }, { c: '#0ea5e9', l: 'ดีมาก', r: '0-15' }];
+        case 'pm25':
+            return [
+                { c: '#ef4444', l: 'มีผลกระทบต่อสุขภาพ', r: '> 75' },
+                { c: '#f97316', l: 'เริ่มมีผลกระทบฯ', r: '38-75' },
+                { c: '#eab308', l: 'ปานกลาง', r: '26-37' },
+                { c: '#22c55e', l: 'ดี', r: '16-25' },
+                { c: '#0ea5e9', l: 'ดีมาก', r: '0-15' }
+            ];
         case 'temp':
-        case 'heat': return [{ c: '#ef4444', l: 'ร้อนจัด', r: '> 39' }, { c: '#f97316', l: 'ร้อน', r: '35-39' }, { c: '#eab308', l: 'อบอ้าว', r: '29-34' }, { c: '#22c55e', l: 'ปกติ/อบอุ่น', r: '23-28' }, { c: '#3b82f6', l: 'เย็นสบาย', r: '< 23' }];
-        case 'rain': return [{ c: '#1e3a8a', l: 'ตกหนัก/พายุ', r: '> 70%' }, { c: '#3b82f6', l: 'โอกาสตกสูง', r: '41-70%' }, { c: '#60a5fa', l: 'โอกาสตกต่ำ', r: '11-40%' }, { c: '#94a3b8', l: 'ไม่มีฝน', r: '0-10%' }];
-        case 'wind': return [{ c: '#ef4444', l: 'พายุ/อันตราย', r: '> 40' }, { c: '#f97316', l: 'ลมแรง', r: '21-40' }, { c: '#eab308', l: 'ลมกำลังดี', r: '11-20' }, { c: '#22c55e', l: 'ลมสงบ', r: '0-10' }];
-        case 'uv': return [{ c: '#a855f7', l: 'อันตรายรุนแรง', r: '> 10' }, { c: '#ef4444', l: 'สูงมาก', r: '8-10' }, { c: '#ea580c', l: 'สูง', r: '6-7' }, { c: '#eab308', l: 'ปานกลาง', r: '3-5' }, { c: '#22c55e', l: 'ต่ำ', r: '0-2' }];
+        case 'heat':
+            return [
+                { c: '#ef4444', l: 'ร้อนจัด/อันตราย', r: '> 39' },
+                { c: '#f97316', l: 'ร้อน', r: '35-39' },
+                { c: '#eab308', l: 'อบอ้าว', r: '29-34' },
+                { c: '#22c55e', l: 'ปกติ/อบอุ่น', r: '23-28' },
+                { c: '#3b82f6', l: 'เย็นสบาย', r: '< 23' }
+            ];
+        case 'rain':
+            return [
+                { c: '#1e3a8a', l: 'ตกหนัก/พายุ', r: '> 70%' },
+                { c: '#3b82f6', l: 'โอกาสตกสูง', r: '41-70%' },
+                { c: '#60a5fa', l: 'โอกาสตกต่ำ', r: '11-40%' },
+                { c: '#94a3b8', l: 'ไม่มีฝน', r: '0-10%' }
+            ];
+        case 'wind':
+            return [
+                { c: '#ef4444', l: 'พายุ/อันตราย', r: '> 40' },
+                { c: '#f97316', l: 'ลมแรง', r: '21-40' },
+                { c: '#eab308', l: 'ลมกำลังดี', r: '11-20' },
+                { c: '#22c55e', l: 'ลมสงบ', r: '0-10' }
+            ];
+        case 'uv':
+            return [
+                { c: '#a855f7', l: 'อันตรายรุนแรง', r: '> 10' },
+                { c: '#ef4444', l: 'สูงมาก', r: '8-10' },
+                { c: '#ea580c', l: 'สูง', r: '6-7' },
+                { c: '#eab308', l: 'ปานกลาง', r: '3-5' },
+                { c: '#22c55e', l: 'ต่ำ', r: '0-2' }
+            ];
         default: return [];
     }
   };
@@ -290,7 +325,8 @@ export default function MapPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${darkMode ? '#334155' : '#cbd5e1'}; border-radius: 10px; }
       `}} />
 
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', marginBottom: '15px', flexShrink: 0 }}>
+      {/* 🌟 Header Section */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', marginBottom: '15px', flexShrink: 0 }}>
           {isMobile ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -314,29 +350,29 @@ export default function MapPage() {
                   </div>
               </div>
           ) : (
-              <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                          <h2 style={{ margin: 0, color: textColor, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🗺️ แผนที่สภาพอากาศ</h2>
-                          {mapCategory === 'risk' && (
-                              <button onClick={() => setShowReferenceModal(true)} style={{ background: 'transparent', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '4px 12px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  📚 แหล่งอ้างอิงทางวิชาการ
-                              </button>
-                          )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <h2 style={{ margin: 0, color: textColor, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>🗺️ แผนที่สภาพอากาศ</h2>
+                          <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px' }}>
+                              <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>📊 ข้อมูลทั่วไป</button>
+                              <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🧠 วิเคราะห์ความเสี่ยง</button>
+                          </div>
                       </div>
-                      <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px', width: 'fit-content' }}>
-                          <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>📊 ข้อมูลทั่วไป</button>
-                          <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🧠 วิเคราะห์ความเสี่ยง</button>
-                      </div>
+                      {mapCategory === 'risk' && (
+                          <button onClick={() => setShowReferenceModal(true)} style={{ background: darkMode ? '#1e293b' : '#f1f5f9', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '6px 15px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
+                              📚 แหล่งอ้างอิงทางวิชาการ
+                          </button>
+                      )}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', maxWidth: '600px' }} className="custom-scrollbar">
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     {mapCategory === 'basic' ? basicModes.map(m => (
-                        <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.85rem' }}>{m.name}</button>
+                        <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.9rem' }}>{m.name}</button>
                     )) : riskModes.map(m => (
-                        <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ flexShrink: 0, padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.85rem' }}>{m.name}</button>
+                        <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.9rem' }}>{m.name}</button>
                     ))}
                   </div>
-              </>
+              </div>
           )}
       </div>
 
@@ -352,30 +388,28 @@ export default function MapPage() {
                     
                     {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${polyOpacity}-${basemapStyle}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
                     
-                    {/* 🌟 ปรับ Logic การโชว์ Label แบบ Progressive Disclosure */}
+                    {/* 🌟 ระบบแสดงป้ายอัจฉริยะ Progressive Decluttering */}
                     {allMapData.map(st => {
                         let isVisible = false;
 
                         if (mapZoom >= 8) { 
-                            // ซูมระดับ 8 ขึ้นไป โชว์หมดทั้งประเทศ
-                            isVisible = true; 
+                            isVisible = true; // ซูมลึก: โชว์ 77 จังหวัด
                         } else if (mapZoom >= 6) {
-                            // ซูมระดับ 6-7 (เห็นเป็นภาค)
+                            // ซูมกลาง: 
                             if (mapCategory === 'risk') {
                                 isVisible = st.displayVal >= 6; // สีส้ม/แดง
                             } else {
                                 isVisible = rankedSidebarData.some(r => r.stationID === st.stationID); // โหมดทั่วไป โชว์ Top 15
                             }
                         } else {
-                            // Zoom 5 (เห็นทั้งประเทศ ตอนเปิดแอป)
+                            // ซูมนอกสุด:
                             if (mapCategory === 'risk') {
                                 isVisible = st.displayVal >= 8; // สีแดงเท่านั้น
-                                // ถ้าไม่มีแดงเลย เอาแค่ 3 อันดับแรก จะได้ไม่โล่งเกินไป
                                 if (!allMapData.some(d => d.displayVal >= 8)) {
                                     isVisible = rankedData.slice(0, 3).some(r => r.stationID === st.stationID);
                                 }
                             } else {
-                                isVisible = rankedData.slice(0, 5).some(r => r.stationID === st.stationID); // โหมดทั่วไป โชว์แค่ Top 5
+                                isVisible = rankedData.slice(0, 5).some(r => r.stationID === st.stationID); // โหมดทั่วไป โชว์ Top 5
                             }
                         }
 
