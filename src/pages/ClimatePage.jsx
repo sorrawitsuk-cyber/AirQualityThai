@@ -457,7 +457,7 @@ export default function ClimatePage() {
                             </h3>
                             <div style={{ fontSize: '0.75rem', color: '#8b5cf6', fontWeight: 'bold', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#8b5cf6', borderRadius: '50%' }}></span>
-                                Historical - สถิติสูงสุดของเมื่อวาน (ไม่มีลูกศรเทียบ)
+                                Historical - สถิติสูงสุดของเมื่อวาน 
                             </div>
                         </div>
                         <input type="text" placeholder={`🔍 ค้นหาจังหวัด...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: isMobile ? '100%' : '250px', padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
