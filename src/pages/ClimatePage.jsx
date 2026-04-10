@@ -2,7 +2,6 @@ import React, { useContext, useState, useEffect, useMemo, useCallback } from 're
 import { WeatherContext } from '../context/WeatherContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 
-// 🌟 Component ลูกศรบอกแนวโน้ม (ใช้ Text Symbol บังคับสี แดง=แย่ลง, เขียว=ดีขึ้น)
 const TrendIndicator = ({ current, prev, mode, hideText = false }) => {
     if (current == null || prev == null || current === '-' || prev === '-') return null;
     const diff = Math.round(current - prev);
@@ -26,12 +25,9 @@ export default function ClimatePage() {
   const [activeTab, setActiveTab] = useState('heat'); 
   const [timeMode, setTimeMode] = useState('live'); 
 
-  // 🌟 State สำหรับฟีเจอร์ Desktop
   const [sortOrder, setSortOrder] = useState('alpha'); 
 
-  // 🌟 State สำหรับฟีเจอร์ Mobile UX
-  const [isMapInteractive, setIsMapInteractive] = useState(false); // ล็อคแผนที่บนมือถือ
-  const [displayLimit, setDisplayLimit] = useState(20); // โหลดทีละ 20 จังหวัด
+  const [isMapInteractive, setIsMapInteractive] = useState(false);
 
   const [userProv, setUserProv] = useState('');
   const [userData, setUserData] = useState(null);
@@ -42,9 +38,6 @@ export default function ClimatePage() {
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayDateText = yesterdayDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
-
-  // 🌟 Reset จำนวนจังหวัดที่แสดง เมื่อมีการเปลี่ยน Tab หรือ Mode
-  useEffect(() => { setDisplayLimit(20); }, [activeTab, timeMode, searchTerm, sortOrder]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -216,12 +209,11 @@ export default function ClimatePage() {
   const activeTabData = tabs.find(t => t.id === activeTab);
   const activeBriefing = modeBriefings[activeTab];
 
-  // 🌟 กรองและจัดเรียงข้อมูล
   const sortedFilteredData = useMemo(() => {
       let filtered = activeTabData.data.filter(item => item.prov.includes(searchTerm));
       if (timeMode === 'yesterday') {
-          if (sortOrder === 'desc') filtered.sort((a, b) => b.val - a.val); // มากไปน้อย
-          else filtered.sort((a, b) => a.prov.localeCompare(b.prov, 'th')); // ก-ฮ
+          if (sortOrder === 'desc') filtered.sort((a, b) => b.val - a.val); 
+          else filtered.sort((a, b) => a.prov.localeCompare(b.prov, 'th')); 
       }
       return filtered;
   }, [activeTabData.data, searchTerm, timeMode, sortOrder]);
@@ -253,7 +245,7 @@ export default function ClimatePage() {
       trendSummaryText = `สถานการณ์ดีขึ้น ▼: พื้นที่เสี่ยงลดลง ${Math.abs(riskyDiff)} จังหวัด (วันนี้ ${riskyCounts[activeTab].live} จ. / เมื่อวาน ${riskyCounts[activeTab].yest} จ.)`;
   }
 
-  let locSummary = { text: 'สถานการณ์ปกติ', color: '#22c55e', bg: darkMode ? '#052e16' : '#dcfce7', icon: '✅', desc: 'ไม่มีการแจ้งเตือนภัยพิบัติรุนแรงในพื้นที่ของคุณ' };
+  let locSummary = { text: 'สถานการณ์ปกติ', color: '#22c55e', bg: darkMode ? '#052e16' : '#dcfce7', icon: '✅', desc: 'ไม่มีการแจ้งเตือนสภาพอากาศรุนแรงในพื้นที่ของคุณ' };
   if (userData && userData.temp !== '-') {
       let criticalThreats = []; let warningThreats = [];
       if (userData.temp >= 40) criticalThreats.push(`ร้อนจัด`);
@@ -286,7 +278,7 @@ export default function ClimatePage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
             <div>
                 <h1 style={{ margin: 0, color: textColor, fontSize: '1.8rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px' }}>🚨 ศูนย์ปฏิบัติการเฝ้าระวัง</h1>
-                <p style={{ margin: '5px 0 0 0', color: subTextColor, fontSize: '0.9rem' }}>ข้อมูลวิเคราะห์ภัยพิบัติรายจังหวัด (Real-time & Historical)</p>
+                <p style={{ margin: '5px 0 0 0', color: subTextColor, fontSize: '0.9rem' }}>ระบบติดตามและวิเคราะห์ความเสี่ยงสภาพอากาศ</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
                 <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '8px 16px', borderRadius: '50px', border: `1px solid ${borderColor}`, fontSize: '0.9rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
@@ -310,7 +302,7 @@ export default function ClimatePage() {
             <div style={{ background: locSummary.bg, border: `1px solid ${locSummary.color}50`, borderRadius: '24px', padding: '25px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', transition: '0.3s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                        <div style={{ fontSize: '1.3rem', fontWeight: '900', color: textColor }}>{isLocating ? 'ค้นหา...' : (userProv === 'กรุงเทพมหานคร' ? userProv : `จ.${userProv}`)}</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '900', color: textColor }}>{isLocating ? 'กำลังตรวจสอบ...' : (userProv === 'กรุงเทพมหานคร' ? userProv : `จ.${userProv}`)}</div>
                         <div style={{ fontSize: '0.8rem', color: subTextColor, marginTop: '2px' }}>📍 พื้นที่เฝ้าระวังของคุณ</div>
                     </div>
                     <button onClick={() => setShowLocFilter(!showLocFilter)} style={{ background: 'transparent', border: 'none', color: locSummary.color, cursor: 'pointer', fontSize: '1.2rem', transition: '0.2s' }} title="ค้นหา/เปลี่ยนจังหวัด">🔍</button>
@@ -339,12 +331,12 @@ export default function ClimatePage() {
                             }}
                             style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#fff', color: textColor, fontFamily: 'Kanit', outline: 'none' }}
                         >
-                            <option value="">-- ค้นหา/เปลี่ยนจังหวัด --</option>
+                            <option value="">-- ระบุตำแหน่งที่ต้องการ... --</option>
                             {[...stations].sort((a,b)=>a.areaTH.localeCompare(b.areaTH,'th')).map(st => (
                                 <option key={st.stationID} value={st.areaTH}>{st.areaTH}</option>
                             ))}
                         </select>
-                        <button onClick={() => { setShowLocFilter(false); fetchUserLocation(); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '12px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold' }} title="ใช้พิกัด GPS ปัจจุบัน">📍 GPS</button>
+                        <button onClick={() => { setShowLocFilter(false); fetchUserLocation(); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '12px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold' }} title="อัปเดตตำแหน่งของฉัน">📍 GPS</button>
                     </div>
                 )}
 
@@ -364,7 +356,7 @@ export default function ClimatePage() {
                             </div>
                         </div>
                     </div>
-                ) : ( <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: subTextColor, marginTop: '20px' }}>กำลังโหลด...</div> )}
+                ) : ( <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: subTextColor, marginTop: '20px' }}>กำลังประมวลผลข้อมูล...</div> )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -396,7 +388,6 @@ export default function ClimatePage() {
                         <h2 style={{ margin: '0 0 10px 0', color: textColor, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>{activeTabData.icon} แผนที่ Nowcast: {activeTabData.label}</h2>
                     </div>
                     <div style={{ flex: 1, minHeight: isMobile ? '350px' : '550px', borderRadius: '16px', overflow: 'hidden', background: '#000', position: 'relative' }}>
-                        {/* 🌟 1. แก้ปัญหา Iframe Trap บนมือถือ */}
                         {isMobile && !isMapInteractive && (
                             <div 
                                 onClick={() => setIsMapInteractive(true)}
@@ -433,32 +424,23 @@ export default function ClimatePage() {
                             </div>
                             <div style={{ fontSize: '0.75rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#0ea5e9', borderRadius: '50%' }}></span>
-                                Nowcast - ข้อมูลเวลาปัจจุบัน
+                                ข้อมูลสถานการณ์เรียลไทม์
                             </div>
-                            <input type="text" placeholder={`🔍 ค้นหา...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
+                            <input type="text" placeholder={`พิมพ์ชื่อจังหวัดเพื่อค้นหา...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
                         </div>
                         <div style={{ padding: '5px 15px', overflowY: 'auto', maxHeight: isMobile ? '300px' : '450px' }} className="custom-scrollbar">
-                            {/* 🌟 2. ระบบ Progressive Disclosure (โหลดทีละ 20) */}
-                            {sortedFilteredData.slice(0, displayLimit).length > 0 ? sortedFilteredData.slice(0, displayLimit).map((item, i) => (
+                            {sortedFilteredData.length > 0 ? sortedFilteredData.map((item, i) => (
                                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 10px', borderBottom: `1px solid ${borderColor}` }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <span style={{ color: subTextColor, fontSize: '0.8rem', width: '20px' }}>{i+1}.</span>
                                         <span style={{ color: textColor, fontWeight: '600', fontSize: '0.9rem' }}>จ.{item.prov}</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <TrendIndicator current={item.val} prev={item.prevVal} mode={activeTab} />
+                                        <TrendIndicator current={item.val} prev={item.prevVal} />
                                         <span style={{ color: activeTabData.color, fontWeight: '900', fontSize: '1rem', width: '60px', textAlign: 'right' }}>{item.val} <small style={{fontSize: '0.6rem'}}>{item.unit}</small></span>
                                     </div>
                                 </div>
                             )) : ( <div style={{ textAlign: 'center', padding: '50px 0', color: subTextColor }}>✅ สถานการณ์ปกติ</div> )}
-                            
-                            {sortedFilteredData.length > displayLimit && (
-                                <div style={{ textAlign: 'center', padding: '15px 0' }}>
-                                    <button onClick={() => setDisplayLimit(prev => prev + 20)} style={{ background: darkMode ? '#334155' : '#e2e8f0', color: textColor, border: 'none', padding: '8px 20px', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}>
-                                        ⬇️ โหลดเพิ่มเติม ({sortedFilteredData.length - displayLimit})
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -497,21 +479,21 @@ export default function ClimatePage() {
                             </h3>
                             <div style={{ fontSize: '0.75rem', color: '#8b5cf6', fontWeight: 'bold', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#8b5cf6', borderRadius: '50%' }}></span>
-                                Historical - สถิติสูงสุดของเมื่อวาน
+                                บันทึกสถิติสูงสุดตลอดวันของเมื่อวาน
                             </div>
                         </div>
+                        
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
                             <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit', cursor: 'pointer' }}>
                                 <option value="alpha">🔤 เรียงตามชื่อ (ก-ฮ)</option>
                                 <option value="desc">🔥 เรียงตามความรุนแรง</option>
                             </select>
-                            <input type="text" placeholder={`🔍 ค้นหาจังหวัด...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
+                            <input type="text" placeholder={`พิมพ์ชื่อจังหวัดเพื่อค้นหา...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'Kanit' }} />
                         </div>
                     </div>
                     
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1px', background: borderColor, padding: '1px' }}>
-                        {/* 🌟 2. ระบบ Progressive Disclosure (โหลดทีละ 20) สำหรับ 77 จังหวัด */}
-                        {sortedFilteredData.slice(0, displayLimit).length > 0 ? sortedFilteredData.slice(0, displayLimit).map((item, i) => (
+                        {sortedFilteredData.length > 0 ? sortedFilteredData.map((item, i) => (
                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: cardBg }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     <span style={{ color: subTextColor, fontSize: '0.9rem', width: '25px', fontWeight: 'bold' }}>{i+1}.</span>
@@ -523,15 +505,13 @@ export default function ClimatePage() {
                                     </span>
                                 </div>
                             </div>
-                        )) : ( <div style={{ textAlign: 'center', padding: '50px 0', color: subTextColor, background: cardBg, gridColumn: '1 / -1' }}>ไม่พบข้อมูลจังหวัดที่ค้นหา</div> )}
+                        )) : ( 
+                            <div style={{ textAlign: 'center', padding: '50px 0', color: subTextColor, background: cardBg, gridColumn: '1 / -1' }}>
+                                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🔍</div>
+                                ไม่พบข้อมูล กรุณาตรวจสอบการสะกดชื่อจังหวัดอีกครั้ง
+                            </div> 
+                        )}
                     </div>
-                    {sortedFilteredData.length > displayLimit && (
-                        <div style={{ textAlign: 'center', padding: '15px 0', background: cardBg }}>
-                            <button onClick={() => setDisplayLimit(prev => prev + 20)} style={{ background: darkMode ? '#334155' : '#e2e8f0', color: textColor, border: 'none', padding: '10px 25px', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}>
-                                ⬇️ โหลดข้อมูลเพิ่มอีก ({sortedFilteredData.length - displayLimit} จังหวัด)
-                            </button>
-                        </div>
-                    )}
                 </div>
             </div>
         )}
