@@ -32,6 +32,9 @@ export default function ClimatePage() {
   const [isLocating, setIsLocating] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // 🌟 [แทรกใหม่] State สำหรับเปิด/ปิด กล่องเลือกจังหวัด
+  const [showLocFilter, setShowLocFilter] = useState(false);
+
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayDateText = yesterdayDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -54,6 +57,7 @@ export default function ClimatePage() {
       return curr;
   }, []);
 
+  // ฟังก์ชันดึง GPS 
   const fetchUserLocation = useCallback(() => {
       setIsLocating(true);
       const fallbackToDefault = () => {
@@ -203,7 +207,6 @@ export default function ClimatePage() {
   const activeBriefing = modeBriefings[activeTab];
   const filteredData = activeTabData.data.filter(item => item.prov.includes(searchTerm));
 
-  // 🌟 ฟังก์ชันคู่บุญที่หายไป เอากลับมาแล้ว!
   const getWindyOverlay = (tabId) => {
       if (tabId === 'rain') return 'rain';
       if (tabId === 'pm25') return 'pm2p5';
@@ -276,8 +279,46 @@ export default function ClimatePage() {
                         <div style={{ fontSize: '1.3rem', fontWeight: '900', color: textColor }}>{isLocating ? 'ค้นหา...' : (userProv === 'กรุงเทพมหานคร' ? userProv : `จ.${userProv}`)}</div>
                         <div style={{ fontSize: '0.8rem', color: subTextColor, marginTop: '2px' }}>📍 พื้นที่เฝ้าระวังของคุณ</div>
                     </div>
-                    <button onClick={fetchUserLocation} disabled={isLocating} style={{ background: 'transparent', border: 'none', color: locSummary.color, cursor: isLocating ? 'wait' : 'pointer', fontSize: '1.2rem', transition: '0.2s', opacity: isLocating ? 0.5 : 1 }} title="ค้นหาพิกัดใหม่">{isLocating ? '⏳' : '🔍'}</button>
+                    {/* 🌟 เปลี่ยนปุ่มนี้ให้เปิด/ปิด Dropdown เลือกจังหวัดแทน */}
+                    <button onClick={() => setShowLocFilter(!showLocFilter)} style={{ background: 'transparent', border: 'none', color: locSummary.color, cursor: 'pointer', fontSize: '1.2rem', transition: '0.2s' }} title="ค้นหา/เปลี่ยนจังหวัด">
+                        🔍
+                    </button>
                 </div>
+
+                {/* 🌟 กล่องตัวกรองเลือกจังหวัด (Dropdown) */}
+                {showLocFilter && (
+                    <div className="fade-in" style={{ marginTop: '15px', display: 'flex', gap: '8px', zIndex: 10, position: 'relative' }}>
+                        <select
+                            value={userProv}
+                            onChange={(e) => {
+                                const pName = e.target.value;
+                                if(!pName) return;
+                                const closest = stations.find(st => st.areaTH === pName);
+                                if(closest) {
+                                    const prov = closest.areaTH.replace('จังหวัด', '');
+                                    setUserProv(prov);
+                                    const curr = stationTemps[closest.stationID] || {};
+                                    const prev = stationYesterday[closest.stationID] || {};
+                                    setUserData({
+                                        temp: Math.round(curr.temp || 0), prevTemp: prev.temp !== undefined ? prev.temp : getSafePrev(curr.temp, 'temp', prov),
+                                        pm25: closest.AQILast?.PM25?.value || 0, prevPm25: prev.pm25 !== undefined ? prev.pm25 : getSafePrev(closest.AQILast?.PM25?.value || 0, 'pm25', prov),
+                                        rain: curr.rainProb || 0, uv: curr.uv || 0, wind: Math.round(curr.windSpeed || 0)
+                                    });
+                                }
+                                setShowLocFilter(false);
+                            }}
+                            style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#fff', color: textColor, fontFamily: 'Kanit', outline: 'none' }}
+                        >
+                            <option value="">-- ค้นหา/เปลี่ยนจังหวัด --</option>
+                            {[...stations].sort((a,b)=>a.areaTH.localeCompare(b.areaTH,'th')).map(st => (
+                                <option key={st.stationID} value={st.areaTH}>{st.areaTH}</option>
+                            ))}
+                        </select>
+                        <button onClick={() => { setShowLocFilter(false); fetchUserLocation(); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '12px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold' }} title="ใช้พิกัด GPS ปัจจุบัน">
+                            📍 GPS
+                        </button>
+                    </div>
+                )}
 
                 {!isLocating && userData ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '20px', gap: '5px' }}>
