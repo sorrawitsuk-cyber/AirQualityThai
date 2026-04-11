@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useMemo } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function AIPage() {
@@ -13,10 +13,19 @@ export default function AIPage() {
   const [weatherData, setWeatherData] = useState(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
 
+  const dateScrollRef = useRef(null);
+  const tabScrollRef = useRef(null);
+
+  const handleScroll = (ref, direction) => {
+      if (ref.current) {
+          ref.current.scrollBy({ left: direction * 200, behavior: 'smooth' });
+      }
+  };
+
   const fetchWeatherByCoords = async (lat, lon) => {
     try {
       setLoadingWeather(true);
-      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,visibility&hourly=temperature_2m,precipitation_probability,pm2_5&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=Asia%2FBangkok`;
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,visibility&hourly=temperature_2m,precipitation_probability,pm2_5,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=Asia%2FBangkok`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=Asia%2FBangkok`;
 
       const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
@@ -42,7 +51,8 @@ export default function AIPage() {
             time: wData.hourly.time,
             temperature_2m: wData.hourly.temperature_2m,
             precipitation_probability: wData.hourly.precipitation_probability,
-            pm25: aData.hourly.pm2_5
+            pm25: aData.hourly.pm2_5,
+            wind_speed_10m: wData.hourly.wind_speed_10m
           },
           daily: {
             time: wData.daily.time,
@@ -50,8 +60,10 @@ export default function AIPage() {
             temperature_2m_max: wData.daily.temperature_2m_max,
             temperature_2m_min: wData.daily.temperature_2m_min,
             apparent_temperature_max: wData.daily.apparent_temperature_max,
-            pm25_max: new Array(7).fill(aData.current.pm2_5),
-            precipitation_probability_max: wData.daily.precipitation_probability_max
+            pm25_max: new Array(7).fill(aData.current.pm2_5), // API ฟรีอาจไม่มีรายวัน ให้ใช้ค่าปัจจุบันแทน
+            precipitation_probability_max: wData.daily.precipitation_probability_max,
+            uv_index_max: wData.daily.uv_index_max,
+            wind_speed_10m_max: wData.daily.wind_speed_10m_max
           },
           coords: { lat, lon }
         });
@@ -91,6 +103,7 @@ export default function AIPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 🧠 AI Engine: ประมวลผลลึกซึ้งด้วย UV และ ความเร็วลม
   const aiReport = useMemo(() => {
     if (!weatherData || !weatherData.daily) return null;
 
@@ -98,6 +111,8 @@ export default function AIPage() {
     const tMax = Math.round(d.temperature_2m_max?.[targetDateIdx] ?? 0);
     const tMin = Math.round(d.temperature_2m_min?.[targetDateIdx] ?? 0);
     const rain = d.precipitation_probability_max?.[targetDateIdx] ?? 0;
+    const uvMax = d.uv_index_max?.[targetDateIdx] ?? 0;
+    const windMax = Math.round(d.wind_speed_10m_max?.[targetDateIdx] ?? 0); // km/h
     const pm25 = d.pm25_max?.[targetDateIdx] !== undefined ? Math.round(d.pm25_max[targetDateIdx]) : Math.round(weatherData.current?.pm25 ?? 0);
 
     const getQuickAnswers = () => {
@@ -122,30 +137,37 @@ export default function AIPage() {
         case 'laundry': 
           if (rain > 30) baseScore -= 5;
           if (rain > 60) baseScore -= 3;
-          if (tMax > 33 && rain < 20) baseScore += 1;
+          // ลมดีช่วยให้ผ้าแห้งไวขึ้น แม้แดดจะน้อย
+          if (windMax >= 10 && windMax <= 25 && rain < 20) baseScore += 1; 
+          // ลมแรงพายุ ผ้าปลิว
+          if (windMax > 35) baseScore -= 3;
           break;
         case 'exercise': 
           if (pm25 > 37.5) baseScore -= 5;
           if (tMax > 36) baseScore -= 3;
           if (rain > 50) baseScore -= 2;
+          if (uvMax > 8) baseScore -= 1; // UV สูงไป วิ่งกลางแจ้งไม่ดี
           break;
         case 'outdoor': 
           if (rain > 40) baseScore -= 4;
           if (tMax > 37) baseScore -= 3;
-          if (pm25 > 50) baseScore -= 2;
+          if (uvMax > 8) baseScore -= 2;
+          if (windMax > 30) baseScore -= 2; // ลมพัดเต็นท์ปลิว
           break;
         case 'travel': 
           if (rain > 50) baseScore -= 4;
           if (tMax > 38) baseScore -= 3;
+          if (uvMax > 10) baseScore -= 2;
           break;
         case 'farming': 
           if (rain > 70) baseScore -= 4;
           if (tMax > 38) baseScore -= 3;
+          if (windMax > 15) baseScore -= 3; // ลมแรงฉีดยาไม่ได้
           break;
         case 'pets': 
           if (tMax > 35) baseScore -= 4;
           if (rain > 40) baseScore -= 3;
-          if (pm25 > 50) baseScore -= 2;
+          if (uvMax > 8) baseScore -= 1; // หมาแมวก็ผิวไหม้ได้
           break;
         case 'carwash': 
           if (rain > 20) baseScore -= 5;
@@ -163,36 +185,41 @@ export default function AIPage() {
     const getMainAdvice = () => {
       if (activeTab === 'laundry') {
           if (rain > 40) return `ประเมินความเสี่ยง: โอกาสฝนตก ${rain}% ไม่แนะนำให้ตากผ้าภายนอกอาคาร ควรใช้เครื่องอบผ้าหรือตากในพื้นที่ร่มที่มีอากาศถ่ายเท`;
-          if (tMax > 33) return `ประเมินความเสี่ยง: สภาพอากาศเหมาะสมอย่างยิ่ง แสงแดดจัดช่วยให้ผ้าแห้งไวและยับยั้งการเจริญเติบโตของแบคทีเรียได้อย่างมีประสิทธิภาพ`;
+          if (windMax > 35) return `ประเมินความเสี่ยง: สภาพอากาศมีกระแสลมกระโชกแรง (${windMax} กม./ชม.) เสี่ยงต่อการที่สิ่งของตากไว้จะปลิวหลุดลอย ควรยึดด้วยไม้หนีบให้แน่นหนา`;
+          if (tMax > 33 && windMax >= 10) return `ประเมินความเสี่ยง: สภาพอากาศเหมาะสมอย่างยิ่ง การผสานกันของแสงแดดจัดและกระแสลม (${windMax} กม./ชม.) จะช่วยให้ผ้าแห้งไวและลดความอับชื้นได้อย่างมีประสิทธิภาพ`;
           return `ประเมินความเสี่ยง: สามารถตากผ้าได้ตามปกติ แต่อาจใช้เวลาแห้งนานกว่าช่วงที่แดดจัด แนะนำให้ติดตามทิศทางเมฆฝนอย่างใกล้ชิด`;
       }
       if (activeTab === 'exercise') {
           if (pm25 > 37.5) return `ประเมินความเสี่ยง: คุณภาพอากาศไม่อยู่ในเกณฑ์มาตรฐาน (PM2.5: ${pm25} µg/m³) ควรงดการวิ่งหรือออกกำลังกายหนักภายนอกอาคาร เปลี่ยนเป็นการคาร์ดิโอในร่มแทน`;
-          if (tMax > 36) return `ประเมินความเสี่ยง: อุณหภูมิพุ่งสูง ระวังภาวะขาดน้ำและฮีทสโตรก ควรเลี่ยงการออกกำลังกายในช่วงบ่าย ให้สลับไปเป็นช่วงเช้าตรู่หรือหัวค่ำ`;
+          if (tMax > 36 || uvMax > 8) return `ประเมินความเสี่ยง: ดัชนีรังสี UV (${uvMax}) และอุณหภูมิอยู่ในระดับอันตราย ระวังภาวะฮีทสโตรกและผิวหนังไหม้แดด ควรเลี่ยงการออกกำลังกายในช่วงบ่ายเด็ดขาด`;
           return `ประเมินความเสี่ยง: สภาพแวดล้อมเหมาะสมสำหรับการออกกำลังกายกลางแจ้ง สามารถดำเนินกิจกรรมตามตารางฝึกซ้อมได้ตามปกติ`;
       }
       if (activeTab === 'outdoor') {
-          if (rain > 40) return `ประเมินความเสี่ยง: มีโอกาสเกิดฝนฟ้าคะนอง หากมีการจัดกิจกรรมกลางแจ้งหรือตั้งแคมป์ ควรเตรียมเต็นท์กันน้ำและแผนสำรองสำหรับการเคลื่อนย้าย`;
-          if (tMax > 37) return `ประเมินความเสี่ยง: ดัชนีความร้อนสะสมอยู่ในระดับสูง ควรจัดเตรียมพื้นที่ร่มเงาและจุดจ่ายน้ำดื่มให้เพียงพอต่อผู้ร่วมกิจกรรม`;
+          if (rain > 40) return `ประเมินความเสี่ยง: มีโอกาสเกิดฝนฟ้าคะนอง หากตั้งแคมป์ควรเตรียมเต็นท์กันน้ำและประเมินจุดเสี่ยงน้ำหลาก`;
+          if (windMax > 30) return `ประเมินความเสี่ยง: กระแสลมแรงถึง ${windMax} กม./ชม. โปรดใช้ความระมัดระวังในการตอกสมอบกและหลีกเลี่ยงการกางเต็นท์ใต้ต้นไม้ใหญ่`;
+          if (uvMax > 8) return `ประเมินความเสี่ยง: ดัชนีรังสี UV สูงมาก ควรจัดเตรียมพื้นที่ร่มเงา (Tarp) และกำชับให้ผู้ร่วมกิจกรรมทาครีมกันแดด (SPF 50+)`;
           return `ประเมินความเสี่ยง: สภาพอากาศเป็นใจอย่างยิ่งสำหรับการทำกิจกรรมกลางแจ้ง ปัจจัยทางอุตุนิยมวิทยาเอื้ออำนวยอย่างเต็มที่`;
       }
       if (activeTab === 'farming') {
-          if (rain > 60) return `ประเมินความเสี่ยง: ไม่แนะนำให้ฉีดพ่นสารเคมีหรือปุ๋ยทางใบ เนื่องจากฝนอาจชะล้างตัวยา และควรเฝ้าระวังน้ำท่วมขังในแปลงเพาะปลูก`;
-          if (tMax > 37) return `ประเมินความเสี่ยง: สภาพอากาศร้อนจัดระเหยความชื้นจากดินอย่างรวดเร็ว ควรรดน้ำพืชในช่วงเช้าตรู่หรือเย็น และระวังพืชเกิดภาวะช็อกความร้อน`;
+          if (rain > 60) return `ประเมินความเสี่ยง: ไม่แนะนำให้ฉีดพ่นสารเคมี เนื่องจากฝนอาจชะล้างตัวยา และควรเฝ้าระวังระบบระบายน้ำในแปลง`;
+          if (windMax > 15) return `ประเมินความเสี่ยง: กระแสลมแรง (${windMax} กม./ชม.) ควรงดการฉีดพ่นสารเคมีหรือปุ๋ยทางใบ เพื่อป้องกันละอองปลิวไปนอกพื้นที่เป้าหมายหรือเป็นอันตรายต่อผู้ปฏิบัติงาน`;
+          if (tMax > 37) return `ประเมินความเสี่ยง: สภาพอากาศร้อนจัด ควรรดน้ำพืชในช่วงเช้าตรู่หรือเย็น และระวังพืชเกิดภาวะช็อกความร้อน`;
           return `ประเมินความเสี่ยง: สภาวะแวดล้อมเหมาะสม สามารถปฏิบัติงานในแปลงเพาะปลูก ฉีดพ่นยา หรือให้ปุ๋ยได้ตามรอบการจัดการปกติ`;
       }
       if (activeTab === 'travel') {
-          if (rain > 50) return `ประเมินความเสี่ยง: สภาพอากาศมีแนวโน้มแปรปรวน แนะนำให้จัดแพลนท่องเที่ยวในอาคาร (Indoor) เป็นหลักเพื่อหลีกเลี่ยงอุปสรรคในการเดินทาง`;
+          if (rain > 50) return `ประเมินความเสี่ยง: สภาพอากาศมีแนวโน้มแปรปรวน แนะนำให้จัดแพลนท่องเที่ยวในอาคาร (Indoor) เป็นหลัก`;
+          if (uvMax > 10) return `ประเมินความเสี่ยง: ดัชนี UV อยู่ในเกณฑ์รุนแรงมาก (Extreme) ควรหลีกเลี่ยงการอยู่กลางแจ้งเป็นเวลานาน สวมแว่นกันแดดและหมวกปีกกว้าง`;
           return `ประเมินความเสี่ยง: เหมาะสมต่อการเดินทางท่องเที่ยว ทัศนวิสัยชัดเจน สามารถดำเนินกิจกรรมตามแพลนที่วางไว้ได้อย่างราบรื่น`;
       }
       if (activeTab === 'pets') {
-          if (tMax > 34) return `ประเมินความเสี่ยง: สภาพอากาศร้อนจัด เสี่ยงต่อภาวะฮีทสโตรกในสัตว์เลี้ยง ควรงดพาเดินเล่นบนพื้นปูนซีเมนต์หรือยางมะตอยในช่วงกลางวันเพื่อป้องกันแผลพุพองที่อุ้งเท้า`;
-          if (rain > 40) return `ประเมินความเสี่ยง: มีโอกาสฝนตก ${rain}% แนะนำให้อยู่ภายในอาคาร และระวังความชื้นที่อาจก่อให้เกิดโรคเชื้อราหรือพยาธิภายนอก`;
+          if (tMax > 34 || uvMax > 8) return `ประเมินความเสี่ยง: สภาพอากาศร้อนจัดและ UV สูง เสี่ยงต่อภาวะฮีทสโตรกและผิวหนังไหม้ (โดยเฉพาะสัตว์เลี้ยงขนสั้น/สีขาว) ควรงดพาเดินเล่นบนพื้นปูนในช่วงกลางวัน`;
+          if (rain > 40) return `ประเมินความเสี่ยง: มีโอกาสฝนตก ${rain}% แนะนำให้อยู่ภายในอาคาร และระวังความชื้นที่อาจก่อให้เกิดโรคเชื้อรา`;
           return `ประเมินความเสี่ยง: สภาพอากาศเป็นมิตรต่อสัตว์เลี้ยง อุณหภูมิอยู่ในเกณฑ์ปลอดภัย สามารถพาออกไปทำกิจกรรมนอกอาคารได้`;
       }
       if (activeTab === 'carwash') {
-          if (rain > 20) return `ประเมินความเสี่ยง: ความน่าจะเป็นของการเกิดฝนสูงถึง ${rain}% แนะนำให้เลื่อนการล้างรถหรือการเคลือบเงาออกไปก่อน เพื่อหลีกเลี่ยงคราบน้ำฝนและดินโคลนเกาะพื้นผิวรถซ้ำ`;
-          return `ประเมินความเสี่ยง: ท้องฟ้าโปร่ง โอกาสฝนตกต่ำมาก เป็นสภาวะแวดล้อมที่เหมาะสมที่สุดสำหรับการล้างรถ ขัดสี และเคลือบเงา`;
+          if (rain > 20) return `ประเมินความเสี่ยง: ความน่าจะเป็นของการเกิดฝนสูงถึง ${rain}% แนะนำให้เลื่อนการล้างรถออกไปก่อน เพื่อหลีกเลี่ยงคราบน้ำฝนและดินโคลนกระเด็นซ้ำ`;
+          if (uvMax > 8 || tMax > 35) return `ประเมินความเสี่ยง: แสงแดดและรังสี UV รุนแรงมาก ไม่ควรล้างรถกลางแจ้ง เนื่องจากหยดน้ำจะทำหน้าที่เป็นแว่นขยายทำลายชั้นแลคเกอร์ และแชมพูจะแห้งไวจนเกิดคราบฝังแน่น`;
+          return `ประเมินความเสี่ยง: ท้องฟ้าโปร่ง โอกาสฝนตกต่ำ เป็นสภาวะแวดล้อมที่เหมาะสมที่สุดสำหรับการล้างรถ ขัดสี และเคลือบเงา`;
       }
       
       if (finalScore >= 8) return `สรุปการประเมิน: สภาพอากาศโดยรวมอยู่ในเกณฑ์ดีเยี่ยม ปัจจัยทางอุตุนิยมวิทยาเอื้ออำนวยต่อการดำเนินชีวิตประจำวันตามปกติ`;
@@ -211,37 +238,37 @@ export default function AIPage() {
         ],
         laundry: [
           { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: isRainy ? `สังเกตทิศทางลมและเมฆฝน หากความชื้นสูงควรชะลอการซักผ้า` : `ปริมาณรังสี UV และแสงแดดเหมาะสม สามารถเริ่มการซักและตากผ้าได้` },
-          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `อุณหภูมิความร้อนระดับนี้ ช่วยลดระยะเวลาตากผ้าและยับยั้งเชื้อแบคทีเรียได้ดี` : `ปริมาณแสงแดดเพียงพอต่อการทำให้ผ้าแห้งตามมาตรฐาน` },
+          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot || windMax >= 10 ? `อุณหภูมิและความเร็วลมระดับนี้ ช่วยลดระยะเวลาตากผ้าและยับยั้งเชื้อแบคทีเรียได้ดีเยี่ยม` : `ปริมาณแสงแดดเพียงพอต่อการทำให้ผ้าแห้งตามมาตรฐาน` },
           { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: `ความชื้นสัมพัทธ์ในอากาศเพิ่มขึ้น ควรรีบจัดเก็บเสื้อผ้าที่ตากไว้เพื่อป้องกันกลิ่นอับ` }
         ],
         exercise: [
           { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: pm25 > 37.5 ? `ค่ามลพิษทางอากาศเกินเกณฑ์มาตรฐาน ควรงดกิจกรรมที่ต้องสูดหายใจลึกภายนอกอาคาร` : `คุณภาพอากาศและอุณหภูมิอยู่ในระดับที่เหมาะสมที่สุดสำหรับการคาร์ดิโอ` },
-          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `ความร้อนสะสมสูง เสี่ยงต่อภาวะ Heatstroke ควรปรับเปลี่ยนเป็นการฝึกซ้อมในฟิตเนส` : `สามารถดำเนินกิจกรรมทางกายได้ แต่ควรเฝ้าระวังอัตราการเต้นของหัวใจและจิบน้ำอย่างสม่ำเสมอ` },
+          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: uvMax > 8 ? `รังสี UV ระดับอันตราย เสี่ยงต่อผิวหนังไหม้ ควรปรับเปลี่ยนเป็นการฝึกซ้อมในฟิตเนส` : `สามารถดำเนินกิจกรรมทางกายได้ แต่ควรเฝ้าระวังอัตราการเต้นของหัวใจและจิบน้ำอย่างสม่ำเสมอ` },
           { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: `อุณหภูมิผ่อนคลายลง เหมาะสมสำหรับการเดินเร็ว วิ่งจ็อกกิ้ง หรือกิจกรรมยืดเหยียดกล้ามเนื้อ` }
         ],
         outdoor: [
           { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: `สภาพแสงและอุณหภูมิเหมาะสมอย่างยิ่งในการจัดเตรียมสถานที่หรือเคลื่อนย้ายอุปกรณ์` },
-          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `รังสี UV อยู่ในเกณฑ์ที่อาจเป็นอันตรายต่อผิวหนัง ควรจัดกิจกรรมภายใต้ร่มเงาหรือโครงสร้างชั่วคราว` : `สภาพอากาศเปิดโล่ง สามารถดำเนินกิจกรรมนันทนาการได้อย่างราบรื่น` },
-          { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: isRainy ? `เฝ้าระวังพายุลมแรง ตรวจสอบการตอกสมอบกและประเมินความปลอดภัยของพื้นที่จุดกางเต็นท์` : `บรรยากาศและอุณหภูมิลดลง เหมาะสมสำหรับการก่อกองไฟและทำกิจกรรมส่วนรวม` }
+          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: uvMax > 8 ? `รังสี UV สูงจัด ควรทาครีมกันแดดซ้ำทุก 2 ชั่วโมง และจัดกิจกรรมภายใต้ร่มเงา` : `สภาพอากาศเปิดโล่ง สามารถดำเนินกิจกรรมนันทนาการได้อย่างราบรื่น` },
+          { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: isRainy || windMax > 20 ? `เฝ้าระวังกระแสลมและพายุ ตรวจสอบการตอกสมอบกให้แน่นหนา` : `บรรยากาศและอุณหภูมิลดลง เหมาะสมสำหรับการก่อกองไฟและทำกิจกรรมส่วนรวม` }
         ],
         farming: [
-          { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: `ช่วงเวลาที่ปากใบพืชเปิดรับสารอาหารได้เต็มที่ เหมาะสมสูงสุดสำหรับการฉีดพ่นปุ๋ยทางใบ` },
+          { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: windMax > 15 ? `กระแสลมแปรปรวน ควรงดการฉีดพ่นปุ๋ยทางใบชั่วคราว` : `ช่วงเวลาที่ปากใบพืชเปิดรับสารอาหารได้เต็มที่ เหมาะสมสูงสุดสำหรับการฉีดพ่นบำรุง` },
           { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `อุณหภูมิดินสูง ควรงดการให้น้ำพืชเพื่อป้องกันภาวะช็อกความร้อนและการลวกของระบบราก` : `สามารถดำเนินการบำรุงรักษาแปลงเพาะปลูกและกำจัดวัชพืชได้ตามแผนการจัดการ` },
           { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: isRainy ? `ติดตามปริมาณฝนสะสมเพื่อประเมินและบริหารจัดการระบบระบายน้ำในแปลงเพาะปลูกสำหรับวันพรุ่งนี้` : `สามารถให้น้ำเสริมแก่พืชได้ เพื่อชดเชยการสูญเสียความชื้นจากกระบวนการคายน้ำระหว่างวัน` }
         ],
         travel: [
           { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: `ทัศนวิสัยดีเยี่ยม เหมาะสมต่อการเดินทางไกลและเยี่ยมชมแหล่งท่องเที่ยวทางธรรมชาติ` },
-          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `แนะนำให้ปรับกำหนดการเป็นการเข้าเยี่ยมชมพิพิธภัณฑ์ ศูนย์การค้า หรือสถานที่ปรับอากาศ` : `การสัญจรราบรื่น สภาพอุตุนิยมวิทยาไม่เป็นอุปสรรคต่อการเดินทาง` },
+          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot || uvMax > 8 ? `แดดและ UV แรงจัด แนะนำให้ปรับกำหนดการเป็นการเข้าเยี่ยมชมพิพิธภัณฑ์ หรือสถานที่ปรับอากาศ` : `การสัญจรราบรื่น สภาพอุตุนิยมวิทยาไม่เป็นอุปสรรคต่อการเดินทาง` },
           { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: `เหมาะสมสำหรับการจัดตารางกิจกรรมช่วงกลางคืน เช่น ตลาดนัดคนเดิน หรือการรับประทานอาหารภายนอก` }
         ],
         pets: [
           { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: pm25 > 37.5 ? `มลพิษทางอากาศค่อนข้างสูง หากพาเดินเล่นควรจำกัดระยะเวลาเพื่อลดผลกระทบต่อระบบหายใจของสัตว์เลี้ยง` : `อุณหภูมิผิวถนนเย็นและอากาศถ่ายเทดี เป็นช่วงเวลาปลอดภัยที่สุดในการพาสัตว์เลี้ยงออกกำลังกาย` },
-          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `พื้นยางมะตอยหรือคอนกรีตอาจมีอุณหภูมิสูงถึง 50-60°C เสี่ยงต่อการเกิดแผลไหม้ที่อุ้งเท้าสุนัข/แมว ควรจัดให้อยู่ในที่ร่ม` : `สามารถทำกิจกรรมระยะสั้นได้ แต่ควรจัดเตรียมน้ำสะอาดให้สัตว์เลี้ยงเข้าถึงได้ตลอดเวลา` },
+          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot || uvMax > 8 ? `พื้นยางมะตอยร้อนจัดและ UV รุนแรง เสี่ยงต่อแผลไหม้ที่อุ้งเท้าและฮีทสโตรก ควรจัดให้อยู่ในที่ร่ม` : `สามารถทำกิจกรรมระยะสั้นได้ แต่ควรจัดเตรียมน้ำสะอาดให้สัตว์เลี้ยงเข้าถึงได้ตลอดเวลา` },
           { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: isRainy ? `ระวังพาหะนำโรค เช่น เห็บ หมัด และสัตว์มีพิษที่มากับความชื้นหลังฝนตก ควรเช็ดอุ้งเท้าให้แห้งสนิทเมื่อกลับเข้าอาคาร` : `อุณหภูมิแวดล้อมผ่อนคลายลง เหมาะสมต่อการพาสัตว์เลี้ยงไปเดินเล่นคลายเครียดก่อนพักผ่อน` }
         ],
         carwash: [
           { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: isRainy ? `สภาพอากาศมีเมฆฝนปกคลุม ยังไม่แนะนำให้ดำเนินการล้างทำความสะอาดรถในเวลานี้` : `ช่วงเวลาเหมาะสมที่สุด อุณหภูมิผิวยังไม่สูงเกินไป ทำให้เช็ดแห้งได้ทันและลดความเสี่ยงการเกิดคราบน้ำ (Water spot)` },
-          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `แสงแดดและอุณหภูมิแวดล้อมที่สูงเกินไป จะทำให้สารทำความสะอาดแห้งไวและทำลายชั้นเคลือบสี ควรล้างรถในที่ร่มเท่านั้น` : `สามารถล้างทำความสะอาด ขัดสี และลงแว็กซ์เคลือบเงาได้ตามกระบวนการปกติ` },
+          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: uvMax > 8 || tMax > 35 ? `รังสี UV และความร้อนสูงเกินไป จะทำให้สารทำความสะอาดแห้งไวและทำลายชั้นเคลือบสี ควรล้างรถในที่ร่มเท่านั้น` : `สามารถล้างทำความสะอาด ขัดสี และลงแว็กซ์เคลือบเงาได้ตามกระบวนการปกติ` },
           { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: isRainy ? `มีความเสี่ยงที่จะเกิดหยาดน้ำฟ้า หากต้องใช้รถควรขับด้วยความระมัดระวังเพื่อหลีกเลี่ยงโคลนกระเด็นจากพื้นถนน` : `สามารถจอดพักรถทิ้งไว้ภายนอกอาคารได้อย่างไร้กังวล ไม่มีปัจจัยสภาพอากาศที่ทำให้รถหมองคล้ำ` }
         ]
       };
@@ -279,7 +306,7 @@ export default function AIPage() {
     <div className="loading-container" style={{ background: appBg, color: textColor }}>
         <div className="loading-spinner" style={{ borderTopColor: '#8b5cf6', borderColor: 'rgba(139, 92, 246, 0.15)' }}></div>
         <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>ระบบกำลังประมวลผลทางสถิติ...</div>
-        <div style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '5px' }}>วิเคราะห์ปัจจัยทางอุตุนิยมวิทยา</div>
+        <div style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '5px' }}>วิเคราะห์ UV และ ปัจจัยทางอุตุนิยมวิทยา</div>
     </div>
   );
   
@@ -314,7 +341,6 @@ export default function AIPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
-                    {/* 🌟 มือถือ: ปุ่มเลือกวันที่แบบ Dropdown ควบคู่ปุ่มเปลี่ยนพื้นที่ */}
                     {isMobile && (
                         <select value={targetDateIdx} onChange={(e) => setTargetDateIdx(parseInt(e.target.value))} style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
                             {[0,1,2,3,4,5,6].map(idx => {
@@ -338,7 +364,6 @@ export default function AIPage() {
                 </div>
             </div>
 
-            {/* 🌟 Desktop: แสดงปุ่มเลือกวันที่แบบ Flex Wrap เรียงกันลงมาสวยๆ */}
             {!isMobile && (
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '20px' }}>
                     {[0,1,2,3,4,5,6].map(idx => {
@@ -375,7 +400,6 @@ export default function AIPage() {
 
         {/* 📑 หมวดหมู่ไลฟ์สไตล์ */}
         {isMobile ? (
-            /* 🌟 Mobile: เปลี่ยนเป็น Grid 4x2 แบบไม่บีบตัวอักษร ตัดตกให้พอดีจอ */
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' }}>
                 {tabConfigs.map(tab => {
                     const isActive = activeTab === tab.id;
@@ -394,7 +418,6 @@ export default function AIPage() {
                 })}
             </div>
         ) : (
-            /* 🌟 Desktop: เรียงปุ่มแบบ Flex Wrap ถ้าที่กว้างไม่พอให้ตกลงมาบรรทัดใหม่ */
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 {tabConfigs.map(tab => {
                     const isActive = activeTab === tab.id;
