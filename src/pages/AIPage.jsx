@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useMemo } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function AIPage() {
@@ -13,7 +13,16 @@ export default function AIPage() {
   const [weatherData, setWeatherData] = useState(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
 
-  // 🌟 ย้ายฟังก์ชันขึ้นมาด้านบน เพื่อให้ระบบรู้จักก่อนนำไปใช้งาน
+  // 🌟 Ref สำหรับปุ่มลูกศรเลื่อนซ้าย-ขวา
+  const dateScrollRef = useRef(null);
+  const tabScrollRef = useRef(null);
+
+  const handleScroll = (ref, direction) => {
+      if (ref.current) {
+          ref.current.scrollBy({ left: direction * 200, behavior: 'smooth' });
+      }
+  };
+
   const fetchWeatherByCoords = async (lat, lon) => {
     try {
       setLoadingWeather(true);
@@ -300,6 +309,18 @@ export default function AIPage() {
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .fade-in { animation: fadeIn 0.4s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* สไตล์ป้องกันปุ่มถูกบีบ (Squished buttons) */
+        .scroll-button-container {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 5px 40px; /* เพิ่ม Padding ซ้ายขวาให้ปุ่มลูกศรมีที่อยู่ */
+            scroll-behavior: smooth;
+        }
+        @media (max-width: 1024px) {
+            .scroll-button-container { padding: 5px 0px; } /* มือถือไม่ต้องเผื่อที่ให้ปุ่มซ้ายขวา */
+        }
       `}} />
 
       <div style={{ width: '100%', maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '120px' }}>
@@ -318,34 +339,43 @@ export default function AIPage() {
                         const val = e.target.value;
                         setSelectedProv(val); 
                         if(val){
-                            // 🌟 แก้บั๊ก .find() โดยเพิ่ม (stations || []) ป้องกัน Error จอขาว
                             const st = (stations || []).find(s => s.areaTH === val);
                             if(st) { fetchWeatherByCoords(st.lat, st.long); fetchLocationName(st.lat, st.long); }
                         }
                     }} style={{ padding: '8px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
                         <option value="">เปลี่ยนพื้นที่</option>
-                        {/* 🌟 แก้บั๊ก .map() ป้องกัน Error จอขาวตอนข้อมูลยังไม่มา */}
                         {(stations || []).map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
                     </select>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginTop: '20px', paddingBottom: '5px' }} className="hide-scrollbar">
-                {[0,1,2,3,4,5,6].map(idx => {
-                    const date = new Date(weatherData?.daily?.time?.[idx] || Date.now());
-                    const dateStr = idx === 0 ? 'วันนี้' : idx === 1 ? 'พรุ่งนี้' : date.toLocaleDateString('th-TH', {weekday:'short', day:'numeric'});
-                    return (
-                        <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ 
-                            flexShrink: 0, padding: '10px 15px', borderRadius: '14px', 
-                            border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, 
-                            background: targetDateIdx === idx ? activeColor : 'transparent', 
-                            color: targetDateIdx === idx ? '#fff' : textColor, 
-                            fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: '0.2s' 
-                        }}>
-                            {dateStr}
-                        </button>
-                    );
-                })}
+            {/* 🌟 ปรับปรุง: แถบเลือกวันที่ + ปุ่มลูกศร */}
+            <div style={{ position: 'relative', marginTop: '20px' }}>
+                {!isMobile && (
+                    <button onClick={() => handleScroll(dateScrollRef, -1)} style={{ position: 'absolute', left: '-15px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, background: cardBg, border: `1px solid ${borderColor}`, color: textColor, borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '2px 0 10px rgba(0,0,0,0.05)' }}>◀</button>
+                )}
+                
+                <div ref={dateScrollRef} className="scroll-button-container hide-scrollbar">
+                    {[0,1,2,3,4,5,6].map(idx => {
+                        const date = new Date(weatherData?.daily?.time?.[idx] || Date.now());
+                        const dateStr = idx === 0 ? 'วันนี้' : idx === 1 ? 'พรุ่งนี้' : date.toLocaleDateString('th-TH', {weekday:'short', day:'numeric'});
+                        return (
+                            <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ 
+                                flexShrink: 0, padding: '10px 15px', borderRadius: '14px', 
+                                border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, 
+                                background: targetDateIdx === idx ? activeColor : 'transparent', 
+                                color: targetDateIdx === idx ? '#fff' : textColor, 
+                                fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: '0.2s' 
+                            }}>
+                                {dateStr}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {!isMobile && (
+                    <button onClick={() => handleScroll(dateScrollRef, 1)} style={{ position: 'absolute', right: '-15px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, background: cardBg, border: `1px solid ${borderColor}`, color: textColor, borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '-2px 0 10px rgba(0,0,0,0.05)' }}>▶</button>
+                )}
             </div>
         </div>
 
@@ -362,22 +392,32 @@ export default function AIPage() {
             </div>
         )}
 
-        {/* 📑 หมวดหมู่ไลฟ์สไตล์ */}
-        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '5px' }} className="hide-scrollbar">
-            {tabConfigs.map(tab => {
-                const isActive = activeTab === tab.id;
-                return (
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                        flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '50px', border: 'none',
-                        background: isActive ? (darkMode ? `${tab.color}30` : `${tab.color}15`) : cardBg,
-                        color: isActive ? tab.color : subTextColor,
-                        border: `1px solid ${isActive ? tab.color : borderColor}`,
-                        fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
-                    }}>
-                        <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span> {tab.label}
-                    </button>
-                );
-            })}
+        {/* 🌟 ปรับปรุง: หมวดหมู่ไลฟ์สไตล์ + ปุ่มลูกศร */}
+        <div style={{ position: 'relative' }}>
+            {!isMobile && (
+                <button onClick={() => handleScroll(tabScrollRef, -1)} style={{ position: 'absolute', left: '-15px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, background: cardBg, border: `1px solid ${borderColor}`, color: textColor, borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '2px 0 10px rgba(0,0,0,0.05)' }}>◀</button>
+            )}
+
+            <div ref={tabScrollRef} className="scroll-button-container hide-scrollbar">
+                {tabConfigs.map(tab => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                            flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '50px', border: 'none',
+                            background: isActive ? (darkMode ? `${tab.color}30` : `${tab.color}15`) : cardBg,
+                            color: isActive ? tab.color : subTextColor,
+                            border: `1px solid ${isActive ? tab.color : borderColor}`,
+                            fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
+                        }}>
+                            <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span> {tab.label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {!isMobile && (
+                <button onClick={() => handleScroll(tabScrollRef, 1)} style={{ position: 'absolute', right: '-15px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, background: cardBg, border: `1px solid ${borderColor}`, color: textColor, borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '-2px 0 10px rgba(0,0,0,0.05)' }}>▶</button>
+            )}
         </div>
 
         {/* 🤖 AI Detailed Report */}
