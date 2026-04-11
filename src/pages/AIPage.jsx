@@ -2,13 +2,75 @@ import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 
 export default function AIPage() {
-  const { stations, weatherData, fetchWeatherByCoords, loadingWeather, darkMode } = useContext(WeatherContext);
+  const { stations, darkMode } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
   const [selectedProv, setSelectedProv] = useState('');
   const [targetDateIdx, setTargetDateIdx] = useState(0); 
   const [activeTab, setActiveTab] = useState('summary'); 
+  
+  const [weatherData, setWeatherData] = useState(null);
+  const [loadingWeather, setLoadingWeather] = useState(true);
+
+  // 🌟 ย้ายฟังก์ชันขึ้นมาด้านบน เพื่อให้ระบบรู้จักก่อนนำไปใช้งาน
+  const fetchWeatherByCoords = async (lat, lon) => {
+    try {
+      setLoadingWeather(true);
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,visibility&hourly=temperature_2m,precipitation_probability,pm2_5&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=Asia%2FBangkok`;
+      const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=Asia%2FBangkok`;
+
+      const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
+      const wData = await wRes.json();
+      const aData = await aRes.json();
+
+      if (wRes.ok && aRes.ok) {
+        setWeatherData({
+          current: {
+            temp: wData.current.temperature_2m,
+            feelsLike: wData.current.apparent_temperature,
+            humidity: wData.current.relative_humidity_2m,
+            windSpeed: wData.current.wind_speed_10m,
+            pressure: wData.current.surface_pressure,
+            visibility: wData.current.visibility,
+            uv: wData.daily.uv_index_max[0],
+            pm25: aData.current.pm2_5,
+            sunrise: wData.daily.sunrise[0],
+            sunset: wData.daily.sunset[0],
+            rainProb: wData.hourly.precipitation_probability[new Date().getHours()],
+          },
+          hourly: {
+            time: wData.hourly.time,
+            temperature_2m: wData.hourly.temperature_2m,
+            precipitation_probability: wData.hourly.precipitation_probability,
+            pm25: aData.hourly.pm2_5
+          },
+          daily: {
+            time: wData.daily.time,
+            weathercode: wData.daily.weather_code,
+            temperature_2m_max: wData.daily.temperature_2m_max,
+            temperature_2m_min: wData.daily.temperature_2m_min,
+            apparent_temperature_max: wData.daily.apparent_temperature_max,
+            pm25_max: new Array(7).fill(aData.current.pm2_5),
+            precipitation_probability_max: wData.daily.precipitation_probability_max
+          },
+          coords: { lat, lon }
+        });
+      }
+    } catch (err) {
+      console.error("Fetch local weather failed", err);
+    } finally {
+      setLoadingWeather(false);
+    }
+  };
+
+  const fetchLocationName = async (lat, lon) => {
+    try {
+      const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
+      const data = await res.json();
+      setLocationName(data?.locality || data?.city || 'ตำแหน่งปัจจุบัน');
+    } catch (e) { setLocationName('ตำแหน่งปัจจุบัน'); }
+  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -30,15 +92,6 @@ export default function AIPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchLocationName = async (lat, lon) => {
-    try {
-      const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
-      const data = await res.json();
-      setLocationName(data?.locality || data?.city || 'ตำแหน่งปัจจุบัน');
-    } catch (e) { setLocationName('ตำแหน่งปัจจุบัน'); }
-  };
-
-  // 🧠 AI Engine: ประมวลผลข้อมูลและสร้างคำแนะนำแบบ Professional Tone
   const aiReport = useMemo(() => {
     if (!weatherData || !weatherData.daily) return null;
 
@@ -48,7 +101,6 @@ export default function AIPage() {
     const rain = d.precipitation_probability_max?.[targetDateIdx] ?? 0;
     const pm25 = d.pm25_max?.[targetDateIdx] !== undefined ? Math.round(d.pm25_max[targetDateIdx]) : Math.round(weatherData.current?.pm25 ?? 0);
 
-    // 💡 1. สรุปด่วน (TL;DR)
     const getQuickAnswers = () => {
       let rainAns = { icon: '☀️', title: 'ฝนตกไหม?', text: 'ปลอดฝน ท้องฟ้าโปร่ง', color: '#22c55e' };
       if (rain > 60) rainAns = { icon: '☔', title: 'ฝนตกไหม?', text: `มีความเสี่ยงสูง โอกาส ${rain}%`, color: '#ef4444' };
@@ -65,7 +117,6 @@ export default function AIPage() {
       return [rainAns, heatAns, dustAns];
     };
 
-    // 💡 2. คำนวณคะแนนตามบริบทที่ชัดเจนและครอบคลุม
     const calculateScore = () => {
       let baseScore = 10;
       switch (activeTab) {
@@ -92,12 +143,12 @@ export default function AIPage() {
           if (rain > 70) baseScore -= 4;
           if (tMax > 38) baseScore -= 3;
           break;
-        case 'pets': // สัตว์เลี้ยง (แพ้ความร้อนและฝน)
+        case 'pets': 
           if (tMax > 35) baseScore -= 4;
           if (rain > 40) baseScore -= 3;
           if (pm25 > 50) baseScore -= 2;
           break;
-        case 'carwash': // ล้างรถ (แพ้ฝน 100%)
+        case 'carwash': 
           if (rain > 20) baseScore -= 5;
           if (rain > 50) baseScore -= 4;
           break;
@@ -110,7 +161,6 @@ export default function AIPage() {
     };
     const finalScore = calculateScore();
 
-    // 💡 3. ข้อความแนะนำหลักแบบตรงประเด็น (วิชาการ)
     const getMainAdvice = () => {
       if (activeTab === 'laundry') {
           if (rain > 40) return `ประเมินความเสี่ยง: โอกาสฝนตก ${rain}% ไม่แนะนำให้ตากผ้าภายนอกอาคาร ควรใช้เครื่องอบผ้าหรือตากในพื้นที่ร่มที่มีอากาศถ่ายเท`;
@@ -146,12 +196,10 @@ export default function AIPage() {
           return `ประเมินความเสี่ยง: ท้องฟ้าโปร่ง โอกาสฝนตกต่ำมาก เป็นสภาวะแวดล้อมที่เหมาะสมที่สุดสำหรับการล้างรถ ขัดสี และเคลือบเงา`;
       }
       
-      // Default (ภาพรวม)
       if (finalScore >= 8) return `สรุปการประเมิน: สภาพอากาศโดยรวมอยู่ในเกณฑ์ดีเยี่ยม ปัจจัยทางอุตุนิยมวิทยาเอื้ออำนวยต่อการดำเนินชีวิตประจำวันตามปกติ`;
       return `สรุปการประเมิน: สภาพอากาศมีความผันผวนของปัจจัยบางประการ ควรประเมินสถานการณ์หน้างานและเตรียมความพร้อมสำหรับความเปลี่ยนแปลง`;
     };
 
-    // 💡 4. Timeline เช้า บ่าย ค่ำ
     const getTimeline = () => {
       const isRainy = rain > 40;
       const isHot = tMax > 35;
@@ -179,7 +227,7 @@ export default function AIPage() {
         ],
         farming: [
           { time: 'ช่วงเช้า (06:00 - 12:00)', icon: '🌅', text: `ช่วงเวลาที่ปากใบพืชเปิดรับสารอาหารได้เต็มที่ เหมาะสมสูงสุดสำหรับการฉีดพ่นปุ๋ยทางใบ` },
-          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `อุณหภูมิผิวดินสูง ควรงดการให้น้ำพืชเพื่อป้องกันภาวะช็อกความร้อนและการลวกของระบบราก` : `สามารถดำเนินการบำรุงรักษาแปลงเพาะปลูกและกำจัดวัชพืชได้ตามแผนการจัดการ` },
+          { time: 'ช่วงบ่าย (12:00 - 18:00)', icon: '☀️', text: isHot ? `อุณหภูมิดินสูง ควรงดการให้น้ำพืชเพื่อป้องกันภาวะช็อกความร้อนและการลวกของระบบราก` : `สามารถดำเนินการบำรุงรักษาแปลงเพาะปลูกและกำจัดวัชพืชได้ตามแผนการจัดการ` },
           { time: 'ช่วงค่ำ (18:00 เป็นต้นไป)', icon: '🌙', text: isRainy ? `ติดตามปริมาณฝนสะสมเพื่อประเมินและบริหารจัดการระบบระบายน้ำในแปลงเพาะปลูกสำหรับวันพรุ่งนี้` : `สามารถให้น้ำเสริมแก่พืชได้ เพื่อชดเชยการสูญเสียความชื้นจากกระบวนการคายน้ำระหว่างวัน` }
         ],
         travel: [
@@ -210,7 +258,6 @@ export default function AIPage() {
     };
   }, [activeTab, targetDateIdx, weatherData]);
 
-  // 🌟 ปรับปรุงหมวดหมู่ไลฟ์สไตล์ (เพิ่ม สัตว์เลี้ยง และ ล้างรถ)
   const tabConfigs = [
     { id: 'summary', icon: '📋', label: 'ภาพรวม', color: '#8b5cf6' },
     { id: 'exercise', icon: '🏃‍♂️', label: 'ออกกำลังกาย', color: '#22c55e' },
@@ -271,12 +318,14 @@ export default function AIPage() {
                         const val = e.target.value;
                         setSelectedProv(val); 
                         if(val){
-                            const st = stations.find(s => s.areaTH === val);
+                            // 🌟 แก้บั๊ก .find() โดยเพิ่ม (stations || []) ป้องกัน Error จอขาว
+                            const st = (stations || []).find(s => s.areaTH === val);
                             if(st) { fetchWeatherByCoords(st.lat, st.long); fetchLocationName(st.lat, st.long); }
                         }
                     }} style={{ padding: '8px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
                         <option value="">เปลี่ยนพื้นที่</option>
-                        {stations.map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
+                        {/* 🌟 แก้บั๊ก .map() ป้องกัน Error จอขาวตอนข้อมูลยังไม่มา */}
+                        {(stations || []).map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
                     </select>
                 </div>
             </div>
