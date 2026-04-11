@@ -292,7 +292,7 @@ export default function AIPage() {
   );
 
   return (
-    <div style={{ width: '100%', minHeight: '100dvh', background: appBg, display: 'block', overflowY: 'auto', WebkitOverflowScrolling: 'touch', fontFamily: 'Kanit, sans-serif' }} className="hide-scrollbar">
+    <div style={{ width: '100%', minHeight: '100dvh', background: appBg, display: 'block', overflowX: 'hidden', overflowY: 'auto', WebkitOverflowScrolling: 'touch', fontFamily: 'Kanit, sans-serif', boxSizing: 'border-box' }} className="hide-scrollbar">
       
       <style dangerouslySetInlineStyle={{__html: `
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -301,9 +301,9 @@ export default function AIPage() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}} />
 
-      <div style={{ width: '100%', maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '120px' }}>
+      <div style={{ width: '100%', maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '120px', boxSizing: 'border-box' }}>
 
-        {/* 📍 Header & Date Selector (Mobile = 1 แถว, Desktop = แยกแถว) */}
+        {/* 📍 Header & Date Selector */}
         <div style={{ background: cardBg, borderRadius: '24px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
                 <div>
@@ -313,10 +313,10 @@ export default function AIPage() {
                     <div style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '2px' }}>พื้นที่การวิเคราะห์: <span style={{color: '#0ea5e9', fontWeight: 'bold'}}>{locationName}</span></div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', overflowX: 'auto' }} className="hide-scrollbar">
-                    {/* 🌟 มือถือ: ยัดปุ่มเลือกวันที่มาไว้ตรงนี้ */}
+                <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
+                    {/* 🌟 มือถือ: ปุ่มเลือกวันที่แบบ Dropdown ควบคู่ปุ่มเปลี่ยนพื้นที่ */}
                     {isMobile && (
-                        <select value={targetDateIdx} onChange={(e) => setTargetDateIdx(parseInt(e.target.value))} style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
+                        <select value={targetDateIdx} onChange={(e) => setTargetDateIdx(parseInt(e.target.value))} style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
                             {[0,1,2,3,4,5,6].map(idx => {
                                 const date = new Date(weatherData?.daily?.time?.[idx] || Date.now());
                                 const dateStr = idx === 0 ? 'วันนี้' : idx === 1 ? 'พรุ่งนี้' : date.toLocaleDateString('th-TH', {weekday:'short', day:'numeric'});
@@ -331,27 +331,26 @@ export default function AIPage() {
                             const st = (stations || []).find(s => s.areaTH === val);
                             if(st) { fetchWeatherByCoords(st.lat, st.long); fetchLocationName(st.lat, st.long); }
                         }
-                    }} style={{ flex: isMobile ? 1 : 'auto', padding: '8px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
+                    }} style={{ flex: isMobile ? 1 : 'auto', minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
                         <option value="">เปลี่ยนพื้นที่</option>
                         {(stations || []).map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
                     </select>
                 </div>
             </div>
 
-            {/* 🌟 Desktop: แสดงปุ่มเลือกวันที่แบบแนวนอน (ซ่อนในมือถือ) */}
+            {/* 🌟 Desktop: แสดงปุ่มเลือกวันที่แบบ Flex Wrap เรียงกันลงมาสวยๆ */}
             {!isMobile && (
-                <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginTop: '20px', paddingBottom: '5px' }} className="hide-scrollbar">
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '20px' }}>
                     {[0,1,2,3,4,5,6].map(idx => {
                         const date = new Date(weatherData?.daily?.time?.[idx] || Date.now());
                         const dateStr = idx === 0 ? 'วันนี้' : idx === 1 ? 'พรุ่งนี้' : date.toLocaleDateString('th-TH', {weekday:'short', day:'numeric'});
                         return (
                             <button key={idx} onClick={() => setTargetDateIdx(idx)} style={{ 
-                                flexShrink: 0, padding: '10px 15px', borderRadius: '14px', 
+                                padding: '8px 15px', borderRadius: '14px', 
                                 border: `1px solid ${targetDateIdx === idx ? activeColor : borderColor}`, 
                                 background: targetDateIdx === idx ? activeColor : 'transparent', 
                                 color: targetDateIdx === idx ? '#fff' : textColor, 
-                                fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: '0.2s',
-                                whiteSpace: 'nowrap'
+                                fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', transition: '0.2s' 
                             }}>
                                 {dateStr}
                             </button>
@@ -374,37 +373,38 @@ export default function AIPage() {
             </div>
         )}
 
-        {/* 📑 หมวดหมู่ไลฟ์สไตล์ (Mobile = Grid 4x2, Desktop = Scroll แนวนอน) */}
+        {/* 📑 หมวดหมู่ไลฟ์สไตล์ */}
         {isMobile ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            /* 🌟 Mobile: เปลี่ยนเป็น Grid 4x2 แบบไม่บีบตัวอักษร ตัดตกให้พอดีจอ */
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' }}>
                 {tabConfigs.map(tab => {
                     const isActive = activeTab === tab.id;
                     return (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px 5px', borderRadius: '16px', border: 'none',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px 2px', borderRadius: '16px', border: 'none',
                             background: isActive ? (darkMode ? `${tab.color}30` : `${tab.color}15`) : cardBg,
                             color: isActive ? tab.color : subTextColor,
                             border: `1px solid ${isActive ? tab.color : borderColor}`,
                             cursor: 'pointer', transition: 'all 0.2s'
                         }}>
                             <span style={{ fontSize: '1.4rem' }}>{tab.icon}</span> 
-                            <span style={{ fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{tab.label}</span>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 'bold', textAlign: 'center', lineHeight: 1.2 }}>{tab.label}</span>
                         </button>
                     );
                 })}
             </div>
         ) : (
-            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '5px' }} className="hide-scrollbar">
+            /* 🌟 Desktop: เรียงปุ่มแบบ Flex Wrap ถ้าที่กว้างไม่พอให้ตกลงมาบรรทัดใหม่ */
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 {tabConfigs.map(tab => {
                     const isActive = activeTab === tab.id;
                     return (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                            flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '50px', border: 'none',
+                            display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '50px', border: 'none',
                             background: isActive ? (darkMode ? `${tab.color}30` : `${tab.color}15`) : cardBg,
                             color: isActive ? tab.color : subTextColor,
                             border: `1px solid ${isActive ? tab.color : borderColor}`,
-                            fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s',
-                            whiteSpace: 'nowrap'
+                            fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
                         }}>
                             <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span> {tab.label}
                         </button>
