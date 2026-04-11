@@ -15,7 +15,7 @@ export default function Layout() {
   const navItems = [
     { path: '/', icon: '📊', label: 'ภาพรวม' },
     { path: '/map', icon: '🗺️', label: 'แผนที่' },
-    { path: '/forecast', icon: '✨', label: 'AI ผู้ช่วย' },
+    { path: '/ai', icon: '✨', label: 'AI ผู้ช่วย' }, // 🌟 เปลี่ยน path ตรงนี้เป็น /ai
     { path: '/alerts', icon: '🚨', label: 'เตือนภัย' },
   ];
 
@@ -63,9 +63,6 @@ export default function Layout() {
           </div>
         </div>
       )}
-
-      {/* 🛑 ลบ Header ของมือถือทิ้งไปแล้ว เพื่อคืนพื้นที่หน้าจอ! 
-      */}
 
       {/* 🟢 Main Content (พื้นที่แสดงเนื้อหา) */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative', paddingBottom: isMobile ? '80px' : '0' }}>

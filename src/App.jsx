@@ -8,7 +8,7 @@ import { WeatherProvider } from './context/WeatherContext';
 // นำเข้าไฟล์หน้าต่างๆ
 import Dashboard from './pages/Dashboard';
 import MapPage from './pages/MapPage';
-import ForecastPage from './pages/ForecastPage';
+import AIPage from './pages/AIPage'; // 🌟 เปลี่ยนชื่อ Import ตรงนี้
 import ClimatePage from './pages/ClimatePage';
 
 function App() {
@@ -24,7 +24,7 @@ function App() {
           <Route path="map" element={<MapPage />} />
           
           {/* หน้า AI ผู้ช่วย */}
-          <Route path="forecast" element={<ForecastPage />} />
+          <Route path="ai" element={<AIPage />} /> {/* 🌟 เปลี่ยน path และ element ตรงนี้ */}
           
           {/* หน้าเตือนภัย */}
           <Route path="alerts" element={<ClimatePage />} />
