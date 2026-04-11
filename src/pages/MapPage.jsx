@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -18,9 +18,13 @@ const provMap = {
   "Ranong": "ระนอง", "Chumphon": "ชุมพร", "Songkhla": "สงขลา", "Satun": "สตูล", "Trang": "ตรัง", "Phatthalung": "พัทลุง", "Pattani": "ปัตตานี", "Yala": "ยะลา", "Narathiwat": "นราธิวาส"
 };
 
-function MapChangeView({ center, zoom }) {
+function MapChangeView({ center }) {
   const map = useMap();
-  useEffect(() => { if (center) map.flyTo(center, zoom, { animate: true, duration: 1.5 }); }, [center, zoom, map]);
+  useEffect(() => { 
+      if (center && center.pos) {
+          map.flyTo(center.pos, center.zoom, { animate: true, duration: 1.5 }); 
+      }
+  }, [center, map]);
   return null;
 }
 
@@ -51,11 +55,12 @@ export default function MapPage() {
   const [geoData, setGeoData] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [mapZoom, setMapZoom] = useState(window.innerWidth < 1024 ? 5 : 6);
-  const [polyOpacity, setPolyOpacity] = useState(0.85);
   
-  // 🌟 เปลี่ยนค่าเริ่มต้นเป็น 'basic' (ข้อมูลทั่วไป)
+  // 🌟 ปรับ Transparency เริ่มต้นให้โปร่งแสงขึ้น (0.7) เพื่อให้เห็น Basemap
+  const [polyOpacity, setPolyOpacity] = useState(0.7);
+  
   const [mapCategory, setMapCategory] = useState('basic'); 
-  const [activeBasicMode, setActiveBasicMode] = useState('pm25'); // ค่าเริ่มต้นย่อยเป็น pm25
+  const [activeBasicMode, setActiveBasicMode] = useState('pm25'); 
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
   
   const [selectedHotspot, setSelectedHotspot] = useState(null); 
@@ -64,6 +69,10 @@ export default function MapPage() {
   const [basemapStyle, setBasemapStyle] = useState('dark'); 
   const [flyToPos, setFlyToPos] = useState(null);
   const [showControls, setShowControls] = useState(window.innerWidth >= 1024);
+
+  // 🌟 State สำหรับจัดการการกะพริบ (Flash) ของพื้นที่แบบ ArcGIS
+  const [flashProv, setFlashProv] = useState(null);
+  const hasAutoLocated = useRef(false);
 
   const basemapUrls = {
     dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -80,6 +89,38 @@ export default function MapPage() {
     fetch('/thailand.json').then(res => res.json()).then(data => setGeoData(data)).catch(e => console.error(e));
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // 🌟 ระบบ Auto-Locate ทันทีที่เปิดหน้าแผนที่
+  useEffect(() => {
+    if (stations && stations.length > 0 && !hasAutoLocated.current) {
+        hasAutoLocated.current = true; // ป้องกันการดึงพิกัดซ้ำ
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (p) => {
+                    let closest = null; let minDistance = Infinity;
+                    stations.forEach(st => {
+                        if(st.lat && st.long) {
+                            const dist = Math.sqrt(Math.pow(st.lat - p.coords.latitude, 2) + Math.pow(st.long - p.coords.longitude, 2));
+                            if (dist < minDistance) { minDistance = dist; closest = st; }
+                        }
+                    });
+                    if (closest) {
+                        // ซูมเข้าไปที่จังหวัดนั้นอัตโนมัติ (Zoom: 8)
+                        setFlyToPos({ pos: [closest.lat, closest.long], zoom: 8 });
+                        
+                        // เปิดเอฟเฟกต์กะพริบพื้นที่ (ArcGIS Style)
+                        const cleanName = closest.areaTH.replace('จังหวัด', '').trim();
+                        setFlashProv(cleanName);
+                        
+                        // ปิดเอฟเฟกต์หลังกะพริบเสร็จ (ประมาณ 3 วินาที)
+                        setTimeout(() => setFlashProv(null), 3000);
+                    }
+                }, 
+                () => { console.log('Geolocation denied by user'); }
+            );
+        }
+    }
+  }, [stations]);
 
   useEffect(() => { setSelectedHotspot(null); }, [mapCategory]);
 
@@ -196,6 +237,7 @@ export default function MapPage() {
 
   const hasHighRisk = useMemo(() => allMapData.some(d => d.displayVal >= 8), [allMapData]);
 
+  // 🌟 ระบบจัดการสีและคลาสของ Polygon (เพิ่มระบบ Flash)
   const styleGeoJSON = (feature) => {
     const props = Object.values(feature.properties || {}).map(v => String(v).trim());
     let thaiNameFromMap = "";
@@ -212,7 +254,18 @@ export default function MapPage() {
         else color = getRiskColor(calculateRisk(station).score);
     }
     
-    return { fillColor: color, weight: 1, opacity: 1, color: darkMode ? '#0f172a' : '#ffffff', fillOpacity: polyOpacity };
+    // ตรวจสอบว่าจังหวัดนี้คือจังหวัดที่ถูก Flash หรือไม่
+    const cleanStationName = station ? station.areaTH.replace('จังหวัด', '').trim() : '';
+    const isFlashed = cleanStationName !== '' && cleanStationName === flashProv;
+
+    return { 
+        fillColor: color, 
+        weight: isFlashed ? 3 : 1, // ถ้ากะพริบ ให้เส้นขอบหนาขึ้น
+        opacity: 1, 
+        color: isFlashed ? '#0ea5e9' : (darkMode ? '#0f172a' : '#ffffff'), // สีขอบเปลี่ยนเป็นสีฟ้าตอนกะพริบ
+        fillOpacity: polyOpacity,
+        className: isFlashed ? 'arcgis-flash-polygon' : '' // ยัด CSS Class เข้าไป
+    };
   };
 
   const handleRegionClick = (station) => {
@@ -224,7 +277,12 @@ export default function MapPage() {
           const pm25 = station.AQILast?.PM25?.value || 0;
           setSelectedHotspot({ type: 'basic', station, data, pm25 });
       }
-      setFlyToPos([station.lat, station.long]);
+      
+      // เมื่อคลิกให้ซูมเข้า และกระพริบพื้นที่ (ArcGIS style)
+      setFlyToPos({ pos: [station.lat, station.long], zoom: 8 });
+      const cleanName = station.areaTH.replace('จังหวัด', '').trim();
+      setFlashProv(cleanName);
+      setTimeout(() => setFlashProv(null), 3000);
   };
 
   const onEachFeature = (feature, layer) => {
@@ -290,10 +348,22 @@ export default function MapPage() {
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '10px' : '20px', boxSizing: 'border-box' }}>
       
+      {/* 🌟 CSS สำหรับ Animation ArcGIS Flash และ Scrollbar */}
       <style dangerouslySetInlineStyle={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${darkMode ? '#334155' : '#cbd5e1'}; border-radius: 10px; }
+        
+        @keyframes arcgis-flash {
+            0% { stroke: #38bdf8; stroke-width: 2px; }
+            25% { stroke: #0ea5e9; stroke-width: 5px; fill-opacity: 0.9; }
+            50% { stroke: #38bdf8; stroke-width: 2px; }
+            75% { stroke: #0ea5e9; stroke-width: 5px; fill-opacity: 0.9; }
+            100% { stroke: #38bdf8; stroke-width: 2px; }
+        }
+        .arcgis-flash-polygon {
+            animation: arcgis-flash 2.5s ease-in-out forwards;
+        }
       `}} />
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', marginBottom: '15px', flexShrink: 0 }}>
@@ -354,9 +424,11 @@ export default function MapPage() {
                 <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 5 : 6} style={{ height: '100%', width: '100%', background: appBg }} zoomControl={false}>
                     <TileLayer url={basemapUrls[basemapStyle]} />
                     <MapZoomListener setMapZoom={setMapZoom} />
-                    <MapChangeView center={flyToPos} zoom={8} />
                     
-                    {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${polyOpacity}-${basemapStyle}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
+                    {/* 🌟 ส่ง Object {pos, zoom} ไปให้ MapChangeView จัดการซูมและแพนกล้อง */}
+                    <MapChangeView center={flyToPos} />
+                    
+                    {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${polyOpacity}-${basemapStyle}-${flashProv}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
                     
                     {allMapData.map(st => {
                         let isVisible = false;
@@ -406,7 +478,26 @@ export default function MapPage() {
 
                     {(showControls || !isMobile) && (
                         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
-                            <button onClick={() => { if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setFlyToPos([p.coords.latitude, p.coords.longitude])); }} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', fontFamily: 'Kanit' }}>📍 พิกัดของฉัน</button>
+                            <button onClick={() => { 
+                                if(navigator.geolocation) {
+                                    navigator.geolocation.getCurrentPosition(p => {
+                                        // หาจังหวัดที่ใกล้ที่สุดเพื่อทำ Flash Polygon
+                                        let closest = null; let minDistance = Infinity;
+                                        stations.forEach(st => {
+                                            const dist = Math.sqrt(Math.pow(st.lat - p.coords.latitude, 2) + Math.pow(st.long - p.coords.longitude, 2));
+                                            if (dist < minDistance) { minDistance = dist; closest = st; }
+                                        });
+                                        if(closest) {
+                                            setFlyToPos({ pos: [closest.lat, closest.long], zoom: 8 });
+                                            setFlashProv(closest.areaTH.replace('จังหวัด', '').trim());
+                                            setTimeout(() => setFlashProv(null), 3000);
+                                        } else {
+                                            setFlyToPos({ pos: [p.coords.latitude, p.coords.longitude], zoom: 8 });
+                                        }
+                                    });
+                                }
+                            }} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', fontFamily: 'Kanit' }}>📍 พิกัดของฉัน</button>
+                            
                             <div style={{ background: darkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, width: '140px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
                                 <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>รูปแบบแผนที่</div>
                                 <select value={basemapStyle} onChange={(e) => setBasemapStyle(e.target.value)} style={{ width: '100%', background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, border: 'none', padding: '6px', borderRadius: '8px', fontSize: '0.75rem', outline: 'none', fontFamily: 'Kanit' }}>
