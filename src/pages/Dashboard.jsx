@@ -28,7 +28,7 @@ export default function Dashboard() {
   const fetchWeatherByCoords = async (lat, lon) => {
     try {
       setLoadingWeather(true);
-      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,visibility&hourly=temperature_2m,precipitation_probability,pm2_5&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=Asia%2FBangkok`;
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,visibility&hourly=temperature_2m,precipitation_probability,precipitation,pm2_5&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=Asia%2FBangkok`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=Asia%2FBangkok`;
 
       const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
@@ -42,6 +42,7 @@ export default function Dashboard() {
             feelsLike: wData.current.apparent_temperature,
             humidity: wData.current.relative_humidity_2m,
             windSpeed: wData.current.wind_speed_10m,
+            windDirection: wData.current.wind_direction_10m,
             pressure: wData.current.surface_pressure,
             visibility: wData.current.visibility,
             uv: wData.daily.uv_index_max[0],
@@ -49,11 +50,13 @@ export default function Dashboard() {
             sunrise: wData.daily.sunrise[0],
             sunset: wData.daily.sunset[0],
             rainProb: wData.hourly.precipitation_probability[new Date().getHours()],
+            precipitation: wData.current.precipitation,
           },
           hourly: {
             time: wData.hourly.time,
             temperature_2m: wData.hourly.temperature_2m,
             precipitation_probability: wData.hourly.precipitation_probability,
+            precipitation: wData.hourly.precipitation,
             pm25: aData.hourly.pm2_5
           },
           daily: {
@@ -73,9 +76,9 @@ export default function Dashboard() {
                   }
                 });
               }
-              return maxPm !== null ? Math.round(maxPm) : Math.round(aData.current?.pm2_5 || 0);
             }),
-            precipitation_probability_max: wData.daily.precipitation_probability_max
+            precipitation_probability_max: wData.daily.precipitation_probability_max,
+            precipitation_sum: wData.daily.precipitation_sum
           },
           coords: { lat, lon }
         });
@@ -273,9 +276,22 @@ export default function Dashboard() {
       time: new Date(t).getHours().toString().padStart(2, '0') + ':00',
       temp: Math.round(hourly?.temperature_2m?.[rIdx] || 0),
       rain: hourly?.precipitation_probability?.[rIdx] || 0,
+      rainAmount: hourly?.precipitation?.[rIdx] || 0,
       pm25: Math.round(hourly?.pm25?.[rIdx] || 0)
     };
   });
+
+  const getWindDir = (deg) => {
+    if (deg >= 337.5 || deg < 22.5) return 'เหนือ';
+    if (deg >= 22.5 && deg < 67.5) return 'ตอ.เฉียงเหนือ';
+    if (deg >= 67.5 && deg < 112.5) return 'ตะวันออก';
+    if (deg >= 112.5 && deg < 157.5) return 'ตอ.เฉียงใต้';
+    if (deg >= 157.5 && deg < 202.5) return 'ใต้';
+    if (deg >= 202.5 && deg < 247.5) return 'ตต.เฉียงใต้';
+    if (deg >= 247.5 && deg < 292.5) return 'ตะวันตก';
+    if (deg >= 292.5 && deg < 337.5) return 'ตต.เฉียงเหนือ';
+    return '-';
+  };
 
   const CustomXAxisTick = ({ x, y, payload }) => {
     const item = chartData[payload.index];
@@ -283,10 +299,10 @@ export default function Dashboard() {
     const pmColor = item.pm25 > 75 ? '#ef4444' : item.pm25 > 37.5 ? '#f97316' : item.pm25 > 25 ? '#eab308' : item.pm25 > 15 ? '#22c55e' : '#0ea5e9';
     return (
       <g transform={`translate(${x},${y})`}>
-        <foreignObject x={-30} y={10} width={60} height={80}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '0.75rem', fontWeight: 'bold', fontFamily: 'Kanit' }}>
+        <foreignObject x={-40} y={10} width={80} height={90}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '0.75rem', fontWeight: 'bold', fontFamily: 'Kanit', textAlign: 'center', lineHeight: 1.2 }}>
             <span style={{ color: subTextColor }}>{item.time}</span>
-            <span style={{ color: '#3b82f6', marginTop: '4px' }}>☔ {item.rain}%</span>
+            <span style={{ color: '#3b82f6', marginTop: '4px' }}>☔ {item.rain}%<br/>{item.rainAmount > 0 ? `(${item.rainAmount}mm)` : ''}</span>
             <span style={{ color: pmColor, marginTop: '2px' }}>😷 {item.pm25}</span>
           </div>
         </foreignObject>
@@ -382,14 +398,24 @@ export default function Dashboard() {
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', flexShrink: 0 }}>
                 <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
-                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>👁️ ทัศนวิสัย</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{(current?.visibility / 1000).toFixed(1)} <span style={{fontSize:'0.75rem'}}>กม.</span></div>
-                    <div style={{ fontSize: '0.7rem', color: subTextColor }}>{current?.visibility < 2000 ? 'มีหมอกหนา' : 'เคลียร์'}</div>
+                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>💧 ความชื้น</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{Math.round(current?.humidity || 0)} <span style={{fontSize:'0.75rem'}}>%</span></div>
+                    <div style={{ fontSize: '0.7rem', color: subTextColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{current?.humidity > 60 ? 'ค่อนข้างชื้น' : 'กำลังดี'}</div>
                 </div>
                 <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
-                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>☔ โอกาสฝนตก</div>
+                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🌬️ ลมพัด ({getWindDir(current?.windDirection)})</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{Math.round(current?.windSpeed || 0)} <span style={{fontSize:'0.75rem'}}>กม./ชม.</span></div>
+                    <div style={{ fontSize: '0.7rem', color: subTextColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{current?.windSpeed > 15 ? 'ลมแรง' : 'ลมสงบ'}</div>
+                </div>
+                <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
+                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>☔ ฝนตก/ปริมาณ</div>
                     <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{chartData[0]?.rain || 0} <span style={{fontSize:'0.75rem'}}>%</span></div>
-                    <div style={{ fontSize: '0.7rem', color: subTextColor }}>{(chartData[0]?.rain || 0) > 40 ? 'ควรพกร่มติดตัว' : 'ฝนทิ้งช่วง'}</div>
+                    <div style={{ fontSize: '0.7rem', color: subTextColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{current?.precipitation > 0 ? `ปริมาณ ${current?.precipitation} mm` : 'ไม่มีฝนตก'}</div>
+                </div>
+                <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
+                    <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>👁️ ทัศนวิสัย</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{(current?.visibility / 1000).toFixed(1)} <span style={{fontSize:'0.75rem'}}>กม.</span></div>
+                    <div style={{ fontSize: '0.7rem', color: subTextColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{current?.visibility < 2000 ? 'มีหมอกหนา' : 'เคลียร์'}</div>
                 </div>
                 <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
                     <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🧭 ความกดอากาศ</div>
@@ -456,7 +482,11 @@ export default function Dashboard() {
                         </div>
 
                         <div style={{ marginLeft: isMobile ? '0' : '55px', display: 'flex', justifyContent: 'space-between', marginTop: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '6px 10px', borderRadius: '10px', fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>
-                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>☔</span> {daily?.precipitation_probability_max?.[idx] || 0}%</div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                             <span style={{fontSize:'0.9rem'}}>☔</span> 
+                             {daily?.precipitation_probability_max?.[idx] || 0}% 
+                             {daily?.precipitation_sum?.[idx] > 0 && <span style={{ opacity: 0.7, marginLeft: '2px' }}>({daily.precipitation_sum[idx]}mm)</span>}
+                           </div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{fontSize:'0.9rem'}}>🥵</span> {Math.round(daily?.apparent_temperature_max?.[idx] || 0)}°</div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{fontSize:'0.9rem'}}>😷</span> 
