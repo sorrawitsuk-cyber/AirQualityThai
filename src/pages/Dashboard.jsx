@@ -76,6 +76,7 @@ export default function Dashboard() {
                   }
                 });
               }
+              return maxPm !== null ? Math.round(maxPm) : Math.round(aData.current?.pm2_5 || 0);
             }),
             precipitation_probability_max: wData.daily.precipitation_probability_max,
             precipitation_sum: wData.daily.precipitation_sum
