@@ -19,6 +19,13 @@ export const WeatherProvider = ({ children }) => {
 
   useEffect(() => {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+    
+    // Toggle the dark-theme class on the body to activate global CSS variables
+    if (darkMode) {
+      document.body.classList.add('dark-theme');
+    } else {
+      document.body.classList.remove('dark-theme');
+    }
   }, [darkMode]);
 
   useEffect(() => {
