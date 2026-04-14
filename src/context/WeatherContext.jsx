@@ -8,7 +8,9 @@ export const WeatherProvider = ({ children }) => {
   const [stations, setStations] = useState([]);
   const [stationTemps, setStationTemps] = useState({});
   const [stationYesterday, setStationYesterday] = useState({}); 
-  const [stationMaxYesterday, setStationMaxYesterday] = useState({}); // 🌟 เพิ่มท่อรับค่าสูงสุด
+  const [stationMaxYesterday, setStationMaxYesterday] = useState({}); 
+  const [stationDaily, setStationDaily] = useState({}); 
+  const [gistdaSummary, setGistdaSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
 
@@ -37,13 +39,15 @@ export const WeatherProvider = ({ children }) => {
         setStations(data.stations || []);
         setStationTemps(data.stationTemps || {});
         setStationYesterday(data.stationYesterday || {}); 
-        setStationMaxYesterday(data.stationMaxYesterday || {}); // 🌟 รับข้อมูลเข้า
+        setStationMaxYesterday(data.stationMaxYesterday || {}); 
+        setStationDaily(data.stationDaily || {});
         setLastUpdated(data.lastUpdated || null);
       } else {
         setStations([]);
         setStationTemps({});
         setStationYesterday({});
         setStationMaxYesterday({});
+        setStationDaily({});
       }
       setLoading(false); 
     }, (error) => {
@@ -51,14 +55,24 @@ export const WeatherProvider = ({ children }) => {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const gistdaRef = ref(db, 'gistda_disaster');
+    const unsubscribeGistda = onValue(gistdaRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setGistdaSummary(data);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeGistda();
+    };
   }, []);
 
   return (
     <WeatherContext.Provider value={{ 
-      stations, stationTemps, stationYesterday, 
-      stationMaxYesterday, // 🌟 ส่งข้อมูลต่อให้หน้าบ้าน
-      loading, lastUpdated, darkMode, setDarkMode      
+      stations, stationTemps, stationYesterday, stationMaxYesterday, stationDaily, gistdaSummary, loading, lastUpdated, 
+      darkMode, setDarkMode 
     }}>
       {children}
     </WeatherContext.Provider>

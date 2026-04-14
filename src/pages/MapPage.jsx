@@ -49,8 +49,19 @@ const getUvText = (uv) => {
     return 'ต่ำ';
 }
 
+const getProvTier = (provName) => {
+    const p = provName.replace('จังหวัด', '').trim();
+    const tier1 = ['กรุงเทพมหานคร', 'เชียงใหม่', 'ขอนแก่น', 'นครราชสีมา', 'ชลบุรี', 'สงขลา', 'ภูเก็ต', 'สุราษฎร์ธานี', 'พิษณุโลก', 'ประจวบคีรีขันธ์'];
+    const tier2 = ['เชียงราย', 'อุดรธานี', 'อุบลราชธานี', 'นครสวรรค์', 'ระยอง', 'พระนครศรีอยุธยา', 'นครศรีธรรมราช', 'กระบี่', 'ตาก', 'กาญจนบุรี', 'สุรินทร์', 'เพชรบูรณ์'];
+    const tier3 = ['แม่ฮ่องสอน', 'น่าน', 'ลำปาง', 'หนองคาย', 'สกลนคร', 'ร้อยเอ็ด', 'สระบุรี', 'ลพบุรี', 'สุพรรณบุรี', 'จันทบุรี', 'ตราด', 'ชุมพร', 'ตรัง', 'นครปฐม', 'สมุทรปราการ', 'บุรีรัมย์', 'ชัยภูมิ', 'พะเยา', 'ราชบุรี', 'เพชรบุรี', 'ศรีสะเกษ', 'ยโสธร', 'นนทบุรี', 'ปทุมธานี', 'เลย', 'อุตรดิตถ์', 'แพร่'];
+    if (tier1.includes(p)) return 1;
+    if (tier2.includes(p)) return 2;
+    if (tier3.includes(p)) return 3;
+    return 4;
+};
+
 export default function MapPage() {
-  const { stations, stationTemps, darkMode } = useContext(WeatherContext);
+  const { stations, stationTemps, stationDaily, darkMode, gistdaSummary, lastUpdated } = useContext(WeatherContext);
   
   const [geoData, setGeoData] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
@@ -60,6 +71,9 @@ export default function MapPage() {
   const [mapCategory, setMapCategory] = useState('basic'); 
   const [activeBasicMode, setActiveBasicMode] = useState('pm25'); 
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
+  const [activeGistdaMode, setActiveGistdaMode] = useState('hotspots');
+  const [dayOffset, setDayOffset] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [selectedHotspot, setSelectedHotspot] = useState(null); 
   const [showReferenceModal, setShowReferenceModal] = useState(false); 
@@ -114,7 +128,10 @@ export default function MapPage() {
     }
   }, [stations, isMobile]);
 
-  useEffect(() => { setSelectedHotspot(null); }, [mapCategory]);
+  useEffect(() => { 
+      setSelectedHotspot(null); 
+      if (mapCategory === 'gistda') setDayOffset(0);
+  }, [mapCategory]);
 
   const basicModes = [
     { id: 'pm25', name: '😷 PM2.5', color: '#f97316', unit: 'µg/m³', desc: 'ความหนาแน่นของฝุ่นละอองขนาดเล็ก' },
@@ -122,29 +139,57 @@ export default function MapPage() {
     { id: 'heat', name: '🥵 ดัชนีความร้อน', color: '#ea580c', unit: '°C', desc: 'อุณหภูมิที่ร่างกายรู้สึกจริง (รวมความชื้น)' },
     { id: 'rain', name: '☔ โอกาสฝน', color: '#3b82f6', unit: '%', desc: 'ความน่าจะเป็นในการเกิดฝนตก' },
     { id: 'wind', name: '🌬️ ลมกระโชก', color: '#0ea5e9', unit: 'km/h', desc: 'ความเร็วลมกระโชกสูงสุด' },
-    { id: 'uv', name: '☀️ รังสี UV', color: '#a855f7', unit: 'Idx', desc: 'ดัชนีรังสีอัลตราไวโอเลต' }
+    { id: 'uv', name: '☀️ รังสี UV', color: '#a855f7', unit: 'ดัชนี', desc: 'ดัชนีรังสีอัลตราไวโอเลต' }
   ];
 
   const riskModes = [
-    { id: 'respiratory', name: '🫁 สุขภาพและทางเดินหายใจ', color: '#ec4899', desc: 'คำนวณจาก: ฝุ่น PM2.5 (70%) และ ความร้อน (30%)' },
+    { id: 'respiratory', name: '🫁 สุขภาพและทางเดินหายใจ', color: '#ec4899', desc: 'คำนวณจาก: ฝุ่น PM2.5 (60%), ความชื้นสูง (20%), และความร้อน (20%)' },
     { id: 'outdoor', name: '🏕️ กิจกรรมกลางแจ้ง', color: '#3b82f6', desc: 'คำนวณจาก: ฝน (40%), ลม (30%), และความร้อน/UV (30%)' },
-    { id: 'wildfire', name: '🔥 ความเสี่ยงไฟป่า', color: '#ea580c', desc: 'คำนวณจาก: ลมแรง (45%), อากาศแห้ง (35%), และความร้อน (20%)' },
-    { id: 'heatstroke', name: '🥵 เฝ้าระวังโรคลมแดด', color: '#ef4444', desc: 'คำนวณจาก: อุณหภูมิความร้อน (60%) และ รังสี UV (40%)' }
+    { id: 'wildfire', name: '🔥 ความเสี่ยงไฟป่า', color: '#ea580c', desc: 'คำนวณจาก: ลมแรง (35%), อากาศแห้ง (30%), ไม่มีฝน (20%), และความร้อน (15%)' },
+    { id: 'heatstroke', name: '🥵 เฝ้าระวังโรคลมแดด', color: '#ef4444', desc: 'คำนวณจาก: อุณหภูมิความร้อน (45%), ความชื้นสูง (30%), และรังสี UV (25%)' }
   ];
 
+  const gistdaModes = [
+    { id: 'hotspots', name: '🔥 จุดความร้อน (7 วัน)', color: '#ef4444', unit: 'จุด', desc: 'จุดความร้อนสะสม 7 วันย้อนหลัง (Top 5)' },
+    { id: 'burntArea', name: '🔥 พื้นที่เผาไหม้', color: '#ea580c', unit: 'ไร่', desc: 'พื้นที่เผาไหม้สะสม (Top 5)' },
+    { id: 'lowSoilMoisture', name: '🏜️ ความชื้นในดินต่ำ', color: '#f59e0b', unit: '%vol', desc: 'ความชื้นในดินต่ำสุด (Top 5)' },
+    { id: 'lowVegetationMoisture', name: '🍂 ความชื้นพืชพรรณต่ำ', color: '#d97706', unit: 'ดัชนี', desc: 'ความชื้นพืชพรรณต่ำสุด (Top 5)' },
+    { id: 'floodArea', name: '🌊 พื้นที่น้ำท่วม', color: '#3b82f6', unit: 'ไร่', desc: 'พื้นที่น้ำท่วมสะสมสูงสุด (Top 5)' }
+  ];
+
+  const getGistdaColor = useCallback((val, mode) => {
+    if (!val) return darkMode ? '#334155' : '#cbd5e1';
+    const modeObj = gistdaModes.find(m => m.id === mode);
+    return modeObj ? modeObj.color : '#ef4444';
+  }, [darkMode]);
+
   const getBasicVal = useCallback((station, mode) => {
-    if (!station || !stationTemps[station.stationID]) return null;
-    const data = stationTemps[station.stationID];
-    switch(mode) {
-        case 'pm25': return station.AQILast?.PM25?.value || 0;
-        case 'temp': return Math.round(data.temp || 0);
-        case 'heat': return Math.round(data.feelsLike || 0);
-        case 'rain': return data.rainProb || 0;
-        case 'wind': return Math.round(data.windSpeed || 0);
-        case 'uv': return data.uv || 0;
-        default: return 0;
+    if (!station) return null;
+    if (dayOffset === 0 || !stationDaily[station.stationID]?.temp) {
+        const data = stationTemps[station.stationID] || {};
+        switch(mode) {
+            case 'pm25': return station.AQILast?.PM25?.value || 0;
+            case 'temp': return Math.round(data.temp || 0);
+            case 'heat': return Math.round(data.feelsLike || 0);
+            case 'rain': return data.rainProb || 0;
+            case 'wind': return Math.round(data.windSpeed || 0);
+            case 'uv': return data.uv || 0;
+            default: return 0;
+        }
+    } else {
+        const idx = dayOffset + 7;
+        const daily = stationDaily[station.stationID] || {};
+        switch(mode) {
+            case 'pm25': return daily.pm25?.[idx] || 0;
+            case 'temp': return daily.temp?.[idx] || 0;
+            case 'heat': return daily.heat?.[idx] || 0;
+            case 'rain': return daily.rain?.[idx] || 0;
+            case 'wind': return daily.wind?.[idx] || 0;
+            case 'uv': return daily.uv?.[idx] || 0;
+            default: return 0;
+        }
     }
-  }, [stationTemps]);
+  }, [stationTemps, stationDaily, dayOffset]);
 
   const getBasicColor = useCallback((val, mode) => {
     if (val === null || val === undefined || val === '') return darkMode ? '#334155' : '#cbd5e1';
@@ -157,40 +202,54 @@ export default function MapPage() {
   }, [darkMode]);
 
   const calculateRisk = useCallback((station) => {
-      const data = stationTemps[station.stationID] || {};
-      const pm25 = station.AQILast?.PM25?.value || 0;
-      const temp = data.temp || 0;
-      const wind = data.windSpeed || 0;
-      const rain = data.rainProb || 0;
-      const uv = data.uv || 0;
-      const hum = data.humidity || 50;
+      let pm25 = 0, temp = 0, wind = 0, rain = 0, uv = 0, hum = 50;
+
+      if (dayOffset === 0 || !stationDaily[station.stationID]?.temp) {
+          const data = stationTemps[station.stationID] || {};
+          pm25 = station.AQILast?.PM25?.value || 0;
+          temp = data.temp || 0;
+          wind = data.windSpeed || 0;
+          rain = data.rainProb || 0;
+          uv = data.uv || 0;
+          hum = data.humidity || 50;
+      } else {
+          const idx = dayOffset + 7;
+          const daily = stationDaily[station.stationID] || {};
+          pm25 = daily.pm25?.[idx] || 0;
+          temp = daily.temp?.[idx] || 0;
+          wind = daily.wind?.[idx] || 0;
+          rain = daily.rain?.[idx] || 0;
+          uv = daily.uv?.[idx] || 0;
+      }
 
       const nPm = Math.min(pm25 / 75 * 10, 10); 
       const nTemp = Math.max(0, Math.min((temp - 28) / 12 * 10, 10)); 
-      const nWind = Math.min(wind / 35 * 10, 10); 
+      const nWind = Math.min(wind / 40 * 10, 10); 
       const nRain = Math.min(rain / 80 * 10, 10); 
       const nUv = Math.min(uv / 11 * 10, 10); 
       const nHumDry = Math.max(0, 10 - (hum / 100 * 10)); 
+      const nHumWet = Math.min(hum / 100 * 10, 10);
+      const nNoRain = Math.max(0, 10 - (rain / 100 * 10));
 
       let score = 0;
       let factors = [];
 
       if (activeRiskMode === 'respiratory') {
-          score = (nPm * 0.7) + (nTemp * 0.3);
-          factors = [{ label: 'มลพิษฝุ่น PM2.5', val: pm25, unit: 'µg', risk: nPm, weight: 70, color: '#f97316' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 30, color: '#ef4444' }];
+          score = (nPm * 0.6) + (nHumWet * 0.2) + (nTemp * 0.2);
+          factors = [{ label: 'มลพิษฝุ่น PM2.5', val: pm25, unit: 'µg/m³', risk: nPm, weight: 60, color: '#f97316' }, { label: 'ความชื้นสัมพัทธ์สูง', val: hum, unit: '%', risk: nHumWet, weight: 20, color: '#3b82f6' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }];
       } else if (activeRiskMode === 'outdoor') {
           score = (nRain * 0.4) + (nWind * 0.3) + (nTemp * 0.2) + (nUv * 0.1);
-          factors = [{ label: 'โอกาสเกิดฝนตก', val: rain, unit: '%', risk: nRain, weight: 40, color: '#3b82f6' }, { label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 30, color: '#0ea5e9' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'Idx', risk: nUv, weight: 10, color: '#a855f7' }];
+          factors = [{ label: 'โอกาสเกิดฝนตก', val: rain, unit: '%', risk: nRain, weight: 40, color: '#3b82f6' }, { label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 30, color: '#0ea5e9' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'ดัชนี', risk: nUv, weight: 10, color: '#a855f7' }];
       } else if (activeRiskMode === 'wildfire') {
-          score = (nWind * 0.45) + (nHumDry * 0.35) + (nTemp * 0.20);
-          factors = [{ label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 45, color: '#0ea5e9' }, { label: 'ความแห้งแล้งของอากาศ', val: hum, unit: '%', risk: nHumDry, weight: 35, color: '#eab308' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }];
+          score = (nWind * 0.35) + (nHumDry * 0.30) + (nNoRain * 0.20) + (nTemp * 0.15);
+          factors = [{ label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 35, color: '#0ea5e9' }, { label: 'ความแห้งแล้งของอากาศ', val: hum, unit: '%', risk: nHumDry, weight: 30, color: '#eab308' }, { label: 'ไม่มีฝนตก (เชื้อเพลิงแห้ง)', val: rain, unit: '%', risk: nNoRain, weight: 20, color: '#94a3b8' }, { label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 15, color: '#ef4444' }];
       } else if (activeRiskMode === 'heatstroke') {
-          score = (nTemp * 0.6) + (nUv * 0.4);
-          factors = [{ label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 60, color: '#ef4444' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'Idx', risk: nUv, weight: 40, color: '#a855f7' }];
+          score = (nTemp * 0.45) + (nHumWet * 0.30) + (nUv * 0.25);
+          factors = [{ label: 'อุณหภูมิความร้อน', val: temp, unit: '°C', risk: nTemp, weight: 45, color: '#ef4444' }, { label: 'ความชื้นสัมพัทธ์สูง (เหงื่อไม่ระเหย)', val: hum, unit: '%', risk: nHumWet, weight: 30, color: '#3b82f6' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'ดัชนี', risk: nUv, weight: 25, color: '#a855f7' }];
       }
 
       return { score: Math.min(Math.round(score * 10) / 10, 10), factors };
-  }, [activeRiskMode, stationTemps]);
+  }, [activeRiskMode, stationTemps, stationDaily, dayOffset]);
 
   const getRiskColor = useCallback((score) => {
       if (score === null || score === undefined) return darkMode ? '#334155' : '#cbd5e1';
@@ -210,24 +269,45 @@ export default function MapPage() {
 
   const allMapData = useMemo(() => {
     return (stations || []).map(st => {
-        let val, color;
+        let val = null, color = null;
         if (mapCategory === 'basic') {
             val = getBasicVal(st, activeBasicMode);
             color = getBasicColor(val, activeBasicMode);
-        } else {
+        } else if (mapCategory === 'risk') {
             const risk = calculateRisk(st);
             val = risk.score;
             color = getRiskColor(risk.score);
+        } else if (mapCategory === 'gistda') {
+            if (gistdaSummary && gistdaSummary[activeGistdaMode]) {
+                const provName = st.areaTH.replace('จังหวัด', '').trim();
+                const found = gistdaSummary[activeGistdaMode].find(item => item.province === provName);
+                if (found) {
+                    val = found.value;
+                    color = getGistdaColor(val, activeGistdaMode);
+                } else {
+                    val = 0;
+                    color = darkMode ? '#334155' : '#cbd5e1';
+                }
+            } else {
+                val = 0;
+                color = darkMode ? '#334155' : '#cbd5e1';
+            }
         }
         return { ...st, displayVal: val, color };
     }).filter(st => st.displayVal !== null && st.displayVal !== undefined);
-  }, [stations, mapCategory, activeBasicMode, calculateRisk, getBasicVal, getBasicColor, getRiskColor]);
+  }, [stations, mapCategory, activeBasicMode, activeGistdaMode, calculateRisk, getBasicVal, getBasicColor, getRiskColor, getGistdaColor, gistdaSummary, darkMode]);
 
   const rankedSidebarData = useMemo(() => {
+    if (mapCategory === 'gistda' && gistdaSummary && gistdaSummary[activeGistdaMode]) {
+        return gistdaSummary[activeGistdaMode].filter(g => g.value > 0).map(gItem => {
+            const st = allMapData.find(s => s.areaTH.replace('จังหวัด', '').trim() === gItem.province);
+            return st || { stationID: gItem.province, areaTH: `จังหวัด${gItem.province}`, displayVal: gItem.value, color: getGistdaColor(gItem.value, activeGistdaMode) };
+        });
+    }
     return [...allMapData].sort((a, b) => b.displayVal - a.displayVal).slice(0, 15);
-  }, [allMapData]);
+  }, [allMapData, mapCategory, activeGistdaMode, gistdaSummary, getGistdaColor]);
 
-  const hasHighRisk = useMemo(() => allMapData.some(d => d.displayVal >= 8), [allMapData]);
+
 
   const styleGeoJSON = (feature) => {
     const props = Object.values(feature.properties || {}).map(v => String(v).trim());
@@ -241,8 +321,13 @@ export default function MapPage() {
 
     let color = 'var(--border-color)';
     if (station) {
-        if (mapCategory === 'basic') color = getBasicColor(getBasicVal(station, activeBasicMode), activeBasicMode);
-        else color = getRiskColor(calculateRisk(station).score);
+        const mapDataNode = allMapData.find(d => d.stationID === station.stationID);
+        if (mapDataNode && mapDataNode.color) {
+            color = mapDataNode.color;
+        } else {
+            if (mapCategory === 'basic') color = getBasicColor(getBasicVal(station, activeBasicMode), activeBasicMode);
+            else if (mapCategory === 'risk') color = getRiskColor(calculateRisk(station).score);
+        }
     }
     
     const cleanStationName = station ? station.areaTH.replace('จังหวัด', '').trim() : '';
@@ -262,9 +347,25 @@ export default function MapPage() {
       if (mapCategory === 'risk') {
           const risk = calculateRisk(station);
           setSelectedHotspot({ type: 'risk', station, riskScore: risk.score, factors: risk.factors, color: getRiskColor(risk.score) });
+      } else if (mapCategory === 'gistda') {
+          const mapDataNode = allMapData.find(d => d.stationID === station.stationID);
+          const val = mapDataNode ? mapDataNode.displayVal : 0;
+          if (val > 0) {
+              setSelectedHotspot({ type: 'gistda', station, val, color: mapDataNode.color });
+          } else {
+              const data = stationTemps[station.stationID] || {};
+              const pm25 = station.AQILast?.PM25?.value || 0;
+              setSelectedHotspot({ type: 'basic', station, data, pm25 });
+          }
       } else {
-          const data = stationTemps[station.stationID] || {};
-          const pm25 = station.AQILast?.PM25?.value || 0;
+          // Send raw daily values matching what we evaluated for dayOffset
+          const daily = stationDaily[station.stationID] || {};
+          const idx = dayOffset + 7;
+          const data = dayOffset === 0 ? (stationTemps[station.stationID] || {}) : {
+              temp: daily.temp?.[idx], feelsLike: daily.heat?.[idx], 
+              rainProb: daily.rain?.[idx], windSpeed: daily.wind?.[idx], uv: daily.uv?.[idx]
+          };
+          const pm25 = dayOffset === 0 ? (station.AQILast?.PM25?.value || 0) : (daily.pm25?.[idx] || 0);
           setSelectedHotspot({ type: 'basic', station, data, pm25 });
       }
       
@@ -304,7 +405,41 @@ export default function MapPage() {
   const borderColor = 'var(--border-color)';
   const subTextColor = 'var(--text-sub)'; 
 
-  const activeModeObj = mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) : riskModes.find(m => m.id === activeRiskMode);
+  const activeModeObj = mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) : 
+                        mapCategory === 'risk' ? riskModes.find(m => m.id === activeRiskMode) : 
+                        gistdaModes.find(m => m.id === activeGistdaMode);
+
+  const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const getDateLabel = (offset) => {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      const day = d.getDate();
+      const month = thaiMonths[d.getMonth()];
+      const year = d.getFullYear() + 543;
+      const shortYear = String(year).slice(-2);
+      return `${day} ${month} ${shortYear}`;
+  };
+
+  const getLastUpdatedText = () => {
+      if (!lastUpdated) return 'ไม่ทราบวันที่อัปเดต';
+      const d = new Date(lastUpdated);
+      // Convert to Bangkok time
+      const bkk = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+      const day = bkk.getDate();
+      const month = thaiMonths[bkk.getMonth()];
+      const year = bkk.getFullYear() + 543;
+      const hh = String(bkk.getHours()).padStart(2, '0');
+      const mm = String(bkk.getMinutes()).padStart(2, '0');
+      return `${day} ${month} ${year}, ${hh}:${mm} น.`;
+  };
+
+  const getPm25QualityText = (val) => {
+      if (val > 75) return { text: 'มีผลกระทบต่อสุขภาพ', color: '#ef4444' };
+      if (val >= 37.6) return { text: 'เริ่มมีผลกระทบเล็กน้อย', color: '#f97316' };
+      if (val >= 25.1) return { text: 'ปานกลาง', color: '#eab308' };
+      if (val >= 15.1) return { text: 'คุณภาพดี', color: '#22c55e' };
+      return { text: 'คุณภาพดีมาก', color: '#0ea5e9' };
+  };
 
   const getDynamicLegendContent = () => {
     if (mapCategory === 'risk') {
@@ -313,6 +448,12 @@ export default function MapPage() {
             { c: '#f97316', l: 'ควรเฝ้าระวัง', r: '6-7.9' },
             { c: '#eab308', l: 'ปานกลาง', r: '4-5.9' },
             { c: '#22c55e', l: 'สถานการณ์ปกติ', r: '0-3.9' }
+        ];
+    }
+    if (mapCategory === 'gistda') {
+        return [
+            { c: activeModeObj?.color || '#ef4444', l: 'ติดอันดับ Top 5 ที่เฝ้าระวัง', r: 'สูงสุด' },
+            { c: darkMode ? '#334155' : '#cbd5e1', l: 'ไม่มีรายงาน / สภาพปกติ', r: '-' }
         ];
     }
     switch (activeBasicMode) {
@@ -337,7 +478,7 @@ export default function MapPage() {
   return (
     <div style={{ height: '100%', width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '10px' : '20px', boxSizing: 'border-box' }}>
       
-      <style dangerouslySetInlineStyle={{__html: `
+      <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${darkMode ? '#334155' : '#cbd5e1'}; border-radius: 10px; }
@@ -359,21 +500,30 @@ export default function MapPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h2 style={{ margin: 0, color: textColor, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>🗺️ แผนที่สภาพอากาศ</h2>
-                      {mapCategory === 'risk' && (
-                          <button onClick={() => setShowReferenceModal(true)} style={{ background: 'var(--bg-secondary)', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '4px 10px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              📚
-                          </button>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {mapCategory === 'risk' && (
+                              <button onClick={() => setShowReferenceModal(true)} style={{ background: 'var(--bg-secondary)', color: '#8b5cf6', border: `1px solid #8b5cf6`, padding: '4px 10px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  📚
+                              </button>
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: '50px', border: `1px solid ${borderColor}` }}>
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+                              <span style={{ fontSize: '0.65rem', color: subTextColor, fontWeight: 'bold' }}>อัปเดต {getLastUpdatedText()}</span>
+                          </div>
+                      </div>
                   </div>
                   <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px' }}>
-                      <button onClick={() => setMapCategory('basic')} style={{ flex: 1, background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>📊 ข้อมูลทั่วไป</button>
-                      <button onClick={() => setMapCategory('risk')} style={{ flex: 1, background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🧠 วิเคราะห์ความเสี่ยง</button>
+                      <button onClick={() => setMapCategory('basic')} style={{ flex: 1, background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '4px', borderRadius: '50px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>📊 ทั่วไป</button>
+                      <button onClick={() => setMapCategory('risk')} style={{ flex: 1, background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '4px', borderRadius: '50px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🧠 ความเสี่ยง</button>
+                      <button onClick={() => setMapCategory('gistda')} style={{ flex: 1, background: mapCategory === 'gistda' ? '#ef4444' : 'transparent', color: mapCategory === 'gistda' ? '#fff' : subTextColor, border: 'none', padding: '4px', borderRadius: '50px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🛰️ พิบัติภัย</button>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }} className="custom-scrollbar">
                     {mapCategory === 'basic' ? basicModes.map(m => (
                         <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.75rem' }}>{m.name}</button>
-                    )) : riskModes.map(m => (
+                    )) : mapCategory === 'risk' ? riskModes.map(m => (
                         <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.75rem' }}>{m.name}</button>
+                    )) : gistdaModes.map(m => (
+                        <button key={m.id} onClick={() => setActiveGistdaMode(m.id)} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '12px', border: `1px solid ${activeGistdaMode === m.id ? m.color : borderColor}`, background: activeGistdaMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeGistdaMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.75rem' }}>{m.name}</button>
                     ))}
                   </div>
               </div>
@@ -381,10 +531,17 @@ export default function MapPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <h2 style={{ margin: 0, color: textColor, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>🗺️ แผนที่สภาพอากาศ</h2>
+                          <div>
+                              <h2 style={{ margin: 0, color: textColor, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>🗺️ แผนที่สภาพอากาศ</h2>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 8px #22c55e', animation: 'pulse 2s infinite' }}></span>
+                                  <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>ข้อมูล Real-time • อัปเดตล่าสุด: {getLastUpdatedText()}</span>
+                              </div>
+                          </div>
                           <div style={{ display: 'flex', background: cardBg, borderRadius: '50px', border: `1px solid ${borderColor}`, padding: '4px' }}>
                               <button onClick={() => setMapCategory('basic')} style={{ background: mapCategory === 'basic' ? '#0ea5e9' : 'transparent', color: mapCategory === 'basic' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>📊 ข้อมูลทั่วไป</button>
                               <button onClick={() => setMapCategory('risk')} style={{ background: mapCategory === 'risk' ? '#8b5cf6' : 'transparent', color: mapCategory === 'risk' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🧠 วิเคราะห์ความเสี่ยง</button>
+                              <button onClick={() => setMapCategory('gistda')} style={{ background: mapCategory === 'gistda' ? '#ef4444' : 'transparent', color: mapCategory === 'gistda' ? '#fff' : subTextColor, border: 'none', padding: '6px 20px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s', fontFamily: 'Kanit' }}>🛰️ พิบัติภัย (GISTDA)</button>
                           </div>
                       </div>
                       {mapCategory === 'risk' && (
@@ -396,13 +553,44 @@ export default function MapPage() {
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     {mapCategory === 'basic' ? basicModes.map(m => (
                         <button key={m.id} onClick={() => setActiveBasicMode(m.id)} style={{ padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeBasicMode === m.id ? m.color : borderColor}`, background: activeBasicMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeBasicMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.9rem' }}>{m.name}</button>
-                    )) : riskModes.map(m => (
+                    )) : mapCategory === 'risk' ? riskModes.map(m => (
                         <button key={m.id} onClick={() => setActiveRiskMode(m.id)} style={{ padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeRiskMode === m.id ? m.color : borderColor}`, background: activeRiskMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeRiskMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.9rem' }}>{m.name}</button>
+                    )) : gistdaModes.map(m => (
+                        <button key={m.id} onClick={() => setActiveGistdaMode(m.id)} style={{ padding: '8px 15px', borderRadius: '12px', border: `1px solid ${activeGistdaMode === m.id ? m.color : borderColor}`, background: activeGistdaMode === m.id ? (darkMode ? `${m.color}20` : `${m.color}15`) : cardBg, color: activeGistdaMode === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Kanit', fontSize: '0.9rem' }}>{m.name}</button>
                     ))}
                   </div>
               </div>
           )}
       </div>
+
+      {mapCategory !== 'gistda' && (
+          <div style={{ background: cardBg, padding: '10px 15px', borderRadius: '12px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px', flexShrink: 0, boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold', cursor: 'pointer' }} onClick={()=>setDayOffset(-7)}>◀ {getDateLabel(-7)}</span>
+                  <span style={{ fontSize: '0.85rem', color: dayOffset === 0 ? textColor : dayOffset < 0 ? '#60a5fa' : '#c084fc', fontWeight: 'bold', background: 'var(--bg-secondary)', padding: '4px 15px', borderRadius: '50px', border: `1px solid ${borderColor}`, display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: dayOffset !== 0 ? 'pointer' : 'default' }} onClick={() => setDayOffset(0)}>
+                  {dayOffset === 0 ? `📅 วันนี้ ${getDateLabel(0)} • Real-time` : dayOffset < 0 ? `🕒 ${getDateLabel(dayOffset)}` : `🔮 ${getDateLabel(dayOffset)}`}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold', cursor: 'pointer' }} onClick={()=>setDayOffset(7)}>{getDateLabel(7)} ▶</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input 
+                      type="range" 
+                      min="-7" max="7" step="1" 
+                      value={dayOffset} 
+                      onChange={(e) => setDayOffset(parseInt(e.target.value))}
+                      style={{ flex: 1, accentColor: activeModeObj?.color || '#0ea5e9', cursor: 'pointer', height: '6px' }}
+                  />
+                  {dayOffset !== 0 && (
+                      <button onClick={() => setDayOffset(0)} style={{ background: 'var(--bg-secondary)', color: activeModeObj?.color || '#0ea5e9', border: `1px solid ${borderColor}`, padding: '3px 10px', borderRadius: '50px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>⏱ วันนี้</button>
+                  )}
+              </div>
+              {Math.abs(dayOffset) >= 4 && (
+                  <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ⚠️ ข้อมูล{dayOffset > 0 ? 'พยากรณ์' : 'ย้อนหลัง'}ไกล — ความแม่นยำอาจลดลง
+                  </div>
+              )}
+          </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, gap: '15px', overflow: 'hidden' }}>
           
@@ -414,27 +602,24 @@ export default function MapPage() {
                     <MapZoomListener setMapZoom={setMapZoom} />
                     <MapChangeView center={flyToPos} />
                     
-                    {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${polyOpacity}-${basemapStyle}-${flashProv}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
+                    {geoData && <GeoJSON key={`${mapCategory}-${activeRiskMode}-${activeBasicMode}-${activeGistdaMode}-${dayOffset}-${polyOpacity}-${basemapStyle}-${flashProv}`} data={geoData} style={styleGeoJSON} onEachFeature={onEachFeature} />}
                     
                     {allMapData.map(st => {
                         let isVisible = false;
 
-                        if (mapZoom >= 8) { 
-                            isVisible = true; 
-                        } else if (mapZoom >= 6) {
-                            if (mapCategory === 'risk') {
-                                isVisible = st.displayVal >= 4; 
-                            } else {
-                                isVisible = rankedSidebarData.some(r => r.stationID === st.stationID);
-                            }
+                        if (mapCategory === 'gistda') {
+                            isVisible = st.displayVal > 0;
                         } else {
-                            if (mapCategory === 'risk') {
-                                isVisible = st.displayVal >= 6; 
-                                if (!hasHighRisk) {
-                                    isVisible = rankedSidebarData.slice(0, 3).some(r => r.stationID === st.stationID);
-                                }
+                            const name = st.areaTH.replace('จังหวัด', '').trim();
+                            const tier = getProvTier(name);
+                            if (mapZoom >= 8) {
+                                isVisible = true;
+                            } else if (mapZoom === 7) {
+                                isVisible = tier <= 3;
+                            } else if (mapZoom === 6) {
+                                isVisible = tier <= 2;
                             } else {
-                                isVisible = rankedSidebarData.slice(0, 5).some(r => r.stationID === st.stationID);
+                                isVisible = tier <= 1; // mapZoom <= 5
                             }
                         }
 
@@ -499,12 +684,23 @@ export default function MapPage() {
 
           <div style={{ width: isMobile ? '100%' : '320px', background: cardBg, borderRadius: isMobile ? '16px' : '20px', padding: '15px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0 }}>
              <h3 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: textColor }}>
-                📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 15)' : 'จัดอันดับค่าสูงสุด (Top 15)'}
+                📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 15)' : mapCategory === 'gistda' ? 'พื้นที่วิกฤต (Top 5)' : 'จัดอันดับค่าสูงสุด (Top 15)'}
              </h3>
              <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: activeModeObj?.color, fontWeight: 'bold' }}>{activeModeObj?.desc}</p>
+             <input 
+                 type="text" 
+                 placeholder="🔍 ค้นหาจังหวัด..." 
+                 value={searchQuery} 
+                 onChange={(e) => setSearchQuery(e.target.value)} 
+                 style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${borderColor}`, background: 'var(--bg-secondary)', color: textColor, fontSize: '0.85rem', fontFamily: 'Kanit', outline: 'none', marginBottom: '10px', boxSizing: 'border-box' }} 
+             />
              
              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }} className="custom-scrollbar">
-                {rankedSidebarData.map((st, idx) => (
+                {rankedSidebarData.filter(st => {
+                    if (!searchQuery.trim()) return true;
+                    const name = st.areaTH.replace('จังหวัด', '').trim();
+                    return name.includes(searchQuery.trim());
+                }).map((st, idx) => (
                    <div 
                        key={st.stationID} 
                        onClick={() => handleRegionClick(st)} 
@@ -568,21 +764,68 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* POPUP 1.5: GISTDA DASHBOARD MODAL */}
+      {selectedHotspot && selectedHotspot.type === 'gistda' && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
+            <div className="fade-in" style={{ background: cardBg, padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '420px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                <button onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                
+                <div style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
+                    <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold', marginBottom: '5px' }}>รายงานสถานการณ์ภัยพิบัติ GISTDA</div>
+                    <h2 style={{ margin: 0, color: textColor, fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 'bold' }}>📍 จ.{selectedHotspot.station.areaTH.replace('จังหวัด','')}</h2>
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: selectedHotspot.color, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: `4px solid ${cardBg}`, outline: `2px solid ${selectedHotspot.color}`, flexShrink: 0 }}>
+                        <span style={{ fontSize: '1.4rem', fontWeight: '900', lineHeight: 1 }}>{selectedHotspot.val.toLocaleString()}</span>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '2px' }}>{activeModeObj?.unit}</span>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '1rem', fontWeight: 'bold', color: selectedHotspot.color }}>{activeModeObj?.name}</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, marginTop: '5px' }}>สถานะ: <span style={{fontWeight:'bold'}}>เฝ้าระวังพิเศษ (Top 5)</span></div>
+                        <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '5px', lineHeight: 1.4 }}>
+                            {activeGistdaMode === 'hotspots' ? 'จุดความร้อนที่ตรวจพบจากดาวเทียม VIIRS สะสม 7 วัน บ่งชี้การเผาไหม้ในพื้นที่' :
+                             activeGistdaMode === 'burntArea' ? 'พื้นที่ที่พบร่องรอยการเผาไหม้จากภาพถ่ายดาวเทียม สะสมรอบ 10 วัน' :
+                             activeGistdaMode === 'lowSoilMoisture' ? 'ค่าความชื้นในดินต่ำกว่าเกณฑ์ปกติ เสี่ยงต่อภัยแล้งและพืชผลเสียหาย' :
+                             activeGistdaMode === 'lowVegetationMoisture' ? 'ค่าดัชนีน้ำในพืช (NDWI) ต่ำ บ่งชี้ว่าพืชขาดน้ำและเสี่ยงเป็นเชื้อเพลิงไฟป่า' :
+                             'พื้นที่น้ำท่วมสะสมที่ตรวจพบจากภาพถ่ายดาวเทียม Sentinel-1'}
+                        </div>
+                    </div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', padding: '10px 12px', borderRadius: '10px', fontSize: '0.75rem', color: subTextColor, lineHeight: 1.5 }}>
+                    ℹ️ ข้อมูลจากสำนักงานพัฒนาเทคโนโลยีอวกาศและภูมิสารสนเทศ (GISTDA) อัปเดตอัตโนมัติทุกรอบ Cron
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* POPUP 2: WEATHER DASHBOARD MODAL */}
       {selectedHotspot && selectedHotspot.type === 'basic' && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
           <div className="fade-in" style={{ background: cardBg, padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '420px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
               <button onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
               
-              <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
-                  <div style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold', marginBottom: '5px' }}>ข้อมูลสภาพอากาศปัจจุบัน</div>
-                  <h2 style={{ margin: 0, color: textColor, fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 'bold' }}>📍 จ.{selectedHotspot.station.areaTH.replace('จังหวัด','')}</h2>
+              <div style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                          <div style={{ fontSize: '0.75rem', color: dayOffset === 0 ? '#22c55e' : dayOffset < 0 ? '#60a5fa' : '#c084fc', fontWeight: 'bold', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {dayOffset === 0 ? `● Real-time • ${getLastUpdatedText()}` : dayOffset < 0 ? `🕒 ข้อมูลวันที่ ${getDateLabel(dayOffset)}` : `🔮 พยากรณ์วันที่ ${getDateLabel(dayOffset)}`}
+                          </div>
+                          <h2 style={{ margin: 0, color: textColor, fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 'bold' }}>📍 จ.{selectedHotspot.station.areaTH.replace('จังหวัด','')}</h2>
+                      </div>
+                      {dayOffset !== 0 && (
+                          <div style={{ fontSize: '0.65rem', color: subTextColor, textAlign: 'right', lineHeight: 1.4, marginTop: '2px' }}>
+                              (ค่าสูงสุด<br/>ของวัน)
+                          </div>
+                      )}
+                  </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '5px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.pm25, 'pm25')}` }}>
                       <span style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>😷 ฝุ่น PM2.5</span>
                       <span style={{ fontSize: '1.4rem', fontWeight: '900', color: getBasicColor(selectedHotspot.pm25, 'pm25') }}>{selectedHotspot.pm25} <span style={{fontSize: '0.7rem', color: subTextColor, fontWeight:'normal'}}>µg/m³</span></span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: getPm25QualityText(selectedHotspot.pm25).color }}>{getPm25QualityText(selectedHotspot.pm25).text}</span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '5px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.temp, 'temp')}` }}>
                       <span style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>🌡️ อุณหภูมิ</span>
@@ -597,13 +840,15 @@ export default function MapPage() {
                       <span style={{ fontSize: '1.4rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.rainProb, 'rain') }}>{selectedHotspot.data.rainProb || 0} <span style={{fontSize: '0.7rem', color: subTextColor, fontWeight:'normal'}}>%</span></span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: '1 / -1', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.windSpeed, 'wind')}` }}>
-                      <span style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>🌬️ ลมกระโชกสูงสุด และทิศทางลม</span>
+                      <span style={{ fontSize: '0.8rem', color: subTextColor, fontWeight: 'bold' }}>🌬️ ลมกระโชกสูงสุด{dayOffset === 0 ? ' และทิศทางลม' : ''}</span>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '1.4rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.windSpeed, 'wind') }}>{Math.round(selectedHotspot.data.windSpeed || 0)} <span style={{fontSize: '0.7rem', color: subTextColor, fontWeight:'normal'}}>km/h</span></span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: cardBg, padding: '4px 10px', borderRadius: '8px', border: `1px solid ${borderColor}` }}>
-                              <span style={{ fontSize: '1.2rem' }}>{getWindDirection(selectedHotspot.data.windDir).arrow}</span>
-                              <span style={{ fontSize: '0.8rem', color: textColor, fontWeight: 'bold' }}>ลม{getWindDirection(selectedHotspot.data.windDir).name}</span>
-                          </div>
+                          {dayOffset === 0 && selectedHotspot.data.windDir !== undefined && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: cardBg, padding: '4px 10px', borderRadius: '8px', border: `1px solid ${borderColor}` }}>
+                                  <span style={{ fontSize: '1.2rem' }}>{getWindDirection(selectedHotspot.data.windDir).arrow}</span>
+                                  <span style={{ fontSize: '0.8rem', color: textColor, fontWeight: 'bold' }}>ลม{getWindDirection(selectedHotspot.data.windDir).name}</span>
+                              </div>
+                          )}
                       </div>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: '1 / -1', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.uv, 'uv')}` }}>
@@ -627,8 +872,8 @@ export default function MapPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #ec4899' }}>
                         <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🫁 สุขภาพและทางเดินหายใจ</div>
-                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> งานวิจัยอาชีวเวชศาสตร์ และ EPA Air Quality Index</div>
-                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>การสัมผัสความร้อนสูงจะทำให้เยื่อบุทางเดินหายใจระคายเคือง กลไกการกรองฝุ่นตามธรรมชาติลดลง ดัชนีนี้จึงนำความเข้มข้นของ PM2.5 (70%) มาคูณร่วมกับ อุณหภูมิความร้อน (30%) เพื่อสะท้อนผลกระทบต่อปอดที่แท้จริง</div>
+                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> งานวิจัยอาชีวเวชศาสตร์, EPA Air Quality Index, และ WHO Hygroscopic PM Guidelines</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>ฝุ่น PM2.5 เมื่อรวมกับความชื้นสูงจะเกิดปรากฏการณ์ Hygroscopic Growth ทำให้อนุภาคฝุ่นขยายตัวและสะสมในปอดมากขึ้น ดัชนีนี้จึงผสาน PM2.5 (60%) กับ ความชื้นสัมพัทธ์ (20%) และอุณหภูมิ (20%) เพื่อประเมินภาระต่อระบบทางเดินหายใจอย่างครอบคลุม</div>
                     </div>
                     <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
                         <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🏕️ กิจกรรมกลางแจ้ง</div>
@@ -637,13 +882,13 @@ export default function MapPage() {
                     </div>
                     <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #ea580c' }}>
                         <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🔥 ความเสี่ยงไฟป่า</div>
-                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> แบบจำลอง Canadian Forest Fire Weather Index (FWI)</div>
-                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>ประเมินสภาวะที่เอื้อต่อการลุกลามของไฟ โดยคำนวณจากความเร็วลมที่เป็นตัวพัดพา (45%) ผสานกับสภาพอากาศที่ทำให้เชื้อเพลิงแห้งติดไฟง่าย คือ ความชื้นสัมพัทธ์ต่ำ (35%) และอุณหภูมิสูง (20%)</div>
+                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> แบบจำลอง Canadian Forest Fire Weather Index (FWI) + Fine Fuel Moisture Code</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>ดัชนี FWI แท้จริงใช้ข้อมูลฝนในการคำนวณ Fine Fuel Moisture Code (FFMC) ดัชนีนี้จึงครอบคลุม 4 ปัจจัย: ลมที่เป็นตัวพัดพาไฟ (35%), ความแห้งแล้งของอากาศ (30%), การไม่มีฝนตกซึ่งทำให้เชื้อเพลิงแห้ง (20%), และอุณหภูมิที่ทำให้จุดติดไฟง่ายขึ้น (15%)</div>
                     </div>
                     <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #ef4444' }}>
                         <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: textColor, marginBottom: '5px' }}>🥵 เฝ้าระวังโรคลมแดด</div>
-                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> องค์การอนามัยโลก (WHO) และดัชนี WBGT</div>
-                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>การประเมินโรคลมแดดที่แม่นยำ ต้องคำนวณ <b>"ภาระความร้อนรวม"</b> ที่ร่างกายได้รับ ดัชนีนี้จึงผสานอุณหภูมิอากาศ (60%) เข้ากับรังสีความร้อนจากดวงอาทิตย์หรือ UV (40%) เพื่อประเมินความเสี่ยงต่อภาวะหน้ามืดเฉียบพลัน</div>
+                        <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '5px' }}><strong>อ้างอิง:</strong> องค์การอนามัยโลก (WHO), ดัชนี WBGT (Wet Bulb Globe Temperature)</div>
+                        <div style={{ fontSize: '0.85rem', color: textColor, lineHeight: 1.5 }}>ดัชนี WBGT ใช้ <b>อุณหภูมิกระเปาะเปียก (Wet-Bulb)</b> เป็นแกนหลัก ซึ่งสะท้อนทั้งความร้อนและความชื้น สูตรนี้จึงผสานอุณหภูมิ (45%) กับความชื้นสัมพัทธ์สูงที่ทำให้เหงื่อไม่ระเหยและร่างกายระบายความร้อนไม่ได้ (30%) และรังสี UV (25%) เพื่อประเมินความเสี่ยงต่อภาวะลมแดดอย่างแม่นยำ</div>
                     </div>
                 </div>
             </div>

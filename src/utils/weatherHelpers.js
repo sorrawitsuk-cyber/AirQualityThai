@@ -37,35 +37,42 @@ export const getWeatherBackground = (isNight, isRaining, isHot) => {
     return 'linear-gradient(135deg, #0ea5e9, #38bdf8)';
 };
 
-export const getBriefingText = (weatherText, maxTemp, dailyRainProb, pm25, currentHour) => {
+export const getBriefingText = (weatherText, currentTemp, feelsLike, maxTemp, dailyRainProb, pm25, currentHour, tomorrowMaxTemp, tomorrowRainProb) => {
     const parts = [];
     const isNight = currentHour >= 18 || currentHour < 6;
     const greeting = isNight ? '🌙 สวัสดีตอนค่ำ!' : currentHour < 12 ? '☀️ สวัสดีตอนเช้า!' : '🌤️ สวัสดีตอนบ่าย!';
 
     parts.push(greeting);
 
+    if (currentTemp !== undefined && feelsLike !== undefined) {
+        parts.push(`ขณะนี้สภาพอากาศ${weatherText} อุณหภูมิ ${Math.round(currentTemp)}° (รู้สึกเหมือน ${Math.round(feelsLike)}°)`);
+    }
+
     // ☂️ ร่ม?
     if (dailyRainProb > 70) parts.push(`☂️ วันนี้ฝนมาแน่ (${dailyRainProb}%) พกร่มไว้เลยนะ!`);
     else if (dailyRainProb > 40) parts.push(`🌂 มีโอกาสฝนตก ${dailyRainProb}% ถ้าออกไปข้างนอกพกร่มไว้จะชัวร์กว่า`);
 
     // 🔥 ร้อน?
-    if (maxTemp >= 40) parts.push(`🥵 ร้อนสะท้านถึง ${maxTemp}° วันนี้อยู่ในร่มดีกว่า ดื่มน้ำเยอะๆ นะ!`);
-    else if (maxTemp >= 38) parts.push(`🔥 ร้อนจัดเลย ${maxTemp}° อย่าลืมดื่มน้ำบ่อยๆ หลีกเลี่ยงแดดช่วงเที่ยงนะ`);
-    else if (maxTemp >= 35) parts.push(`🌡️ อุณหภูมิสูงสุด ${maxTemp}° ค่อนข้างร้อน ทาครีมกันแดดด้วยนะ`);
+    if (maxTemp >= 40) parts.push(`🥵 ระหว่างวันร้อนสะท้านถึง ${maxTemp}° วันนี้อยู่ในร่มดีกว่า ดื่มน้ำเยอะๆ นะ!`);
+    else if (maxTemp >= 38) parts.push(`🔥 ระหว่างวันค่อนข้างร้อนจัด ${maxTemp}° อย่าลืมดื่มน้ำบ่อยๆ หลีกเลี่ยงแดดช่วงเที่ยงนะ`);
+    else if (maxTemp >= 35) parts.push(`🌡️ อุณหภูมิสูงสุดวันนี้ ${maxTemp}° ทาครีมกันแดดด้วยนะ`);
     else if (maxTemp <= 22) parts.push(`🧥 วันนี้เย็นสบาย ${maxTemp}° เตรียมเสื้อกันหนาวไว้ด้วย`);
 
     // 😷 ฝุ่น?
     if (pm25 > 75) parts.push(`😷 ฝุ่นหนักมาก (PM2.5: ${Math.round(pm25)}) ใส่ N95 ก่อนออกนอกบ้านนะ!`);
     else if (pm25 > 37.5) parts.push(`😷 ฝุ่นค่อนข้างเยอะ (PM2.5: ${Math.round(pm25)}) ใส่แมสก์ไว้จะดีกว่า`);
-    else if (pm25 <= 15) parts.push(`🌿 อากาศสะอาดมาก ฝุ่นน้อย หายใจสบาย`);
 
-    // 👕 ตากผ้า?
-    if (dailyRainProb > 50) parts.push(`👕 วันนี้อย่าเพิ่งตากผ้าข้างนอกนะ เสี่ยงเจอฝน!`);
-    else if (dailyRainProb <= 20 && maxTemp >= 30) parts.push(`👕 ตากผ้าได้เลย แดดดี ฝนไม่มี!`);
-
-    // ✨ สรุปรวม ถ้าอากาศดีทุกอย่าง
-    if (dailyRainProb <= 20 && maxTemp < 38 && pm25 <= 25) {
-        parts.push(`✨ โดยรวมอากาศดี เหมาะออกไปทำกิจกรรมข้างนอก!`);
+    // 🔮 พรุ่งนี้?
+    if (tomorrowMaxTemp !== null && tomorrowMaxTemp !== undefined) {
+        let tmrText = `พรุ่งนี้`;
+        if (tomorrowRainProb > 50) tmrText += `มีแววฝนตก (${tomorrowRainProb}%) `;
+        else tmrText += `ฝนแทบไม่มี `;
+        tmrText += `อุณหภูมิสูงสุดประมาณ ${tomorrowMaxTemp}°`;
+        parts.push(`🔮 ${tmrText}`);
+    } else {
+        if (dailyRainProb <= 20 && maxTemp < 38 && pm25 <= 25) {
+            parts.push(`✨ โดยรวมอากาศดี เหมาะออกไปทำกิจกรรมข้างนอก!`);
+        }
     }
 
     return parts.join(' ');

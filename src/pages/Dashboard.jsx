@@ -11,6 +11,7 @@ import SunriseSunsetArc from '../components/Dashboard/SunriseSunsetArc';
 import ActivityRecommendations from '../components/Dashboard/ActivityRecommendations';
 import TopStats from '../components/Dashboard/TopStats';
 import WeatherRadar from '../components/Dashboard/WeatherRadar';
+import DisasterSummary from '../components/Dashboard/DisasterSummary';
 
 export default function Dashboard() {
   const { stations, stationTemps, darkMode, lastUpdated } = useContext(WeatherContext);
@@ -81,7 +82,7 @@ export default function Dashboard() {
     return [];
   }, [geoData, selectedProv]);
 
-  // --- 🇹🇭 ระบบคำนวณ Top 5 จาก Firebase ---
+  // --- 🇹🇭 ระบบคำนวณ Top 5 จาก Firebase (Today) ---
   const { top5Heat, top5Cool, top5PM25, top5Rain } = useMemo(() => {
     const heat = [], cool = [], pm25 = [], rain = [];
     (stations || []).forEach(st => {
@@ -104,6 +105,33 @@ export default function Dashboard() {
       top5Rain: rain.sort((a, b) => b.val - a.val).slice(0, 5)
     };
   }, [stations, stationTemps]);
+
+  // --- 🇹🇭 ระบบคำนวณ Top 5 (Yesterday) ---
+  const { stationMaxYesterday } = useContext(WeatherContext);
+  const { top5HeatY, top5CoolY, top5PM25Y, top5RainY } = useMemo(() => {
+    const heat = [], cool = [], pm25 = [], rain = [];
+    (stations || []).forEach(st => {
+      const name = st.areaTH.replace('จังหวัด','');
+      const maxObj = stationMaxYesterday?.[st.stationID] || {};
+      
+      const temp = maxObj.temp !== undefined ? Math.round(maxObj.temp) : -99;
+      const coolTemp = maxObj.temp !== undefined ? Math.round(maxObj.temp) : 999;
+      const pmVal = maxObj.pm25 !== undefined ? Math.round(maxObj.pm25) : 0;
+      const rainVal = maxObj.rain !== undefined ? maxObj.rain : 0;
+
+      if (temp !== -99) heat.push({ name, val: temp });
+      if (coolTemp !== 999) cool.push({ name, val: coolTemp });
+      if (pmVal > 0) pm25.push({ name, val: pmVal });
+      if (rainVal > 0) rain.push({ name, val: rainVal });
+    });
+
+    return {
+      top5HeatY: heat.sort((a, b) => b.val - a.val).slice(0, 5),
+      top5CoolY: cool.sort((a, b) => a.val - b.val).slice(0, 5),
+      top5PM25Y: pm25.sort((a, b) => b.val - a.val).slice(0, 5),
+      top5RainY: rain.sort((a, b) => b.val - a.val).slice(0, 5)
+    };
+  }, [stations, stationMaxYesterday]);
 
   useEffect(() => {
     const useDefaultLocation = () => {
@@ -219,7 +247,11 @@ export default function Dashboard() {
   const maxTemp = Math.round(daily?.temperature_2m_max?.[0] || 0);
   const minTemp = Math.round(daily?.temperature_2m_min?.[0] || 0);
   const dailyRainProb = daily?.precipitation_probability_max?.[0] || 0;
-  const briefingText = getBriefingText(weatherText, maxTemp, dailyRainProb, current?.pm25, currentHour);
+  
+  const tomorrowMaxTemp = daily?.temperature_2m_max?.[1] ? Math.round(daily.temperature_2m_max[1]) : null;
+  const tomorrowRainProb = daily?.precipitation_probability_max?.[1] || 0;
+
+  const briefingText = getBriefingText(weatherText, current?.temp, current?.feelsLike, maxTemp, dailyRainProb, current?.pm25, currentHour, tomorrowMaxTemp, tomorrowRainProb);
 
   // Date/time formatting
   const now = new Date();
@@ -281,7 +313,7 @@ export default function Dashboard() {
                </div>
                <div style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 'bold', marginTop: '10px', alignSelf: 'center' }}>{weatherText}</div>
                <div style={{ fontSize: '0.9rem', opacity: 0.9, alignSelf: 'center', marginTop: '6px', background: 'rgba(0,0,0,0.15)', padding: '4px 12px', borderRadius: '20px' }}>
-                 รู้สึกเหมือน {Math.round(current?.feelsLike || 0)}°C <span style={{ opacity: 0.5, margin: '0 5px' }}>|</span> ส. {Math.round(daily?.temperature_2m_max?.[0] || current?.temp)}° <span style={{ opacity: 0.5, margin: '0 5px' }}>|</span> ต. {Math.round(daily?.temperature_2m_min?.[0] || current?.temp)}°
+                 รู้สึกเหมือน {Math.round(current?.feelsLike || 0)}°C <span style={{ opacity: 0.5, margin: '0 5px' }}>|</span> สูงสุด {Math.round(daily?.temperature_2m_max?.[0] || current?.temp)}° <span style={{ opacity: 0.5, margin: '0 5px' }}>|</span> ต่ำสุด {Math.round(daily?.temperature_2m_min?.[0] || current?.temp)}°
                </div>
             </div>
           </div>
@@ -478,6 +510,10 @@ export default function Dashboard() {
            top5Cool={top5Cool}
            top5PM25={top5PM25}
            top5Rain={top5Rain}
+           top5HeatY={top5HeatY}
+           top5CoolY={top5CoolY}
+           top5PM25Y={top5PM25Y}
+           top5RainY={top5RainY}
            isMobile={isMobile}
            cardBg={cardBg}
            borderColor={borderColor}
@@ -491,6 +527,15 @@ export default function Dashboard() {
            cardBg={cardBg}
            borderColor={borderColor}
            textColor={textColor}
+        />
+
+        {/* === SECTION 11: GISTDA Disaster Summary === */}
+        <DisasterSummary 
+           isMobile={isMobile}
+           cardBg={cardBg}
+           borderColor={borderColor}
+           textColor={textColor}
+           subTextColor={subTextColor}
         />
 
         {/* === Footer === */}
