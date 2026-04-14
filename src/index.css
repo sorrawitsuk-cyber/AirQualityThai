@@ -185,3 +185,44 @@ body {
   from { opacity: 0; transform: translateY(15px); }
   to { opacity: 0.6; transform: translateY(0); }
 }
+
+/* =========================================
+   🗺️ MapPage: Custom Scrollbar
+   ========================================= */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.dark-theme .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+
+/* =========================================
+   🗺️ MapPage: Province Flash Animation
+   ========================================= */
+@keyframes arcgis-flash {
+  0% { stroke: #38bdf8; stroke-width: 2px; }
+  25% { stroke: #0ea5e9; stroke-width: 5px; fill-opacity: 0.9; }
+  50% { stroke: #38bdf8; stroke-width: 2px; }
+  75% { stroke: #0ea5e9; stroke-width: 5px; fill-opacity: 0.9; }
+  100% { stroke: #38bdf8; stroke-width: 2px; }
+}
+.arcgis-flash-polygon {
+  animation: arcgis-flash 2.5s ease-in-out forwards;
+}
+
+/* =========================================
+   ✨ Fade-in Animation (Global Reusable)
+   ========================================= */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* =========================================
+   💗 Pulse Animation for Live Indicators
+   ========================================= */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
