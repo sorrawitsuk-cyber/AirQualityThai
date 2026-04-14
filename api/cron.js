@@ -22,10 +22,17 @@ const provMap = {
 
 // ===== TMD API Helper =====
 async function fetchTmdRegions(token) {
-    const allForecasts = [];
-    for (const region of TMD_REGIONS) {
+    const regions = ['N', 'NE', 'C', 'E', 'S', 'W'];
+    let allForecasts = [];
+
+    // ใส่วันที่+เวลา ปัจจุบันตาม format ของ TMD (YYYY-MM-DD และนำหน้าชั่วโมง)
+    const bangkokTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+    const dateStr = bangkokTime.getFullYear() + '-' + String(bangkokTime.getMonth() + 1).padStart(2, '0') + '-' + String(bangkokTime.getDate()).padStart(2, '0');
+    const hourStr = bangkokTime.getHours();
+
+    for (const region of regions) {
         try {
-            const url = `${TMD_BASE}/hourly/region?region=${region}&fields=${TMD_FIELDS}&duration=24`;
+            const url = `${TMD_BASE}/hourly/region?region=${region}&fields=${TMD_FIELDS}&date=${dateStr}&hour=${hourStr}&duration=24`;
             const res = await fetch(url, {
                 headers: {
                     'accept': 'application/json',
@@ -34,7 +41,6 @@ async function fetchTmdRegions(token) {
             });
             if (res.ok) {
                 const data = await res.json();
-                // TMD returns WeatherForecasts (or WeatherForcasts — typo in their API)
                 const forecasts = data.WeatherForecasts || data.WeatherForcasts || data.WeatherForecast || [];
                 allForecasts.push(...forecasts);
                 console.log(`TMD Region ${region}: ${forecasts.length} locations`);
@@ -52,51 +58,30 @@ async function fetchTmdRegions(token) {
 
 // ===== Process TMD data → province & amphoe level =====
 function processTmdData(forecasts) {
-    const provinceMap = {}; // { provName: { current: {...}, amphoes: [...] } }
-    const bangkokTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
-    const currentHour = bangkokTime.getHours();
-
+    const provinceMap = {}; 
+    
     forecasts.forEach(item => {
-        const loc = item.location || {};
+        if (!item.location) return;
+        const loc = item.location;
         const provName = loc.province || '';
         const amphoeName = loc.amphoe || null;
         const areatype = loc.areatype || 'province';
-        const lat = loc.lat;
-        const lon = loc.lon;
-        const geocode = loc.geocode || '';
-
-        // Find the forecast closest to current time
-        const fcs = item.forecasts || [];
-        let bestFc = fcs[0]; // default first
-        if (fcs.length > 0) {
-            // Find the forecast for the current hour
-            for (const fc of fcs) {
-                const fcHour = new Date(fc.time).getHours();
-                if (fcHour === currentHour) {
-                    bestFc = fc;
-                    break;
-                }
-            }
-            // If no exact match, use the latest forecast that's not in the future
-            if (!bestFc || !bestFc.data) bestFc = fcs[0];
-        }
-
-        const d = bestFc?.data || {};
+        
+        const d = item.forecasts?.[0]?.data || {};
         const entry = {
             name: amphoeName || provName,
             province: provName,
             amphoe: amphoeName,
             areatype,
-            lat, lon, geocode,
+            lat: loc.lat, 
+            lon: loc.lon, 
+            geocode: loc.geocode || '',
             tc: d.tc != null ? Math.round(d.tc * 10) / 10 : null,
             rh: d.rh != null ? Math.round(d.rh) : null,
             ws10: d.ws10 != null ? Math.round(d.ws10 * 10) / 10 : null,
             wd10: d.wd10 != null ? Math.round(d.wd10) : null,
             rain: d.rain != null ? Math.round(d.rain * 10) / 10 : null,
-            cond: d.cond || null,
-            slp: d.slp != null ? Math.round(d.slp) : null,
-            // Store all 24h forecasts for charts
-            hourlyForecasts: fcs.slice(0, 24).map(fc => ({
+            hourlyForecasts: (item.forecasts || []).slice(0, 24).map(fc => ({
                 time: fc.time,
                 tc: fc.data?.tc,
                 rh: fc.data?.rh,
@@ -110,9 +95,12 @@ function processTmdData(forecasts) {
             provinceMap[provName] = { amphoes: [], provinceLevelData: null };
         }
 
+        // เก็บข้อมูลระดับจังหวัด
         if (areatype === 'province' || !amphoeName) {
             provinceMap[provName].provinceLevelData = entry;
-        } else {
+        } 
+        // เก็บข้อมูลระดับอำเภอ
+        else {
             provinceMap[provName].amphoes.push(entry);
         }
     });
