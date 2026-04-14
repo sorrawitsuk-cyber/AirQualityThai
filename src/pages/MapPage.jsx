@@ -192,11 +192,11 @@ export default function MapPage() {
   ];
 
   const gistdaModes = [
-    { id: 'hotspots', name: '🔥 จุดความร้อน (7 วัน)', color: '#ef4444', unit: 'จุด', desc: 'จุดความร้อนสะสม 7 วันย้อนหลัง (Top 5)' },
-    { id: 'burntArea', name: '🔥 พื้นที่เผาไหม้', color: '#ea580c', unit: 'ไร่', desc: 'พื้นที่เผาไหม้สะสม (Top 5)' },
-    { id: 'lowSoilMoisture', name: '🏜️ ความชื้นในดินต่ำ', color: '#f59e0b', unit: '%vol', desc: 'ความชื้นในดินต่ำสุด (Top 5)' },
-    { id: 'lowVegetationMoisture', name: '🍂 ความชื้นพืชพรรณต่ำ', color: '#d97706', unit: 'ดัชนี', desc: 'ความชื้นพืชพรรณต่ำสุด (Top 5)' },
-    { id: 'floodArea', name: '🌊 พื้นที่น้ำท่วม', color: '#3b82f6', unit: 'ไร่', desc: 'พื้นที่น้ำท่วมสะสมสูงสุด (Top 5)' }
+    { id: 'hotspots', name: '🔥 จุดความร้อน (7 วัน)', color: '#ef4444', unit: 'จุด', desc: '🟢 ข้อมูลสดจาก GISTDA — จุดความร้อนสะสม 7 วันย้อนหลัง (Top 5)' },
+    { id: 'burntArea', name: '🔥 พื้นที่เผาไหม้', color: '#ea580c', unit: 'ไร่', desc: '🟢 ข้อมูลสดจาก GISTDA — พื้นที่เผาไหม้สะสม 10 วัน (Top 5)' },
+    { id: 'lowSoilMoisture', name: '🏜️ ความชื้นในดินต่ำ', color: '#f59e0b', unit: '%vol', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true },
+    { id: 'lowVegetationMoisture', name: '🍂 ความชื้นพืชพรรณต่ำ', color: '#d97706', unit: 'ดัชนี', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true },
+    { id: 'floodArea', name: '🌊 พื้นที่น้ำท่วม', color: '#3b82f6', unit: 'ไร่', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true }
   ];
 
   const getGistdaColor = useCallback((val, mode, rank) => {
@@ -756,7 +756,24 @@ export default function MapPage() {
              />
              
              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }} className="custom-scrollbar">
-                {rankedSidebarData.filter(st => {
+                {/* แสดงข้อความเมื่อ GISTDA mode ยังไม่มี API */}
+                {mapCategory === 'gistda' && activeModeObj?.noApi && (
+                    <div style={{ textAlign: 'center', padding: '30px 15px', color: subTextColor }}>
+                        <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🛰️</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#f59e0b' }}>ยังไม่มีข้อมูลจาก API</div>
+                        <div style={{ fontSize: '0.75rem', marginTop: '8px', lineHeight: 1.6 }}>ข้อมูล{activeModeObj.name.replace(/[^\u0E00-\u0E7F\s]/g, '').trim()} ยังไม่มี Public API จาก GISTDA<br/>ระบบกำลังหาช่องทางเชื่อมต่อข้อมูลดาวเทียม</div>
+                        <div style={{ fontSize: '0.65rem', marginTop: '12px', color: '#94a3b8', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: '8px', border: `1px solid ${borderColor}` }}>💡 ข้อมูลจุดความร้อนและพื้นที่เผาไหม้ใช้งานได้ปกติ</div>
+                    </div>
+                )}
+                {/* แสดงข้อความเมื่อ GISTDA data เป็น empty array (API ล่ม/ไม่มีข้อมูล) */}
+                {mapCategory === 'gistda' && !activeModeObj?.noApi && rankedSidebarData.length === 0 && !searchQuery.trim() && (
+                    <div style={{ textAlign: 'center', padding: '30px 15px', color: subTextColor }}>
+                        <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>📡</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#f59e0b' }}>ไม่พบข้อมูลจาก GISTDA</div>
+                        <div style={{ fontSize: '0.75rem', marginTop: '8px', lineHeight: 1.6 }}>API GISTDA อาจกำลังปิดปรับปรุง<br/>หรือไม่มีข้อมูลในช่วงเวลานี้</div>
+                    </div>
+                )}
+                {!(mapCategory === 'gistda' && activeModeObj?.noApi) && rankedSidebarData.filter(st => {
                     if (!searchQuery.trim()) return true;
                     const name = st.areaTH.replace('จังหวัด', '').trim();
                     return name.includes(searchQuery.trim());

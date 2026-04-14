@@ -66,14 +66,15 @@ export default async function handler(req, res) {
         AQILast: { PM25: { value: Math.round(a.current?.pm2_5 || 0) } }
       });
 
+      // ✅ FIX: past_days=7 → index 7 = วันนี้ (ไม่ใช่ index 1 ซึ่งคือ 6 วันก่อน)
       newTemps[sID] = {
         temp: Math.round(w.current?.temperature_2m || 0),
         feelsLike: Math.round(w.current?.apparent_temperature || 0),
         humidity: Math.round(w.current?.relative_humidity_2m || 0),
-        rainProb: Math.round(w.daily?.precipitation_probability_max?.[1] || 0),
+        rainProb: Math.round(w.daily?.precipitation_probability_max?.[7] || 0),
         windSpeed: Math.round(w.current?.wind_speed_10m || 0),
         windDir: Math.round(w.current?.wind_direction_10m || 0),
-        uv: Math.round(w.daily?.uv_index_max?.[1] || 0)
+        uv: Math.round(w.daily?.uv_index_max?.[7] || 0)
       };
 
       // 🌟 เปลี่ยนมาดึง temperature_2m (อุณหภูมิปรอทปกติ) แทน Feels Like
@@ -197,23 +198,15 @@ export default async function handler(req, res) {
         }
     } catch(e) { console.error("Cron GISTDA Burn Error:", e); }
 
+    // ✅ FIX: ลบ hardcoded fallback ออก — ถ้า API ล่มจะแสดง "ไม่มีข้อมูล" แทนข้อมูลปลอม
     const gistdaPayload = {
         lastUpdated: bangkokTime.toISOString(),
-        hotspots: hotspotsTop5.length > 0 ? hotspotsTop5 : [
-            { province: 'แม่ฮ่องสอน', value: 4124 }, { province: 'กาญจนบุรี', value: 2849 }, { province: 'น่าน', value: 1742 }, { province: 'เชียงใหม่', value: 1507 }, { province: 'ชัยภูมิ', value: 1403 }
-        ],
-        burntArea: burntAreaTop5.length > 0 ? burntAreaTop5 : [
-            { province: 'ลพบุรี', value: 417952 }, { province: 'อุตรดิตถ์', value: 355866 }, { province: 'ลำปาง', value: 320364 }, { province: 'นครสวรรค์', value: 291761 }, { province: 'เลย', value: 258900 }
-        ],
-        lowSoilMoisture: [
-            { province: 'แม่ฮ่องสอน', value: 3.36 }, { province: 'เชียงใหม่', value: 3.52 }, { province: 'อุตรดิตถ์', value: 5.91 }, { province: 'ตาก', value: 6.09 }, { province: 'น่าน', value: 6.18 }
-        ],
-        lowVegetationMoisture: [
-            { province: 'สมุทรสงคราม', value: 0.09 }, { province: 'สุรินทร์', value: 0.07 }, { province: 'สุพรรณบุรี', value: 0.07 }, { province: 'สุโขทัย', value: 0.07 }, { province: 'ชัยนาท', value: 0.07 }
-        ],
-        floodArea: [
-            { province: '-', value: 0 }
-        ]
+        hotspots: hotspotsTop5,
+        burntArea: burntAreaTop5,
+        // ⚠️ GISTDA ไม่มี Public API สำหรับข้อมูลเหล่านี้ — ส่ง array ว่างจนกว่าจะหา API ได้
+        lowSoilMoisture: [],
+        lowVegetationMoisture: [],
+        floodArea: []
     };
     await set(ref(db, 'gistda_disaster'), gistdaPayload);
 
