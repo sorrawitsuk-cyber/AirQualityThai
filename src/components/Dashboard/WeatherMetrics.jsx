@@ -1,5 +1,5 @@
 import React from 'react';
-import { getWindDir, getSunTime } from '../../utils/weatherHelpers';
+import { getWindDir } from '../../utils/weatherHelpers';
 
 export default function WeatherMetrics({ current, chartData, cardBg, borderColor, subTextColor, textColor }) {
   return (
@@ -29,9 +29,8 @@ export default function WeatherMetrics({ current, chartData, cardBg, borderColor
             <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{Math.round(current?.pressure || 0)} <span style={{fontSize:'0.75rem'}}>hPa</span></div>
         </div>
         <div style={{ background: cardBg, padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}` }}>
-            <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🌅 ดวงอาทิตย์</div>
-            <div style={{ fontSize: '0.85rem', fontWeight: '900', color: textColor }}>ขึ้น {getSunTime(current?.sunrise)}</div>
-            <div style={{ fontSize: '0.85rem', fontWeight: '900', color: textColor }}>ตก {getSunTime(current?.sunset)}</div>
+            <div style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>☀️ รังสี UV</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: '900', color: textColor }}>{current?.uv || 0} <span style={{fontSize:'0.75rem'}}>{current?.uv > 8 ? 'สูงมาก' : current?.uv > 5 ? 'สูง' : current?.uv > 2 ? 'ปานกลาง' : 'ต่ำ'}</span></div>
         </div>
     </div>
   );
