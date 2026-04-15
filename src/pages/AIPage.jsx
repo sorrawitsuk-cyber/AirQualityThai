@@ -4,13 +4,31 @@ import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, YAxis, CartesianG
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default function AIPage() {
-  const { stations, darkMode } = useContext(WeatherContext);
+  const { stations, darkMode, amphoeData } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
   const [selectedProv, setSelectedProv] = useState('');
+  const [selectedDist, setSelectedDist] = useState('');
   const [targetDateIdx, setTargetDateIdx] = useState(-1); 
   const [activeTab, setActiveTab] = useState('summary'); 
+  
+  const currentAmphoes = useMemo(() => {
+    if (!selectedProv) return [];
+    if (amphoeData?.provinces) {
+      const cleanProv = selectedProv.replace('จังหวัด', '').trim();
+      const provData = amphoeData.provinces[cleanProv] || amphoeData.provinces[selectedProv];
+      if (provData?.amphoes) {
+        return provData.amphoes.map((a, i) => ({
+          id: i,
+          name: String(a.n || '').trim(),
+          lat: a.lat,
+          lon: a.lon
+        })).filter(a => a.name !== '').sort((a, b) => a.name.localeCompare(b.name, 'th'));
+      }
+    }
+    return [];
+  }, [amphoeData, selectedProv]);
   
   const [weatherData, setWeatherData] = useState(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
@@ -106,6 +124,7 @@ export default function AIPage() {
         fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
         fetchLocationName(pos.coords.latitude, pos.coords.longitude);
         setSelectedProv('');
+        setSelectedDist('');
       }, () => {
         setLoadingWeather(false);
       }, { timeout: 5000 });
@@ -628,13 +647,29 @@ export default function AIPage() {
                     <select value={selectedProv} onChange={(e) => { 
                         const val = e.target.value;
                         setSelectedProv(val); 
+                        setSelectedDist('');
                         if(val){
                             const st = (stations || []).find(s => s.areaTH === val);
                             if(st) { fetchWeatherByCoords(st.lat, st.long); fetchLocationName(st.lat, st.long); }
                         }
                     }} style={{ flex: isMobile ? 1 : 'auto', minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
-                        <option value="">เปลี่ยนพื้นที่</option>
+                        <option value="">เลือกจังหวัด</option>
                         {(stations || []).map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
+                    </select>
+
+                    <select value={selectedDist} onChange={(e) => { 
+                        const val = e.target.value;
+                        setSelectedDist(val); 
+                        if(val){
+                            const amphoe = currentAmphoes.find(a => a.name === val);
+                            if(amphoe && amphoe.lat && amphoe.lon) { 
+                                fetchWeatherByCoords(amphoe.lat, amphoe.lon); 
+                                setLocationName(`${val}, ${selectedProv}`); 
+                            }
+                        }
+                    }} disabled={!selectedProv || currentAmphoes.length === 0} style={{ flex: isMobile ? 1 : 'auto', minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none', opacity: (!selectedProv || currentAmphoes.length === 0) ? 0.5 : 1 }}>
+                        <option value="">เลือกอำเภอ</option>
+                        {currentAmphoes.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
                     </select>
                 </div>
             </div>
