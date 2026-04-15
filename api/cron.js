@@ -5,7 +5,7 @@ import { provinces77 } from '../src/provinces77.js';
 // TMD API Regions — 6 calls ได้ข้อมูลทั้งประเทศ
 const TMD_REGIONS = ['N', 'NE', 'C', 'E', 'W', 'S'];
 const TMD_BASE = 'https://data.tmd.go.th/nwpapi/v1/forecast/location';
-const TMD_FIELDS = 'tc,rh,ws10,wd10,rain,cond,slp';
+const TMD_FIELDS = 'tc,rh,rain,slp,cond';
 
 // พจนานุกรมรหัสจังหวัด 2 ตัวแรก (TIS-1099)
 const provMap = {
@@ -32,7 +32,7 @@ async function fetchTmdRegions(token) {
 
     for (const region of regions) {
         try {
-            const url = `${TMD_BASE}/hourly/region?region=${region}&fields=${TMD_FIELDS}&date=${dateStr}&hour=${hourStr}&duration=24`;
+            const url = `${TMD_BASE}/hourly/region?region=${region}&fields=${TMD_FIELDS}&date=${dateStr}&hour=${hourStr}&duration=1`;
             const res = await fetch(url, {
                 headers: {
                     'accept': 'application/json',
@@ -41,9 +41,14 @@ async function fetchTmdRegions(token) {
             });
             if (res.ok) {
                 const data = await res.json();
+                // TMD typo: sometimes WeatherForecasts, sometimes WeatherForecast
                 const forecasts = data.WeatherForecasts || data.WeatherForcasts || data.WeatherForecast || [];
-                allForecasts.push(...forecasts);
-                console.log(`TMD Region ${region}: ${forecasts.length} locations`);
+                if (forecasts.length === 0 && data.fields) {
+                    console.error(`TMD Region ${region}: field error:`, JSON.stringify(data));
+                } else {
+                    allForecasts.push(...forecasts);
+                    console.log(`TMD Region ${region}: ${forecasts.length} locations`);
+                }
             } else {
                 console.warn(`TMD Region ${region} failed: ${res.status}`);
             }
@@ -78,16 +83,14 @@ function processTmdData(forecasts) {
             geocode: loc.geocode || '',
             tc: d.tc != null ? Math.round(d.tc * 10) / 10 : null,
             rh: d.rh != null ? Math.round(d.rh) : null,
-            ws10: d.ws10 != null ? Math.round(d.ws10 * 10) / 10 : null,
-            wd10: d.wd10 != null ? Math.round(d.wd10) : null,
             rain: d.rain != null ? Math.round(d.rain * 10) / 10 : null,
+            slp: d.slp != null ? Math.round(d.slp) : null,
+            cond: d.cond != null ? d.cond : null,
             hourlyForecasts: (item.forecasts || []).slice(0, 24).map(fc => ({
                 time: fc.time,
                 tc: fc.data?.tc,
                 rh: fc.data?.rh,
-                rain: fc.data?.rain,
-                ws10: fc.data?.ws10,
-                wd10: fc.data?.wd10
+                rain: fc.data?.rain
             }))
         };
 
@@ -220,8 +223,8 @@ export default async function handler(req, res) {
         humidity: hasTmd ? (tmdData.rh || Math.round(w.current?.relative_humidity_2m || 0)) : Math.round(w.current?.relative_humidity_2m || 0),
         rainProb: Math.round(w.daily?.precipitation_probability_max?.[1] || 0),
         rainMm: hasTmd ? (tmdData.rain || 0) : 0,
-        windSpeed: hasTmd ? Math.round(tmdData.ws10 || 0) : Math.round(w.current?.wind_speed_10m || 0),
-        windDir: hasTmd ? (tmdData.wd10 || 0) : Math.round(w.current?.wind_direction_10m || 0),
+        windSpeed: Math.round(w.current?.wind_speed_10m || 0),
+        windDir: Math.round(w.current?.wind_direction_10m || 0),
         uv: Math.round(w.daily?.uv_index_max?.[1] || 0),
         pressure: hasTmd ? (tmdData.slp || null) : null,
         cond: hasTmd ? tmdData.cond : null,
@@ -311,7 +314,7 @@ export default async function handler(req, res) {
         };
 
         Object.entries(tmdProvinceMap).forEach(([provName, provData]) => {
-            // เก็บเฉพาะข้อมูลที่จำเป็น (ลดขนาด)
+            // เก็บข้อมูลระดับอำเภอ (ถ้ามี)
             const amphoeList = (provData.amphoes || []).map(a => ({
                 n: a.name,
                 lat: a.lat,
@@ -319,16 +322,26 @@ export default async function handler(req, res) {
                 gc: a.geocode,
                 tc: a.tc,
                 rh: a.rh,
-                ws: a.ws10,
-                wd: a.wd10,
                 rain: a.rain,
                 cond: a.cond
             }));
 
-            if (amphoeList.length > 0) {
+            // เก็บข้อมูลระดับจังหวัดด้วย (ใช้แทนอำเภอเมื่อ /region ไม่มีอำเภอ)
+            const provLevel = provData.provinceLevelData;
+            if (amphoeList.length > 0 || provLevel) {
                 amphoePayload.provinces[provName] = {
                     count: amphoeList.length,
-                    amphoes: amphoeList
+                    amphoes: amphoeList,
+                    // Province-level summary จาก TMD
+                    prov: provLevel ? {
+                        tc: provLevel.tc,
+                        rh: provLevel.rh,
+                        rain: provLevel.rain,
+                        slp: provLevel.slp,
+                        cond: provLevel.cond,
+                        lat: provLevel.lat,
+                        lon: provLevel.lon
+                    } : null
                 };
             }
         });
