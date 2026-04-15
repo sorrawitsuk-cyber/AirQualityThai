@@ -304,18 +304,18 @@ export default function Dashboard() {
     <div ref={mainScrollRef} style={{ height: '100%', width: '100%', background: appBg, display: 'flex', justifyContent: 'center', overflowY: 'auto', fontFamily: 'Kanit, sans-serif', position: 'relative' }} className="hide-scrollbar">
       <style dangerouslySetInnerHTML={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .fade-in { animation: fadeIn 0.3s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } } @keyframes pulseGlow { 0% { filter: drop-shadow(0 0 10px rgba(255,255,255,0.1)); transform: scale(1); } 50% { filter: drop-shadow(0 0 25px rgba(255,255,255,0.4)); transform: scale(1.05); } 100% { filter: drop-shadow(0 0 10px rgba(255,255,255,0.1)); transform: scale(1); } }`}} />
       
-      <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1200px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '15px', padding: isMobile ? '15px' : '30px', paddingBottom: '30px' }}>
+      <div style={{ width: '100%', maxWidth: isMobile ? '600px' : '1280px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', padding: isMobile ? '15px' : '30px', paddingBottom: '40px', margin: '0 auto' }}>
 
         {/* === SECTION 1: Alert Banner === */}
         {alertBanner && (
-            <div style={{ background: alertBanner.color, color: '#fff', padding: '10px 15px', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', fontSize: '0.9rem', flexShrink: 0 }}>
-                <span style={{ fontSize: '1.2rem' }}>{alertBanner.icon}</span> {alertBanner.text}
+            <div style={{ background: alertBanner.color, color: '#fff', padding: '12px 20px', borderRadius: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', fontSize: '1rem', flexShrink: 0 }}>
+                <span style={{ fontSize: '1.4rem' }}>{alertBanner.icon}</span> {alertBanner.text}
             </div>
         )}
 
         {/* === SECTION 2: Location Filter === */}
         {showFilter && (
-            <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px', borderRadius: '16px', border: `1px solid ${borderColor}`, flexWrap: 'wrap', flexShrink: 0 }}>
+            <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '15px', background: cardBg, padding: '15px', borderRadius: '20px', border: `1px solid ${borderColor}`, flexWrap: 'wrap', flexShrink: 0 }}>
               <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '130px', background: 'var(--bg-secondary)', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '0.95rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
                 <option value="">-- เลือกจังหวัด --</option>
                 {sortedStations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
@@ -368,12 +368,12 @@ export default function Dashboard() {
             />
           ) : (
             <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', minWidth: 0 }}>
-                <div style={{ background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, gridColumn: 'span 2' }}>
+                <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, gridColumn: isMobile ? 'span 2' : 'span 1' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.95rem' }}>
                         <span style={{ fontSize: '1.2rem' }}>☀️</span> รังสี UV
                     </div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>
-                        {current?.uv || 0} <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'normal' }}>
+                    <div style={{ fontSize: '2rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>
+                        {current?.uv || 0} <span style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'normal' }}>
                             {current?.uv > 8 ? 'สูงมาก' : current?.uv > 5 ? 'สูง' : current?.uv > 2 ? 'ปานกลาง' : 'ต่ำ'}
                         </span>
                     </div>
@@ -382,12 +382,12 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                <div style={{ background: cardBg, borderRadius: '25px', padding: '20px', border: `1px solid ${borderColor}`, gridColumn: 'span 2' }}>
+                <div style={{ background: cardBg, borderRadius: '20px', padding: '15px', border: `1px solid ${borderColor}`, gridColumn: isMobile ? 'span 2' : 'span 1' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.95rem' }}>
                         <span style={{ fontSize: '1.2rem' }}>🌫️</span> ระดับความรุนแรงฝุ่น
                     </div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>
-                        {current?.pm25 || 0} <span style={{ fontSize: '1rem', color: subTextColor, fontWeight: 'normal' }}>µg/m³</span>
+                    <div style={{ fontSize: '2rem', fontWeight: '900', color: textColor, marginTop: '5px' }}>
+                        {current?.pm25 || 0} <span style={{ fontSize: '0.9rem', color: subTextColor, fontWeight: 'normal' }}>µg/m³</span>
                     </div>
                     <div style={{ width: '100%', height: '8px', background: 'linear-gradient(to right, #0ea5e9 0%, #22c55e 15%, #eab308 30%, #f97316 50%, #ef4444 75%, #7f1d1d 100%)', borderRadius: '10px', marginTop: '15px', position: 'relative' }}>
                         <div style={{ position: 'absolute', top: '-4px', left: `${Math.min(((current?.pm25 || 0) / 250) * 100, 100)}%`, width: '16px', height: '16px', background: '#fff', border: '3px solid #0f172a', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}></div>
