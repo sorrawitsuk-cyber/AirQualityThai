@@ -29,6 +29,7 @@ export default function Layout() {
     { path: '/map', icon: '🗺️', label: 'แผนที่' },
     { path: '/ai', icon: '✨', label: 'AI ผู้ช่วย' },
     { path: '/alerts', icon: '🚨', label: 'เตือนภัย' },
+    { path: '/news', icon: '📰', label: 'ข่าวสาร' },
   ];
 
   const appBg = darkMode ? '#050d1a' : '#d6eeff';

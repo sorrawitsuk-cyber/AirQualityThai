@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import MapPage from './pages/MapPage';
 import AIPage from './pages/AIPage'; // 🌟 เปลี่ยนชื่อ Import ตรงนี้
 import ClimatePage from './pages/ClimatePage';
+import NewsPage from './pages/NewsPage';
 
 function App() {
   return (
@@ -28,6 +29,9 @@ function App() {
           
           {/* หน้าเตือนภัย */}
           <Route path="alerts" element={<ClimatePage />} />
+
+          {/* หน้าข่าวสาร */}
+          <Route path="news" element={<NewsPage />} />
         </Route>
       </Routes>
     </WeatherProvider>
