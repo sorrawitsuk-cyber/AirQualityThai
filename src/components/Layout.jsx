@@ -32,11 +32,11 @@ export default function Layout() {
     { path: '/news', icon: '📰', label: 'ข่าวสาร' },
   ];
 
-  const appBg = darkMode ? '#050d1a' : '#d6eeff';
-  const sidebarBg = darkMode ? '#0b1629' : '#ffffff';
-  const textColor = darkMode ? '#e2f0fb' : '#0c1f3d';
-  const borderColor = darkMode ? '#1a3050' : '#7dd3fc';
-  const subTextColor = darkMode ? '#7eb8d4' : '#2d6486';
+  const appBg = 'var(--bg-app)';
+  const sidebarBg = 'var(--bg-card)';
+  const textColor = 'var(--text-main)';
+  const borderColor = 'var(--border-color)';
+  const subTextColor = 'var(--text-sub)';
 
   const gpsColor = gpsPermission === 'granted' && location ? '#22c55e' : gpsPermission === 'denied' ? '#ef4444' : '#0ea5e9';
   const gpsIcon = gpsLoading ? '⏳' : gpsPermission === 'granted' && location ? '📍' : '📡';
@@ -82,7 +82,7 @@ export default function Layout() {
               onClick={getLocation}
               disabled={gpsLoading}
               title={location ? `ตำแหน่ง: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'คลิกเพื่อระบุตำแหน่ง GPS'}
-              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0f1e36' : '#f0f9ff', color: gpsColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s', fontSize: '0.85rem' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: 'var(--bg-secondary)', color: gpsColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s', fontSize: '0.85rem' }}
             >
               {gpsIcon} {gpsLoading ? 'กำลังค้นหา...' : location ? 'พบตำแหน่งแล้ว' : 'ระบุตำแหน่ง GPS'}
             </button>
@@ -100,7 +100,7 @@ export default function Layout() {
             {/* Dark Mode */}
             <button
               onClick={() => setDarkMode(!darkMode)}
-              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0f1e36' : '#f0f9ff', color: textColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: 'var(--bg-secondary)', color: textColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
             >
               {darkMode ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด'}
             </button>
