@@ -553,7 +553,7 @@ export default function ClimatePage() {
                                         });
                                     }
                                 }}
-                                style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#fff', color: textColor, fontFamily: 'inherit', outline: 'none' }}
+                                style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0f1e36' : '#fff', color: textColor, fontFamily: 'inherit', outline: 'none' }}
                             >
                                 <option value="">-- เลือกจังหวัด --</option>
                                 {[...stations].sort((a,b)=>a.areaTH.localeCompare(b.areaTH,'th')).map(st => (
@@ -575,7 +575,7 @@ export default function ClimatePage() {
                                     } else setUserAmphoeData(null);
                                 }}
                                 disabled={currentAmphoes.length === 0}
-                                style={{ padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#fff', color: textColor, fontFamily: 'inherit', outline: 'none' }}
+                                style={{ padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0f1e36' : '#fff', color: textColor, fontFamily: 'inherit', outline: 'none' }}
                             >
                                 <option value="">-- เลือกอำเภอ {currentAmphoes.length > 0 ? `(${currentAmphoes.length} อำเภอ)` : ''} --</option>
                                 {currentAmphoes.map((a, i) => (
@@ -683,7 +683,7 @@ export default function ClimatePage() {
                         </div>
                     ) : (
                         /* 🔥🌊 ข้อมูลดาวเทียม — ไม่ใช้ Windy เพราะไม่มี fire/flood overlay */
-                        <div style={{ flex: 1, minHeight: isMobile ? '250px' : '400px', borderRadius: '16px', background: darkMode ? '#0f172a' : '#f8fafc', border: `2px dashed ${borderColor}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '15px', padding: '30px' }}>
+                        <div style={{ flex: 1, minHeight: isMobile ? '250px' : '400px', borderRadius: '16px', background: darkMode ? '#0b1629' : '#f0f9ff', border: `2px dashed ${borderColor}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '15px', padding: '30px' }}>
                             <div style={{ fontSize: '3rem' }}>{activeTab === 'fire' ? '🛰️🔥' : '🛰️🌊'}</div>
                             <div style={{ fontSize: '1.1rem', fontWeight: '900', color: textColor, textAlign: 'center' }}>
                                 ข้อมูลจากดาวเทียม GISTDA
@@ -704,7 +704,7 @@ export default function ClimatePage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     <div style={{ background: darkMode ? `${activeBriefing.bg}15` : activeBriefing.bg, padding: '20px', borderRadius: '24px', border: `1px solid ${activeBriefing.border}`, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ color: activeBriefing.color, fontWeight: '900', fontSize: '1rem' }}>{activeBriefing.level}</div>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: darkMode ? '#cbd5e1' : '#334155', lineHeight: '1.5' }}>{activeBriefing.desc}</p>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: darkMode ? '#7eb8d4' : '#2d6486', lineHeight: '1.5' }}>{activeBriefing.desc}</p>
                         {/* หมายเหตุสำหรับ Tab ฝน — แจ้งว่าเป็น probability ไม่ใช่ปริมาณ */}
                         {activeTab === 'rain' && (
                             <div style={{ fontSize: '0.7rem', color: subTextColor, fontStyle: 'italic', borderTop: `1px solid ${borderColor}`, paddingTop: '8px', marginTop: '4px' }}>

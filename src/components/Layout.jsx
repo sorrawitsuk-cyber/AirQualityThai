@@ -31,11 +31,11 @@ export default function Layout() {
     { path: '/alerts', icon: '🚨', label: 'เตือนภัย' },
   ];
 
-  const appBg = darkMode ? '#020617' : '#f8fafc';
-  const sidebarBg = darkMode ? '#0f172a' : '#ffffff';
-  const textColor = darkMode ? '#f8fafc' : '#0f172a';
-  const borderColor = darkMode ? '#1e293b' : '#e2e8f0';
-  const subTextColor = darkMode ? '#94a3b8' : '#64748b';
+  const appBg = darkMode ? '#050d1a' : '#d6eeff';
+  const sidebarBg = darkMode ? '#0b1629' : '#ffffff';
+  const textColor = darkMode ? '#e2f0fb' : '#0c1f3d';
+  const borderColor = darkMode ? '#1a3050' : '#7dd3fc';
+  const subTextColor = darkMode ? '#7eb8d4' : '#2d6486';
 
   const gpsColor = gpsPermission === 'granted' && location ? '#22c55e' : gpsPermission === 'denied' ? '#ef4444' : '#0ea5e9';
   const gpsIcon = gpsLoading ? '⏳' : gpsPermission === 'granted' && location ? '📍' : '📡';
@@ -81,7 +81,7 @@ export default function Layout() {
               onClick={getLocation}
               disabled={gpsLoading}
               title={location ? `ตำแหน่ง: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'คลิกเพื่อระบุตำแหน่ง GPS'}
-              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#f1f5f9', color: gpsColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s', fontSize: '0.85rem' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0f1e36' : '#f0f9ff', color: gpsColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s', fontSize: '0.85rem' }}
             >
               {gpsIcon} {gpsLoading ? 'กำลังค้นหา...' : location ? 'พบตำแหน่งแล้ว' : 'ระบุตำแหน่ง GPS'}
             </button>
@@ -99,7 +99,7 @@ export default function Layout() {
             {/* Dark Mode */}
             <button
               onClick={() => setDarkMode(!darkMode)}
-              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#1e293b' : '#f1f5f9', color: textColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0f1e36' : '#f0f9ff', color: textColor, fontFamily: 'Kanit, sans-serif', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
             >
               {darkMode ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด'}
             </button>

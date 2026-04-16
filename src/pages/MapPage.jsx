@@ -247,7 +247,7 @@ export default function MapPage() {
   ];
 
   const getGistdaColor = useCallback((val, mode, rank) => {
-    if (!val) return darkMode ? '#334155' : '#cbd5e1';
+    if (!val) return darkMode ? '#1a3050' : '#b8d9f5';
     const modeObj = gistdaModes.find(m => m.id === mode);
     const baseColor = modeObj ? modeObj.color : '#ef4444';
     // 🎨 FIX: ใช้ opacity ตามอันดับ (อันดับ 1 = เข้มสุด)
@@ -287,13 +287,13 @@ export default function MapPage() {
   }, [stationTemps, stationDaily, dayOffset]);
 
   const getBasicColor = useCallback((val, mode) => {
-    if (val === null || val === undefined || val === '') return darkMode ? '#334155' : '#cbd5e1';
+    if (val === null || val === undefined || val === '') return darkMode ? '#1a3050' : '#b8d9f5';
     if (mode === 'pm25') return val > 75 ? '#ef4444' : val >= 37.6 ? '#f97316' : val >= 25.1 ? '#eab308' : val >= 15.1 ? '#22c55e' : '#0ea5e9';
     if (mode === 'temp' || mode === 'heat') return val > 39 ? '#ef4444' : val >= 35 ? '#f97316' : val >= 29 ? '#eab308' : val >= 23 ? '#22c55e' : '#3b82f6';
     if (mode === 'rain') return val > 70 ? '#1e3a8a' : val >= 41 ? '#3b82f6' : val >= 11 ? '#60a5fa' : '#94a3b8';
     if (mode === 'wind') return val > 40 ? '#ef4444' : val >= 21 ? '#f97316' : val >= 11 ? '#eab308' : '#22c55e';
     if (mode === 'uv') return val > 10 ? '#a855f7' : val >= 8 ? '#ef4444' : val >= 6 ? '#ea580c' : val >= 3 ? '#eab308' : '#22c55e';
-    return darkMode ? '#334155' : '#cbd5e1';
+    return darkMode ? '#1a3050' : '#b8d9f5';
   }, [darkMode]);
 
   const calculateRisk = useCallback((station) => {
@@ -357,12 +357,12 @@ export default function MapPage() {
   }, [activeRiskMode, stationTemps, stationDaily, dayOffset]);
 
   const getRiskColor = useCallback((score) => {
-      if (score === null || score === undefined) return darkMode ? '#334155' : '#cbd5e1';
+      if (score === null || score === undefined) return darkMode ? '#1a3050' : '#b8d9f5';
       if (score >= 8) return '#ef4444'; 
       if (score >= 6) return '#f97316'; 
       if (score >= 4) return '#eab308'; 
       if (score >= 0) return '#22c55e'; 
-      return darkMode ? '#334155' : '#cbd5e1'; 
+      return darkMode ? '#1a3050' : '#b8d9f5'; 
   }, [darkMode]);
 
   const getRiskLabel = (score) => {
@@ -391,11 +391,11 @@ export default function MapPage() {
                     color = getGistdaColor(val, activeGistdaMode, foundIdx);
                 } else {
                     val = 0;
-                    color = darkMode ? '#334155' : '#cbd5e1';
+                    color = darkMode ? '#1a3050' : '#b8d9f5';
                 }
             } else {
                 val = 0;
-                color = darkMode ? '#334155' : '#cbd5e1';
+                color = darkMode ? '#1a3050' : '#b8d9f5';
             }
         }
         return { ...st, displayVal: val, color };
@@ -442,7 +442,7 @@ export default function MapPage() {
         fillColor: color, 
         weight: isFlashed ? 3 : 1,
         opacity: 1, 
-        color: isFlashed ? '#0ea5e9' : (darkMode ? '#0f172a' : '#ffffff'),
+        color: isFlashed ? '#0ea5e9' : (darkMode ? '#050d1a' : '#ffffff'),
         fillOpacity: polyOpacity,
         className: isFlashed ? 'arcgis-flash-polygon' : '' 
     };
@@ -501,7 +501,7 @@ export default function MapPage() {
       const isFlashed = !!flashProv && cleanName === flashProv;
       layer.setStyle({
         weight: isFlashed ? 3 : 1,
-        color: isFlashed ? '#0ea5e9' : (darkMode ? '#0f172a' : '#ffffff'),
+        color: isFlashed ? '#0ea5e9' : (darkMode ? '#050d1a' : '#ffffff'),
       });
     });
   }, [flashProv, darkMode]);
@@ -509,7 +509,7 @@ export default function MapPage() {
   const createMapIcon = (stationName, val, color) => {
     return L.divIcon({
         className: 'custom-risk-icon',
-        html: `<div style="background: ${color}; color: ${color === '#eab308' || color === '#cbd5e1' ? '#0f172a' : '#fff'}; font-weight: 900; font-size: ${isMobile ? '9px' : '11px'}; padding: ${isMobile ? '2px 4px' : '4px 8px'}; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; line-height: 1.1;">
+        html: `<div style="background: ${color}; color: ${color === '#eab308' || color === '#b8d9f5' ? '#0c1f3d' : '#fff'}; font-weight: 900; font-size: ${isMobile ? '9px' : '11px'}; padding: ${isMobile ? '2px 4px' : '4px 8px'}; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; line-height: 1.1;">
                  <span style="font-size: 0.7em; opacity: 0.9;">${stationName}</span>
                  <span>${val}</span>
                </div>`,
@@ -572,7 +572,7 @@ export default function MapPage() {
     if (mapCategory === 'gistda') {
         return [
             { c: activeModeObj?.color || '#ef4444', l: 'ติดอันดับ Top 5 ที่เฝ้าระวัง', r: 'สูงสุด' },
-            { c: darkMode ? '#334155' : '#cbd5e1', l: 'ไม่มีรายงาน / สภาพปกติ', r: '-' }
+            { c: darkMode ? '#1a3050' : '#b8d9f5', l: 'ไม่มีรายงาน / สภาพปกติ', r: '-' }
         ];
     }
     switch (activeBasicMode) {
@@ -732,7 +732,7 @@ export default function MapPage() {
                                 amphoeMarkers.push(
                                     <Marker key={`amp-${provName}-${i}`} position={[a.lat, a.lon]} icon={L.divIcon({
                                         className: 'custom-amphoe-icon',
-                                        html: `<div style="background: ${color}cc; color: ${color === '#eab308' || color === '#cbd5e1' ? '#0f172a' : '#fff'}; font-weight: 700; font-size: 8px; padding: 2px 5px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 2px 6px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center; line-height: 1.1; white-space: nowrap;"><span style='font-size:6px;opacity:0.85'>${label}</span><span>${val}</span></div>`,
+                                        html: `<div style="background: ${color}cc; color: ${color === '#eab308' || color === '#b8d9f5' ? '#0c1f3d' : '#fff'}; font-weight: 700; font-size: 8px; padding: 2px 5px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 2px 6px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center; line-height: 1.1; white-space: nowrap;"><span style='font-size:6px;opacity:0.85'>${label}</span><span>${val}</span></div>`,
                                         iconSize: [44, 24], iconAnchor: [22, 12]
                                     })} interactive={false} />
                                 );

@@ -890,7 +890,7 @@ export default function AIPage() {
                     {aiReport.timeline.map((item, i) => (
                         <div key={i} style={{ display: 'flex', gap: '18px', position: 'relative' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: activeColor, zIndex: 1, border: `4px solid ${darkMode ? '#0f172a' : '#ffffff'}`, boxShadow: `0 0 0 1px ${activeColor}40` }}></div>
+                                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: activeColor, zIndex: 1, border: `4px solid ${darkMode ? '#050d1a' : '#ffffff'}`, boxShadow: `0 0 0 1px ${activeColor}40` }}></div>
                                 {i !== aiReport.timeline.length - 1 && <div style={{ width: '2px', flex: 1, background: `linear-gradient(to bottom, ${activeColor}80, ${activeColor}20)`, marginTop: '-8px', marginBottom: '-8px' }}></div>}
                             </div>
                             <div style={{ flex: 1, paddingBottom: i !== aiReport.timeline.length - 1 ? '20px' : '0' }}>
@@ -927,7 +927,7 @@ export default function AIPage() {
                                     maxWidth: '85%',
                                     padding: '12px 16px',
                                     borderRadius: '16px',
-                                    backgroundColor: log.role === 'user' ? activeColor : (darkMode ? '#1e293b' : '#f1f5f9'),
+                                    backgroundColor: log.role === 'user' ? activeColor : (darkMode ? '#0f1e36' : '#f0f9ff'),
                                     color: log.role === 'user' ? '#fff' : textColor,
                                     borderBottomRightRadius: log.role === 'user' ? '4px' : '16px',
                                     borderBottomLeftRadius: log.role === 'ai' ? '4px' : '16px',
@@ -940,7 +940,7 @@ export default function AIPage() {
                         ))}
                         {isChatLoading && (
                             <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                <div style={{ padding: '12px 16px', borderRadius: '16px', backgroundColor: (darkMode ? '#1e293b' : '#f1f5f9'), color: subTextColor, fontSize: '0.85rem' }}>
+                                <div style={{ padding: '12px 16px', borderRadius: '16px', backgroundColor: (darkMode ? '#0f1e36' : '#f0f9ff'), color: subTextColor, fontSize: '0.85rem' }}>
                                     กำลังคิดคำตอบ...
                                 </div>
                             </div>
@@ -954,7 +954,7 @@ export default function AIPage() {
                             value={chatInput} 
                             onChange={(e) => setChatInput(e.target.value)} 
                             placeholder="พิมพ์คำถามของคุณที่นี่..." 
-                            style={{ flex: 1, padding: '12px 16px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0f172a' : '#fff', color: textColor, fontFamily: 'Kanit', outline: 'none' }} 
+                            style={{ flex: 1, padding: '12px 16px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0b1629' : '#fff', color: textColor, fontFamily: 'Kanit', outline: 'none' }} 
                             disabled={isChatLoading}
                         />
                         <button type="submit" disabled={isChatLoading || !chatInput.trim()} style={{ background: activeColor, color: '#fff', border: 'none', padding: '0 20px', borderRadius: '12px', cursor: (isChatLoading || !chatInput.trim()) ? 'not-allowed' : 'pointer', fontWeight: 'bold', opacity: (isChatLoading || !chatInput.trim()) ? 0.6 : 1 }}>

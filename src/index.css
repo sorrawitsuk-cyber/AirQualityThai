@@ -12,35 +12,37 @@
 
 /* ตั้งค่า CSS Variables (Custom Properties) สำหรับการจัดการ Theme อย่างสะอาด */
 :root {
-  --bg-app: #e0f2fe; /* พาสเทลฟ้าอ่อน */
+  /* ☀️ Light: blue-white pastel vivid */
+  --bg-app: #d6eeff;
   --bg-card: #ffffff;
-  --text-main: #0f172a;
-  --text-sub: #475569;
-  --border-color: #bae6fd;
-  --bg-secondary: #e0f2fe;
-  --bg-tertiary: #bae6fd;
-  --bg-overlay: #e0f2fe;
-  --bg-overlay-heavy: rgba(255, 255, 255, 0.7);
+  --text-main: #0c1f3d;
+  --text-sub: #2d6486;
+  --border-color: #7dd3fc;
+  --bg-secondary: #f0f9ff;
+  --bg-tertiary: #d6eeff;
+  --bg-overlay: #e8f5ff;
+  --bg-overlay-heavy: rgba(255, 255, 255, 0.88);
   --bg-success: #dcfce7;
   --bg-danger: #fee2e2;
   --bg-warning: #ffedd5;
-  --bg-nav-blur: rgba(224, 242, 254, 0.95);
+  --bg-nav-blur: rgba(214, 238, 255, 0.97);
 }
 
 body.dark-theme {
-  --bg-app: #020617;
-  --bg-card: #0f172a;
-  --text-main: #f8fafc;
-  --text-sub: #94a3b8;
-  --border-color: #1e293b;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #1e293b;
-  --bg-overlay: rgba(0, 0, 0, 0.2);
-  --bg-overlay-heavy: rgba(0, 0, 0, 0.3);
-  --bg-success: #052e16;
-  --bg-danger: #450a0a;
-  --bg-warning: #431407;
-  --bg-nav-blur: rgba(15, 23, 42, 0.9);
+  /* 🌙 Dark: midnight blue — กราฟสีโดดเด่น */
+  --bg-app: #050d1a;
+  --bg-card: #0b1629;
+  --text-main: #e2f0fb;
+  --text-sub: #7eb8d4;
+  --border-color: #1a3050;
+  --bg-secondary: #0f1e36;
+  --bg-tertiary: #132745;
+  --bg-overlay: rgba(5, 13, 26, 0.4);
+  --bg-overlay-heavy: rgba(5, 13, 26, 0.65);
+  --bg-success: #042a16;
+  --bg-danger: #3d0808;
+  --bg-warning: #3a1005;
+  --bg-nav-blur: rgba(11, 22, 41, 0.95);
 }
 
 html {
@@ -80,11 +82,11 @@ body {
   box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
 }
 .dark-theme .leaflet-popup-content-wrapper {
-  background-color: #1e293b !important;
-  color: #f8fafc !important;
+  background-color: #0f1e36 !important;
+  color: #e2f0fb !important;
 }
 .dark-theme .leaflet-popup-tip {
-  background-color: #1e293b !important;
+  background-color: #0f1e36 !important;
 }
 
 /* =========================================
@@ -204,7 +206,7 @@ body {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-.dark-theme .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+.dark-theme .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a3050; }
 
 /* =========================================
    🗺️ MapPage: Province Flash Animation
