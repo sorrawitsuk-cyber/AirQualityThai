@@ -6,32 +6,35 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
  * ใช้ useRegisterSW จาก vite-plugin-pwa
  */
 export default function UpdateNotification() {
+  const [swReg, setSwReg] = useState(null);
+
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
-      if (!r) return;
-
-      // ตรวจสอบทุก 60 วินาทีขณะแอพเปิดอยู่
-      const interval = setInterval(() => r.update(), 60 * 1000);
-
-      // ตรวจสอบทันทีเมื่อ user กลับมาใช้แอพ (จาก background)
-      const onVisible = () => {
-        if (document.visibilityState === 'visible') r.update();
-      };
-      document.addEventListener('visibilitychange', onVisible);
-
-      // Cleanup เมื่อ component unmount
-      return () => {
-        clearInterval(interval);
-        document.removeEventListener('visibilitychange', onVisible);
-      };
+      if (r) setSwReg(r);
     },
     onRegisterError(error) {
       console.log('[PWA] SW registration error:', error);
     },
   });
+
+  // ตรวจสอบ SW update ทุก 60 วิ และเมื่อ app กลับมา foreground
+  useEffect(() => {
+    if (!swReg) return;
+
+    const interval = setInterval(() => swReg.update(), 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') swReg.update();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [swReg]);
 
   const close = () => setNeedRefresh(false);
 
