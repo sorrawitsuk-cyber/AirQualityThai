@@ -1,10 +1,36 @@
-import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, YAxis, CartesianGrid } from 'recharts';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// 🌟 Component ลูกศรบอกแนวโน้ม (บังคับสี: แดง=เพิ่ม/แย่ลง, เขียว=ลด/ดีขึ้น)
+const TrendIndicator = ({ current, prev, hideText = false }) => {
+    if (current == null || prev == null || current === '-' || prev === '-') return null;
+    const diff = Math.round(current - prev);
+    if (diff === 0) return <span title="ไม่มีการเปลี่ยนแปลง" style={{fontSize:'0.75em', opacity:0.6, color:'#94a3b8', marginLeft:'6px', whiteSpace:'nowrap'}}>➖</span>;
+    
+    const isWorse = diff > 0;
+    const color = isWorse ? '#ef4444' : '#22c55e'; 
+    const arrow = isWorse ? '▲' : '▼';
+
+    return (
+        <span title="แนวโน้มเปรียบเทียบกับก่อนหน้า" style={{fontSize:'0.8em', color: color, opacity: 0.9, marginLeft: '6px', whiteSpace:'nowrap', fontWeight:'bold', cursor:'help'}}>
+            {arrow} {Math.abs(diff)} {hideText ? '' : <span style={{fontSize:'0.7em', fontWeight:'normal'}}></span>}
+        </span>
+    );
+};
+
+// 🌟 Component แสดงทิศลม
+const WindDirection = ({ deg }) => {
+    if (deg == null) return null;
+    const dirs = ['เหนือ','ตอ.เหนือ','ตะวันออก','ตอ.ใต้','ใต้','ตก.ใต้','ตะวันตก','ตก.เหนือ'];
+    const arrows = ['↑','↗','→','↘','↓','↙','←','↖'];
+    const idx = Math.round(deg / 45) % 8;
+    return <span style={{fontSize:'0.7rem', opacity:0.7, marginLeft:'4px'}} title={`ทิศ${dirs[idx]}`}>{arrows[idx]}</span>;
+};
+
 export default function AIPage() {
-  const { stations, darkMode, amphoeData } = useContext(WeatherContext);
+  const { stations, stationTemps, darkMode, amphoeData, gistdaSummary } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
@@ -12,6 +38,8 @@ export default function AIPage() {
   const [selectedDist, setSelectedDist] = useState('');
   const [targetDateIdx, setTargetDateIdx] = useState(-1); 
   const [activeTab, setActiveTab] = useState('summary'); 
+  const [activeWarningTab, setActiveWarningTab] = useState('heat');
+  const [warningSearchTerm, setWarningSearchTerm] = useState('');
   
   const [geoData, setGeoData] = useState([]);
   useEffect(() => {
@@ -66,6 +94,82 @@ export default function AIPage() {
           chatEndRef.current.scrollIntoView({ behavior: "smooth" });
       }
   }, [chatLogs]);
+
+  const isRisky = useCallback((mode, val) => {
+      if (val == null) return false;
+      if(mode === 'heat') return val >= 39;     
+      if(mode === 'pm25') return val >= 37.5;   
+      if(mode === 'uv') return val >= 8;        
+      if(mode === 'rain') return val >= 60;     
+      if(mode === 'wind') return val >= 40;     
+      if(mode === 'fire') return val > 0;       
+      if(mode === 'flood') return val > 0;      
+      return false;
+  }, []);
+
+  const { liveData, riskyCounts } = useMemo(() => {
+    let lData = { heat: [], pm25: [], uv: [], rain: [], wind: [], fire: [], flood: [] };
+    let counts = { heat: 0, pm25: 0, uv: 0, rain: 0, wind: 0, fire: 0, flood: 0 };
+    
+    if (stations?.length > 0 && stationTemps) {
+        stations.forEach(st => {
+          const data = stationTemps[st.stationID] || {};
+          const provName = (st.areaTH || st.nameTH || '').replace('จังหวัด', '');
+
+          const currTemp = Math.round(data.temp || 0); 
+          const currPM = st.AQILast?.PM25?.value || 0;
+          const currUV = data.uv || 0;
+          const currRain = data.rainProb || 0;
+          const currWind = Math.round(data.windSpeed || 0);
+          const windDir = data.windDir || null;
+
+          if (isRisky('heat', currTemp)) counts.heat++;
+          if (isRisky('pm25', currPM)) counts.pm25++;
+          if (isRisky('uv', currUV)) counts.uv++;
+          if (isRisky('rain', currRain)) counts.rain++;
+          if (isRisky('wind', currWind)) counts.wind++;
+
+          if (currTemp >= 39) lData.heat.push({ prov: provName, val: currTemp, prevVal: null, unit: '°C' });
+          if (currPM >= 37.5) lData.pm25.push({ prov: provName, val: currPM, prevVal: null, unit: 'µg/m³' });
+          if (currUV >= 8) lData.uv.push({ prov: provName, val: currUV, prevVal: null, unit: 'UV' });
+          if (currRain >= 60) lData.rain.push({ prov: provName, val: currRain, prevVal: null, unit: '%' });
+          if (currWind >= 40) lData.wind.push({ prov: provName, val: currWind, prevVal: null, unit: 'km/h', windDir });
+        });
+    }
+
+    if (gistdaSummary?.hotspots?.length > 0) {
+        lData.fire = gistdaSummary.hotspots
+            .filter(p => p.value > 0)
+            .map(p => ({ prov: p.province, val: p.value, prevVal: null, unit: 'จุด' }))
+            .sort((a,b) => b.val - a.val);
+        counts.fire = lData.fire.length;
+    }
+    if (gistdaSummary?.floodArea?.length > 0) {
+        lData.flood = gistdaSummary.floodArea
+            .filter(p => p.value > 0)
+            .map(p => ({ prov: p.province, val: p.value, prevVal: null, unit: 'ไร่' }))
+            .sort((a,b) => b.val - a.val);
+        counts.flood = lData.flood.length;
+    }
+
+    Object.keys(lData).forEach(key => { if(key !== 'fire' && key !== 'flood') lData[key].sort((a, b) => b.val - a.val) });
+    return { liveData: lData, riskyCounts: counts };
+  }, [stations, stationTemps, gistdaSummary, isRisky]);
+
+  const warningTabs = [
+      { id: 'heat', label: 'ความร้อน', icon: '🥵', color: '#ef4444', data: liveData.heat },
+      { id: 'pm25', label: 'ฝุ่น PM2.5', icon: '😷', color: '#f97316', data: liveData.pm25 },
+      { id: 'rain', label: 'โอกาสฝน', icon: '⛈️', color: '#3b82f6', data: liveData.rain },
+      { id: 'wind', label: 'ลมแรง', icon: '🌪️', color: '#eab308', data: liveData.wind },
+      { id: 'fire', label: 'จุดความร้อน', icon: '🔥', color: '#ea580c', data: liveData.fire },
+      { id: 'flood', label: 'น้ำท่วม', icon: '🌊', color: '#0284c7', data: liveData.flood }
+  ];
+
+  const activeWarningTabData = warningTabs.find(t => t.id === activeWarningTab);
+  const sortedFilteredWarningData = useMemo(() => {
+      let filtered = activeWarningTabData.data.filter(item => item.prov.includes(warningSearchTerm));
+      return filtered;
+  }, [activeWarningTabData.data, warningSearchTerm]);
 
   const fetchWeatherByCoords = async (lat, lon) => {
     try {
@@ -700,7 +804,7 @@ export default function AIPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
                 <div>
                     <h1 style={{ margin: 0, fontSize: '1.4rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        ✨ ระบบประเมินสภาพอากาศ
+                        ✨ วิเคราะห์สภาพอากาศ
                     </h1>
                     <div style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                         พื้นที่การวิเคราะห์: <span style={{color: '#0ea5e9', fontWeight: 'bold'}}>{locationName}</span> 
@@ -1086,7 +1190,7 @@ export default function AIPage() {
                 {/* 💬 AI Chat Container */}
                 <h4 style={{ margin: '0 0 15px 0', color: textColor, display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.1rem' }}>
                     <div style={{background: `linear-gradient(135deg, ${activeColor}, ${activeColor}dd)`, color: '#fff', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', boxShadow: `0 4px 10px ${activeColor}40`}}>🤖</div> 
-                    <span style={{fontWeight: '800'}}>ถามคำถามเกี่ยวกับสภาพอากาศเพิ่มเติม</span>
+                    <span style={{fontWeight: '800'}}>ถามการวิเคราะห์สภาพอากาศเพิ่มเติมกับ AI</span>
                 </h4>
                 <div style={{ background: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.8)', borderRadius: '20px', padding: '20px', border: `1px solid ${borderColor}` }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', marginBottom: '15px', paddingRight: '5px' }}>
@@ -1141,6 +1245,75 @@ export default function AIPage() {
                 </div>
             </div>
         )}
+
+        {/* 🚨 Provincial Warning Section */}
+        <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <h2 style={{ margin: '15px 0 5px 0', fontSize: '1.4rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800' }}>
+                 🚨 แจ้งเตือนพื้นที่เสี่ยงภัย
+            </h2>
+            
+            {/* 6 Warning Tabs */}
+            <div className={isMobile ? 'hide-scrollbar' : ''} style={{ display: isMobile ? 'flex' : 'grid', gridTemplateColumns: isMobile ? 'none' : 'repeat(3, 1fr)', gap: '10px', overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? '5px' : '0' }}>
+                {warningTabs.map((tab, idx) => {
+                    const count = riskyCounts[tab.id];
+                    return (
+                        <div key={idx} onClick={() => setActiveWarningTab(tab.id)} style={{ background: cardBg, padding: isMobile ? '8px 10px' : '12px 5px', borderRadius: '16px', border: `2px solid ${activeWarningTab === tab.id ? tab.color : borderColor}`, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', gap: '6px', boxShadow: activeWarningTab === tab.id ? `0 6px 16px ${tab.color}20` : 'none', transform: activeWarningTab === tab.id ? 'translateY(-2px)' : 'none', flexShrink: 0, minWidth: isMobile ? '110px' : undefined }}>
+                            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{tab.icon}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.68rem', color: subTextColor, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+                                    <span style={{ fontSize: '0.95rem', fontWeight: '900', color: tab.color }}>{count}</span>
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 'bold', color: tab.color }}>จ.</span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Warning List */}
+            <div style={{ background: cardBg, borderRadius: '24px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ padding: '15px 20px', borderBottom: `1px solid ${borderColor}`, background: darkMode ? 'var(--bg-tertiary)' : '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h3 style={{ margin: 0, color: textColor, fontSize: '1rem' }}>📋 แจ้งเตือนพื้นที่เสี่ยง</h3>
+                        <span style={{ fontSize: '0.75rem', background: `${activeWarningTabData.color}20`, color: activeWarningTabData.color, padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold' }}>พบ {activeWarningTabData.data.length} จังหวัด</span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#0ea5e9', borderRadius: '50%' }}></span>
+                        ข้อมูลสถานการณ์เรียลไทม์
+                    </div>
+                    <input type="text" placeholder="พิมพ์ชื่อจังหวัดเพื่อค้นหา..." value={warningSearchTerm} onChange={(e) => setWarningSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: cardBg, color: textColor, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ padding: '5px 15px', overflowY: 'auto', maxHeight: isMobile ? '300px' : '450px' }} className="hide-scrollbar">
+                    {sortedFilteredWarningData.length > 0 ? sortedFilteredWarningData.map((item, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 10px', borderBottom: `1px solid ${borderColor}` }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ color: subTextColor, fontSize: '0.8rem', width: '20px' }}>{i+1}.</span>
+                                <span style={{ color: textColor, fontWeight: '600', fontSize: '0.9rem' }}>จ.{item.prov}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ color: activeWarningTabData.color, fontWeight: '900', fontSize: '1rem', width: '80px', textAlign: 'right' }}>
+                                    {typeof item.val === 'number' ? item.val.toLocaleString() : item.val} <small style={{fontSize: '0.6rem'}}>{item.unit}</small>
+                                </span>
+                                {activeWarningTab === 'wind' && item.windDir != null && <WindDirection deg={item.windDir} />}
+                            </div>
+                        </div>
+                    )) : (
+                        (activeWarningTab === 'fire' || activeWarningTab === 'flood') && !gistdaSummary ? (
+                            <div style={{ textAlign: 'center', padding: '50px 0', color: subTextColor }}>
+                                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>📡</div>
+                                กำลังดึงข้อมูลดาวเทียม GISTDA...
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '50px 0', color: subTextColor }}>
+                                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>✅</div>
+                                ไม่พบพื้นที่เสี่ยงในขณะนี้
+                            </div>
+                        )
+                    )}
+                </div>
+            </div>
+        </div>
 
       </div>
     </div>

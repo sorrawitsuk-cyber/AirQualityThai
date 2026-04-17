@@ -9,7 +9,6 @@ import { WeatherProvider } from './context/WeatherContext';
 import Dashboard from './pages/Dashboard';
 import MapPage from './pages/MapPage';
 import AIPage from './pages/AIPage'; // 🌟 เปลี่ยนชื่อ Import ตรงนี้
-import ClimatePage from './pages/ClimatePage';
 import NewsPage from './pages/NewsPage';
 
 function App() {
@@ -24,12 +23,9 @@ function App() {
           {/* หน้าแผนที่ */}
           <Route path="map" element={<MapPage />} />
           
-          {/* หน้า AI ผู้ช่วย */}
+          {/* หน้า วิเคราะห์ */}
           <Route path="ai" element={<AIPage />} /> {/* 🌟 เปลี่ยน path และ element ตรงนี้ */}
           
-          {/* หน้าเตือนภัย */}
-          <Route path="alerts" element={<ClimatePage />} />
-
           {/* หน้าข่าวสาร */}
           <Route path="news" element={<NewsPage />} />
         </Route>

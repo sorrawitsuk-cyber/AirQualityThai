@@ -27,8 +27,7 @@ export default function Layout() {
   const navItems = [
     { path: '/', icon: '📊', label: 'ภาพรวม' },
     { path: '/map', icon: '🗺️', label: 'แผนที่' },
-    { path: '/ai', icon: '✨', label: 'AI ผู้ช่วย' },
-    { path: '/alerts', icon: '🚨', label: 'เตือนภัย' },
+    { path: '/ai', icon: '✨', label: 'วิเคราะห์' },
     { path: '/news', icon: '📰', label: 'ข่าวสาร' },
   ];
 
