@@ -202,24 +202,13 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, [fetchGeoData]);
 
-  // 🌟 UX แบ่งตามอุปกรณ์: มือถือออโต้ซูม (Portable) / คอมอยู่เฉยๆ (Monitor)
+  // 🌟 UX: ไม่ auto-zoom บนมือถือ — แสดงแผนที่ทั้งประเทศเมื่อเปิด
   useEffect(() => {
     if (stations && stations.length > 0 && !hasAutoLocated.current) {
-        hasAutoLocated.current = true; 
-        if (isMobile && navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (p) => {
-                    const closest = findClosestStation(p.coords.latitude, p.coords.longitude, stations);
-                    if (closest) {
-                        setFlyToPos({ pos: [closest.lat, closest.long], zoom: 8 });
-                        setFlash(closest.areaTH.replace('จังหวัด', '').trim());
-                    }
-                },
-                () => { console.log('Geolocation denied by user'); }
-            );
-        }
+        hasAutoLocated.current = true;
+        // ไม่ทำอะไร — ไม่ zoom บนมือถือ, ผู้ใช้กด "📍 พิกัดของฉัน" เองได้
     }
-  }, [stations, isMobile, setFlash]);
+  }, [stations]);
 
   useEffect(() => {
       setSelectedHotspot(null);
@@ -838,10 +827,7 @@ export default function MapPage() {
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, gap: isMobile ? '0' : '15px', overflow: 'hidden' }}>
           
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '0' : '15px' }}>
-              <div style={{ flex: 1, borderRadius: isMobile ? '0' : '20px', overflow: 'hidden', border: isMobile ? 'none' : `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? 'calc(100vh - 120px)' : 'auto', background: cardBg }}
-                onTouchStart={isMobile ? handleTouchStart : undefined}
-                onTouchEnd={isMobile ? handleTouchEnd : undefined}
-              >
+              <div style={{ flex: 1, borderRadius: isMobile ? '0' : '20px', overflow: 'hidden', border: isMobile ? 'none' : `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? 'calc(100vh - 120px)' : 'auto', background: cardBg }}>
                 {/* === MOBILE MODE INDICATOR (top-left) === */}
                 {isMobile && (
                   <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 1000, background: `${activeModeObj?.color || '#0ea5e9'}dd`, backdropFilter: 'blur(6px)', color: '#fff', padding: '5px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 2px 10px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', gap: '5px', pointerEvents: 'none' }}>
@@ -853,14 +839,39 @@ export default function MapPage() {
                     )}
                   </div>
                 )}
-                {/* === MOBILE SWIPE HINT (shows briefly on first load) === */}
-                {isMobile && mapCategory !== 'gistda' && (
-                  <div style={{ position: 'absolute', bottom: '110px', left: '50%', transform: 'translateX(-50%)', zIndex: 999, background: 'rgba(0,0,0,0.55)', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 'bold', pointerEvents: 'none', whiteSpace: 'nowrap', opacity: 0.7 }}>
-                    ← ปัดเปลี่ยนข้อมูล →
-                  </div>
-                )}
 
-                <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 5 : 6} style={{ height: '100%', width: '100%', background: appBg }} zoomControl={false}>
+                {/* === MOBILE LAYER TAB BAR (แถบเลื่อนเปลี่ยนชั้นข้อมูล) === */}
+                {isMobile && (() => {
+                  const modeList = mapCategory === 'basic' ? basicModes :
+                                   mapCategory === 'risk' ? riskModes :
+                                   mapCategory === 'yesterday' ? yesterdayModes :
+                                   gistdaModes;
+                  const activeId = mapCategory === 'basic' ? activeBasicMode :
+                                   mapCategory === 'risk' ? activeRiskMode :
+                                   mapCategory === 'yesterday' ? activeYesterdayMode :
+                                   activeGistdaMode;
+                  const setMode = (id) => {
+                    if (mapCategory === 'basic') setActiveBasicMode(id);
+                    else if (mapCategory === 'risk') setActiveRiskMode(id);
+                    else if (mapCategory === 'yesterday') setActiveYesterdayMode(id);
+                    else setActiveGistdaMode(id);
+                  };
+                  return (
+                    <div style={{ position: 'absolute', bottom: '55px', left: 0, right: 0, zIndex: 1000, display: 'flex', gap: '6px', padding: '7px 10px', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {modeList.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => setMode(m.id)}
+                          style={{ flexShrink: 0, padding: '5px 13px', borderRadius: '20px', border: `1.5px solid ${activeId === m.id ? m.color : 'rgba(255,255,255,0.25)'}`, background: activeId === m.id ? m.color : 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', whiteSpace: 'nowrap', transition: 'all 0.15s', opacity: m.noApi ? 0.5 : 1 }}
+                        >
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 6 : 6} style={{ height: '100%', width: '100%', background: appBg }} zoomControl={false}>
                     <TileLayer url={basemapUrls[basemapStyle]} />
                     <MapZoomListener setMapZoom={setMapZoom} />
                     <MapChangeView center={flyToPos} />
