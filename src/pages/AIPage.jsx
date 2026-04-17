@@ -226,73 +226,111 @@ export default function AIPage() {
     const factors = getWeatherFactorsForDay(dayIdx);
     if (!factors) return 0;
     const { rain, tMax, uvMax, windMax, pm25, tMin, heatMax } = factors;
-    let baseScore = 10;
+    // Base 7: realistic starting point for Thai climate (not 10, since 10/10 should be rare)
+    let baseScore = 7;
     switch (tabId) {
       case 'laundry':
-        if (rain > 30) baseScore -= 5;
-        if (rain > 60) baseScore -= 3;
-        if (windMax >= 10 && windMax <= 25 && rain < 20) baseScore += 1;
-        if (windMax > 35) baseScore -= 3;
+        if (rain < 10 && windMax >= 8 && windMax <= 25) baseScore += 2; // ideal drying conditions
+        else if (rain < 20 && windMax >= 5) baseScore += 1;
+        if (rain > 20) baseScore -= 2;
+        if (rain > 40) baseScore -= 3;
+        if (rain > 60) baseScore -= 2;
+        if (windMax > 35) baseScore -= 2;
+        if (heatMax > 40) baseScore -= 1;
         break;
       case 'exercise':
-        if (pm25 > 37.5) baseScore -= 5;
-        if (heatMax > 38 || tMax > 36) baseScore -= 3;
+        if (pm25 > 25) baseScore -= 2;
+        if (pm25 > 37.5) baseScore -= 3;
+        if (heatMax > 35 || tMax > 33) baseScore -= 2; // Thailand: 33°C already hot for exercise
+        if (heatMax > 38 || tMax > 36) baseScore -= 2;
+        if (rain > 30) baseScore -= 1;
         if (rain > 50) baseScore -= 2;
-        if (uvMax > 8) baseScore -= 1;
+        if (uvMax > 6) baseScore -= 1;  // UV 6+ already significant
+        if (uvMax > 10) baseScore -= 1;
         break;
       case 'outdoor':
-        if (rain > 40) baseScore -= 4;
-        if (heatMax > 40 || tMax > 37) baseScore -= 3;
-        if (uvMax > 8) baseScore -= 2;
-        if (windMax > 30) baseScore -= 2;
+        if (rain > 20) baseScore -= 2;
+        if (rain > 40) baseScore -= 2;
+        if (heatMax > 36 || tMax > 34) baseScore -= 2; // realistic Thai threshold
+        if (heatMax > 40 || tMax > 37) baseScore -= 2;
+        if (uvMax > 6) baseScore -= 1;
+        if (uvMax > 9) baseScore -= 1;
+        if (windMax > 30) baseScore -= 1;
         break;
       case 'travel':
-        if (rain > 50) baseScore -= 4;
-        if (heatMax > 42 || tMax > 38) baseScore -= 3;
-        if (uvMax > 10) baseScore -= 2;
+        if (rain > 30) baseScore -= 2;
+        if (rain > 50) baseScore -= 2;
+        if (heatMax > 38 || tMax > 35) baseScore -= 2; // 35°C already unpleasant for travel
+        if (heatMax > 42 || tMax > 39) baseScore -= 2;
+        if (uvMax > 8) baseScore -= 1;
+        if (uvMax > 11) baseScore -= 1;
         break;
       case 'farming':
-        if (rain > 70) baseScore -= 4;
-        if (heatMax > 40 || tMax > 38) baseScore -= 3;
-        if (windMax > 15) baseScore -= 3;
+        if (rain > 0 && rain <= 30) baseScore += 1; // light rain is good for farming
+        if (rain > 50) baseScore -= 2;
+        if (rain > 70) baseScore -= 2;
+        if (heatMax > 38 || tMax > 36) baseScore -= 2;
+        if (heatMax > 42 || tMax > 39) baseScore -= 2;
+        if (windMax > 15) baseScore -= 1;
+        if (windMax > 25) baseScore -= 2;
         break;
       case 'pets':
-        if (heatMax > 38 || tMax > 35) baseScore -= 4;
-        if (rain > 40) baseScore -= 3;
-        if (uvMax > 8) baseScore -= 1;
+        if (heatMax > 33 || tMax > 32) baseScore -= 2; // pets sensitive to Thai heat
+        if (heatMax > 38 || tMax > 35) baseScore -= 2;
+        if (rain > 30) baseScore -= 2;
+        if (rain > 50) baseScore -= 1;
+        if (uvMax > 6) baseScore -= 1;
+        if (uvMax > 9) baseScore -= 1;
         break;
       case 'construction':
-        if (rain > 50) baseScore -= 5;
-        if (rain > 30) baseScore -= 2;
-        if (windMax > 20) baseScore -= 3;
-        if (heatMax > 40 || tMax > 36) baseScore -= 2;
+        if (rain > 20) baseScore -= 2;
+        if (rain > 40) baseScore -= 2;
+        if (rain > 60) baseScore -= 2;
+        if (windMax > 15) baseScore -= 1;
+        if (windMax > 25) baseScore -= 2;
+        if (heatMax > 38 || tMax > 35) baseScore -= 2;
+        if (heatMax > 42 || tMax > 38) baseScore -= 1;
         break;
       case 'rain_risk':
         baseScore -= Math.round(rain / 10);
         break;
       case 'health':
-        if (pm25 > 37.5) baseScore -= 4;
-        if (pm25 > 50) baseScore -= 3;
-        if (heatMax > 40 || tMax > 35) baseScore -= 2;
+        if (pm25 > 25) baseScore -= 1;
+        if (pm25 > 37.5) baseScore -= 3;
+        if (pm25 > 50) baseScore -= 2;
+        if (heatMax > 36 || tMax > 34) baseScore -= 2;
+        if (heatMax > 40 || tMax > 37) baseScore -= 1;
+        if (uvMax > 8) baseScore -= 1;
         break;
       case 'photography':
-        if (rain > 40) baseScore -= 4;
-        if (pm25 > 37.5) baseScore -= 3;
+        if (rain < 5 && uvMax >= 4 && uvMax <= 8 && pm25 < 25) baseScore += 2; // golden conditions
+        if (rain > 20) baseScore -= 2;
+        if (rain > 50) baseScore -= 2;
+        if (pm25 > 25) baseScore -= 1;
+        if (pm25 > 37.5) baseScore -= 2;
+        if (uvMax > 10) baseScore -= 1; // harsh midday light
         break;
       case 'vending':
-        if (rain > 40) baseScore -= 4;
-        if (heatMax > 42 || tMax > 38) baseScore -= 3;
+        if (heatMax > 32 || tMax > 31) baseScore += 1; // hot = more drinks sold
+        if (rain > 20) baseScore -= 2;
+        if (rain > 40) baseScore -= 2;
+        if (heatMax > 40 || tMax > 38) baseScore -= 2; // too hot = people stay home
         if (windMax > 25) baseScore -= 2;
         break;
       case 'solar':
-        if (rain > 40) baseScore -= 4;
-        if (uvMax < 5) baseScore -= 2;
-        if (rain > 60) baseScore -= 3;
+        if (uvMax >= 8 && rain < 20) baseScore += 2; // high UV + dry = excellent solar
+        else if (uvMax >= 5 && rain < 40) baseScore += 1;
+        if (rain > 40) baseScore -= 3;
+        if (rain > 60) baseScore -= 2;
+        if (uvMax < 3) baseScore -= 3;
+        if (uvMax < 5) baseScore -= 1;
         break;
       default:
+        if (rain > 30) baseScore -= 1;
         if (rain > 50) baseScore -= 2;
-        if (heatMax > 42 || tMax > 37) baseScore -= 2;
-        if (pm25 > 50) baseScore -= 2;
+        if (heatMax > 40 || tMax > 37) baseScore -= 2;
+        if (pm25 > 37.5) baseScore -= 2;
+        if (pm25 > 50) baseScore -= 1;
     }
     return Math.max(1, Math.min(10, baseScore)); 
   };
@@ -734,6 +772,142 @@ export default function AIPage() {
                 </div>
             )}
         </div>
+
+        {/* 🔥 Hero Card – Heat Index + Risk */}
+        {(() => {
+          const hf = getWeatherFactorsForDay(targetDateIdx);
+          if (!hf) return null;
+          const { tMax, tMin, heatMax, uvMax, pm25, rain, windMax } = hf;
+          const humidity = weatherData.current?.humidity ?? 0;
+
+          const heatColor = heatMax > 42 ? '#ef4444' : heatMax > 38 ? '#f97316' : heatMax > 33 ? '#f59e0b' : '#10b981';
+          const heatBg   = heatMax > 42 ? 'rgba(239,68,68,0.12)' : heatMax > 38 ? 'rgba(249,115,22,0.10)' : heatMax > 33 ? 'rgba(245,158,11,0.10)' : 'rgba(16,185,129,0.10)';
+          const heatLabel= heatMax > 42 ? 'อันตราย' : heatMax > 38 ? 'ร้อนมาก' : heatMax > 33 ? 'อบอ้าว' : 'สบาย';
+
+          const uvColor  = uvMax > 8 ? '#ef4444' : uvMax > 5 ? '#f97316' : uvMax > 2 ? '#f59e0b' : '#10b981';
+          const pm25Color= pm25 > 75 ? '#ef4444' : pm25 > 37.5 ? '#f97316' : pm25 > 25 ? '#f59e0b' : pm25 > 15 ? '#10b981' : '#0ea5e9';
+          const rainColor= rain > 60 ? '#ef4444' : rain > 30 ? '#f59e0b' : '#10b981';
+          const windColor= windMax > 30 ? '#ef4444' : windMax > 15 ? '#f59e0b' : '#10b981';
+          const humidColor= humidity > 80 ? '#f59e0b' : humidity < 30 ? '#f59e0b' : '#10b981';
+
+          // overall risk
+          const risks = [
+            heatMax > 42 ? 4 : heatMax > 38 ? 3 : heatMax > 33 ? 2 : 1,
+            pm25 > 75 ? 4 : pm25 > 37.5 ? 3 : pm25 > 25 ? 2 : 1,
+            uvMax > 8 ? 3 : uvMax > 5 ? 2 : 1,
+            rain > 60 ? 3 : rain > 30 ? 2 : 1,
+          ];
+          const maxRisk = Math.max(...risks);
+          const riskLabel = maxRisk >= 4 ? 'อันตราย' : maxRisk === 3 ? 'ควรระวัง' : maxRisk === 2 ? 'ระมัดระวัง' : 'ปลอดภัยดี';
+          const riskColor = maxRisk >= 4 ? '#ef4444' : maxRisk === 3 ? '#f97316' : maxRisk === 2 ? '#f59e0b' : '#10b981';
+          const riskIcon  = maxRisk >= 4 ? '🚨' : maxRisk === 3 ? '⚠️' : maxRisk === 2 ? '⚡' : '✅';
+          const safeScore = Math.max(0, Math.min(100, 100 - (heatMax > 33 ? (heatMax - 33) * 3 : 0) - (pm25 > 15 ? Math.min(30, (pm25 - 15) * 0.8) : 0) - (uvMax > 3 ? Math.min(15, (uvMax - 3) * 2) : 0) - (rain > 20 ? Math.min(15, (rain - 20) * 0.3) : 0)));
+          const scorePct = safeScore / 100;
+          const circR = 28, circC = 2 * Math.PI * circR;
+          const scoreColor = safeScore >= 70 ? '#10b981' : safeScore >= 40 ? '#f59e0b' : '#ef4444';
+
+          // warning chips
+          const warns = [];
+          if (heatMax > 42) warns.push({ icon: '🔥', text: `ดัชนีความร้อน ${heatMax}°C วิกฤต ระวังลมแดด`, color: '#ef4444' });
+          else if (heatMax > 38) warns.push({ icon: '🌡️', text: `ความร้อน ${heatMax}°C สูง ดื่มน้ำบ่อยๆ`, color: '#f97316' });
+          if (pm25 > 75) warns.push({ icon: '😷', text: `ฝุ่น PM2.5 ${pm25} อันตราย สวม N95`, color: '#ef4444' });
+          else if (pm25 > 37.5) warns.push({ icon: '😷', text: `ฝุ่น PM2.5 ${pm25} เกินเกณฑ์ ใส่หน้ากาก`, color: '#f97316' });
+          if (uvMax > 8) warns.push({ icon: '☀️', text: `UV ${uvMax} สูงมาก ทาครีมกันแดด SPF50+`, color: '#f97316' });
+          else if (uvMax > 5) warns.push({ icon: '🕶️', text: `UV ${uvMax} ควรสวมแว่นกันแดด`, color: '#f59e0b' });
+          if (rain > 60) warns.push({ icon: '⛈️', text: `ฝนตก ${rain}% สูงมาก พกร่มเด็ดขาด`, color: '#3b82f6' });
+          else if (rain > 30) warns.push({ icon: '🌂', text: `โอกาสฝน ${rain}% ควรพกร่ม`, color: '#60a5fa' });
+          if (warns.length === 0) warns.push({ icon: '✅', text: 'สภาพอากาศปลอดภัย เหมาะกับกิจกรรมกลางแจ้ง', color: '#10b981' });
+
+          return (
+            <div className="no-print" style={{
+              background: darkMode
+                ? `linear-gradient(135deg, ${heatBg}, rgba(5,13,26,0.95))`
+                : `linear-gradient(135deg, ${heatBg}, rgba(248,250,252,0.95))`,
+              borderRadius: '24px',
+              border: `1.5px solid ${heatColor}40`,
+              boxShadow: `0 8px 32px ${heatColor}20`,
+              padding: isMobile ? '20px' : '24px',
+              display: 'flex', flexDirection: 'column', gap: '18px',
+            }}>
+
+              {/* Row 1: heat index big + score circle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+
+                {/* Heat index */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '0.72rem', color: darkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                    🌡️ ดัชนีความร้อน (รู้สึกเหมือน)
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+                    <span style={{ fontSize: isMobile ? '3.8rem' : '4.5rem', fontWeight: '900', color: heatColor, lineHeight: 1 }}>{heatMax}°</span>
+                    <div style={{ paddingBottom: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.8rem', background: `${heatColor}22`, color: heatColor, padding: '2px 8px', borderRadius: '20px', fontWeight: 'bold' }}>{heatLabel}</span>
+                      <span style={{ fontSize: '0.75rem', color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}>อุณหภูมิจริง {tMax}° / {tMin}°C</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Safety score circle */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                  <div style={{ position: 'relative', width: '76px', height: '76px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="76" height="76" viewBox="0 0 76 76" style={{ position: 'absolute', transform: 'rotate(-90deg)', filter: `drop-shadow(0 0 6px ${scoreColor}40)` }}>
+                      <circle cx="38" cy="38" r={circR} fill="none" stroke={darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'} strokeWidth="7" />
+                      <circle cx="38" cy="38" r={circR} fill="none" stroke={scoreColor} strokeWidth="7"
+                        strokeDasharray={circC} strokeDashoffset={circC - scorePct * circC}
+                        strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s ease-in-out' }} />
+                    </svg>
+                    <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: scoreColor, lineHeight: 1 }}>{Math.round(safeScore)}</span>
+                      <span style={{ fontSize: '0.6rem', color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)', fontWeight: 'bold' }}>/100</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: riskColor }}>{riskIcon} {riskLabel}</div>
+                  <div style={{ fontSize: '0.65rem', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>คะแนนความปลอดภัย</div>
+                </div>
+              </div>
+
+              {/* Row 2: stat chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {[
+                  { icon: '☀️', label: 'UV', val: uvMax, unit: '', color: uvColor, bg: `${uvColor}18` },
+                  { icon: '😷', label: 'PM2.5', val: pm25, unit: ' µg', color: pm25Color, bg: `${pm25Color}18` },
+                  { icon: '☔', label: 'ฝน', val: rain, unit: '%', color: rainColor, bg: `${rainColor}18` },
+                  { icon: '💨', label: 'ลม', val: windMax, unit: ' กม/ชม', color: windColor, bg: `${windColor}18` },
+                  { icon: '💧', label: 'ความชื้น', val: humidity, unit: '%', color: humidColor, bg: `${humidColor}18` },
+                ].map(s => (
+                  <div key={s.label} style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    background: s.bg, border: `1px solid ${s.color}40`,
+                    borderRadius: '50px', padding: '5px 12px',
+                    fontSize: '0.82rem',
+                  }}>
+                    <span>{s.icon}</span>
+                    <span style={{ color: darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)', fontSize: '0.72rem' }}>{s.label}</span>
+                    <span style={{ fontWeight: '800', color: s.color }}>{s.val}{s.unit}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Row 3: warnings */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ fontSize: '0.72rem', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', fontWeight: 'bold', letterSpacing: '0.5px' }}>⚡ สิ่งที่ควรระวัง</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {warns.map((w, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                      background: `${w.color}15`, border: `1px solid ${w.color}40`,
+                      borderRadius: '10px', padding: '5px 10px',
+                      fontSize: '0.8rem', fontWeight: '600', color: w.color,
+                    }}>
+                      <span>{w.icon}</span><span>{w.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
 
         {/* 📑 หมวดหมู่ไลฟ์สไตล์ Cards WITH SCORES */}
         <div className="no-print" style={{ 
