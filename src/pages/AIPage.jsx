@@ -305,14 +305,14 @@ export default function AIPage() {
     if (!weatherData || !weatherData.daily) return null;
     if (dayIdx === -1) {
         return {
-            tMax: Math.round(weatherData.daily.temperature_2m_max?.[0] ?? weatherData.current?.temp ?? 0),
-            tMin: Math.round(weatherData.daily.temperature_2m_min?.[0] ?? weatherData.current?.temp ?? 0),
-            rain: weatherData.daily.precipitation_probability_max?.[0] ?? weatherData.current?.rainProb ?? 0,
-            uvMax: weatherData.daily.uv_index_max?.[0] ?? 0,
-            windMax: Math.round(weatherData.daily.wind_speed_10m_max?.[0] ?? weatherData.current?.windSpeed ?? 0),
+            tMax: Math.round(weatherData.current?.temp ?? 0),
+            tMin: Math.round(weatherData.current?.temp ?? 0),
+            rain: weatherData.current?.rainProb ?? 0,
+            uvMax: weatherData.current?.uv ?? 0,
+            windMax: Math.round(weatherData.current?.windSpeed ?? 0),
             pm25: Math.round(weatherData.current?.pm25 ?? 0),
             feelsLike: Math.round(weatherData.current?.feelsLike ?? weatherData.current?.temp ?? 0),
-            heatMax: Math.round(weatherData.daily.apparent_temperature_max?.[0] ?? weatherData.current?.feelsLike ?? 0),
+            heatMax: Math.round(weatherData.current?.feelsLike ?? 0),
         };
     }
     const d = weatherData.daily;
@@ -946,7 +946,7 @@ export default function AIPage() {
                     <span style={{ fontSize: isMobile ? '3.8rem' : '4.5rem', fontWeight: '900', color: heatColor, lineHeight: 1 }}>{heatMax}°</span>
                     <div style={{ paddingBottom: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span style={{ fontSize: '0.8rem', background: `${heatColor}22`, color: heatColor, padding: '2px 8px', borderRadius: '20px', fontWeight: 'bold' }}>{heatLabel}</span>
-                      <span style={{ fontSize: '0.75rem', color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}>อุณหภูมิจริง {tMax}° / {tMin}°C</span>
+                      <span style={{ fontSize: '0.75rem', color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}>{targetDateIdx === -1 ? `อุณหภูมิจริง ${tMax}°C` : `อุณหภูมิจริง ${tMax}° / ${tMin}°C`}</span>
                     </div>
                   </div>
                 </div>
