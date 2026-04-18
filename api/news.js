@@ -15,8 +15,8 @@ const USGS_URL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/sign
 const RELIEFWEB_URL = 'https://api.reliefweb.int/v1/disasters?appname=airqualitythai&limit=30&sort[]=date.created:desc';
 
 const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-
 const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
 const GDACS_EVENT_MAP = {
   EQ: 'แผ่นดินไหว',
   FL: 'น้ำท่วม',
@@ -25,6 +25,17 @@ const GDACS_EVENT_MAP = {
   VO: 'ภูเขาไฟ',
   DR: 'ภัยแล้ง',
   TS: 'สึนามิ',
+};
+
+const VISUAL_PRESETS = {
+  warning: { emoji: '⚠️', gradient: 'linear-gradient(135deg, #f97316 0%, #ef4444 100%)', kicker: 'ประกาศเตือน' },
+  storm: { emoji: '🌧️', gradient: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)', kicker: 'พายุและฝน' },
+  earthquake: { emoji: '🌋', gradient: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)', kicker: 'แผ่นดินไหว' },
+  'thai-disaster': { emoji: '📍', gradient: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', kicker: 'เหตุการณ์ในไทย' },
+  'global-alert': { emoji: '🌐', gradient: 'linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)', kicker: 'เตือนภัยโลก' },
+  'global-disaster': { emoji: '🧭', gradient: 'linear-gradient(135deg, #0284c7 0%, #0f766e 100%)', kicker: 'เหตุการณ์สำคัญ' },
+  weather: { emoji: '⛅', gradient: 'linear-gradient(135deg, #0ea5e9 0%, #14b8a6 100%)', kicker: 'พยากรณ์อากาศ' },
+  default: { emoji: '📰', gradient: 'linear-gradient(135deg, #0f766e 0%, #0369a1 100%)', kicker: 'ข่าวเด่น' },
 };
 
 function isoNow() {
@@ -70,9 +81,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
         ...(options.headers || {}),
       },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response;
   } finally {
     clearTimeout(timeout);
@@ -114,6 +123,58 @@ function gdacsSeverity(level = '') {
   if (level === 'Red') return 'high';
   if (level === 'Orange') return 'medium';
   return 'normal';
+}
+
+function isMostlyThai(text = '') {
+  return /[\u0E00-\u0E7F]/.test(text);
+}
+
+function translateStaticText(text = '') {
+  const replacements = [
+    ['Earthquake', 'แผ่นดินไหว'],
+    ['Flood', 'น้ำท่วม'],
+    ['Tropical Cyclone', 'พายุหมุนเขตร้อน'],
+    ['Wildfire', 'ไฟป่า'],
+    ['Wild Fire', 'ไฟป่า'],
+    ['Volcano', 'ภูเขาไฟ'],
+    ['Drought', 'ภัยแล้ง'],
+    ['Tsunami', 'สึนามิ'],
+    ['Landslide', 'ดินถล่ม'],
+    ['Storm Surge', 'คลื่นพายุซัดฝั่ง'],
+    ['Heat Wave', 'คลื่นความร้อน'],
+    ['Cold Wave', 'คลื่นความหนาว'],
+    ['Significant earthquake', 'แผ่นดินไหวสำคัญ'],
+    ['magnitude', 'ขนาด'],
+    ['km', 'กม.'],
+    ['Red', 'ระดับแดง'],
+    ['Orange', 'ระดับส้ม'],
+    ['Green', 'ระดับเขียว'],
+    ['ongoing', 'กำลังเกิดขึ้น'],
+    ['alert', 'แจ้งเตือน'],
+    ['past', 'ที่ผ่านมา'],
+  ];
+
+  return replacements.reduce((value, [from, to]) => value.replaceAll(from, to), text).trim();
+}
+
+function buildVisual(category, fallbackTitle = '', extra = {}) {
+  const preset = VISUAL_PRESETS[category] || VISUAL_PRESETS.default;
+  return {
+    emoji: preset.emoji,
+    gradient: preset.gradient,
+    kicker: extra.kicker || preset.kicker,
+    label: extra.label || fallbackTitle,
+  };
+}
+
+function enrichItem(item) {
+  const visualCategory = item.category === 'global-alert' && item.eventType === 'EQ' ? 'earthquake' : item.category;
+  return {
+    ...item,
+    visual: buildVisual(visualCategory, item.title, {
+      kicker: item.eventLabel || item.country || item.status || undefined,
+    }),
+  };
 }
 
 function mapWeatherCode(code) {
@@ -173,6 +234,7 @@ function buildWeatherSummary(weather) {
     summary,
     bullets,
     today,
+    visual: buildVisual('weather', summary),
     days: (daily.time || []).map((time, index) => ({
       time,
       label: mapWeatherCode(daily.weathercode?.[index]),
@@ -253,7 +315,7 @@ async function fetchEarthquakes() {
   const data = await fetchJson(USGS_URL);
   return (data.features || []).slice(0, 10).map((item) => ({
     id: item.id,
-    title: item.properties?.title,
+    title: item.properties?.title || '',
     summary: item.properties?.place || '',
     magnitude: item.properties?.mag,
     publishedAt: item.properties?.time,
@@ -296,7 +358,7 @@ async function fetchReliefWebDisasters(mode) {
     const fields = item.fields || {};
     return {
       id: item.id,
-      title: fields.name,
+      title: fields.name || '',
       summary: `${(fields.type || []).map((entry) => entry.name).join(', ') || 'ภัยพิบัติ'} · ${fields.country?.[0]?.name || ''}`.trim(),
       publishedAt: fields.date?.created,
       status: fields.status,
@@ -308,6 +370,68 @@ async function fetchReliefWebDisasters(mode) {
       category: mode === 'thai' ? 'thai-disaster' : 'global-disaster',
     };
   });
+}
+
+async function maybeTranslateGlobalItems(items) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const targets = items.filter((item) => !isMostlyThai(item.title) || !isMostlyThai(item.summary || ''));
+  if (!targets.length) return items;
+
+  if (!apiKey) {
+    return items.map((item) => ({
+      ...item,
+      title: translateStaticText(item.title || ''),
+      summary: translateStaticText(item.summary || ''),
+    }));
+  }
+
+  const payload = targets.map((item, index) => ({
+    index,
+    title: item.title || '',
+    summary: item.summary || '',
+    eventLabel: item.eventLabel || '',
+    country: item.country || '',
+    status: item.status || '',
+  }));
+
+  const prompt = [
+    'แปลข่าวภัยพิบัติและสภาพอากาศต่อไปนี้เป็นภาษาไทยสำหรับผู้ใช้ทั่วไป',
+    'ตอบเป็น JSON array เท่านั้น โดยคงลำดับเดิมและใช้รูปแบบ [{"index":0,"title":"...","summary":"..."}]',
+    'แปลให้กระชับ อ่านง่าย และห้ามเติมข้อมูลใหม่',
+    JSON.stringify(payload),
+  ].join('\n');
+
+  const client = new GoogleGenerativeAI(apiKey);
+
+  for (const model of MODEL_CANDIDATES) {
+    try {
+      const result = await client.getGenerativeModel({ model }).generateContent(prompt);
+      const text = result.response.text()?.trim();
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) continue;
+
+      const translatedByIndex = new Map(parsed.map((entry) => [entry.index, entry]));
+
+      return items.map((item) => {
+        const targetIndex = targets.indexOf(item);
+        if (targetIndex === -1) return item;
+        const translated = translatedByIndex.get(targetIndex);
+        return {
+          ...item,
+          title: translated?.title?.trim() || translateStaticText(item.title || ''),
+          summary: translated?.summary?.trim() || translateStaticText(item.summary || ''),
+        };
+      });
+    } catch (error) {
+      console.error(`AI translation failed on ${model}:`, error.message || error);
+    }
+  }
+
+  return items.map((item) => ({
+    ...item,
+    title: translateStaticText(item.title || ''),
+    summary: translateStaticText(item.summary || ''),
+  }));
 }
 
 function buildDigest({ weather, tmd, gdacs, usgs, thaiDisasters, globalDisasters, sourceStatus }) {
@@ -327,34 +451,21 @@ function buildDigest({ weather, tmd, gdacs, usgs, thaiDisasters, globalDisasters
 
   bullets.push(...thaiLines);
 
-  if (topGdacs) {
-    bullets.push(`ต่างประเทศ: ${topGdacs.eventLabel} ใน${topGdacs.country || 'หลายพื้นที่'} ระดับ ${topGdacs.alertLevel || 'ติดตาม'} จาก GDACS`);
-  }
-
-  if (topEarthquake) {
-    bullets.push(`แผ่นดินไหวเด่นในสัปดาห์นี้: ${topEarthquake.title}`);
-  }
-
-  if (thaiHeadline) {
-    bullets.push(`ReliefWeb ประเทศไทยล่าสุด: ${thaiHeadline.title}`);
-  }
-
-  if (sourceFailures.length) {
-    bullets.push(`บางแหล่งยังดึงไม่ได้ชั่วคราว: ${sourceFailures.join(', ')}`);
-  }
-
-  const overview = {
-    thaiWarningCount: tmd.warnings?.length || 0,
-    thaiDisasterCount: thaiDisasters?.length || 0,
-    globalAlertCount: gdacs?.length || 0,
-    globalDisasterCount: globalDisasters?.length || 0,
-    earthquakeCount: usgs?.length || 0,
-  };
+  if (topGdacs) bullets.push(`ต่างประเทศ: ${topGdacs.eventLabel} ใน${topGdacs.country || 'หลายพื้นที่'} ระดับ ${topGdacs.alertLevel || 'ติดตาม'}`);
+  if (topEarthquake) bullets.push(`แผ่นดินไหวเด่นในสัปดาห์นี้: ${topEarthquake.title}`);
+  if (thaiHeadline) bullets.push(`เหตุการณ์ในไทยล่าสุด: ${thaiHeadline.title}`);
+  if (sourceFailures.length) bullets.push('บางข้อมูลอาจใช้เวลามากกว่าปกติ แต่ข่าวสำคัญยังแสดงได้ตามปกติ');
 
   return {
     title: 'สรุปข่าวอากาศและภัยพิบัติ',
     updatedAt: isoNow(),
-    overview,
+    overview: {
+      thaiWarningCount: tmd.warnings?.length || 0,
+      thaiDisasterCount: thaiDisasters?.length || 0,
+      globalAlertCount: gdacs?.length || 0,
+      globalDisasterCount: globalDisasters?.length || 0,
+      earthquakeCount: usgs?.length || 0,
+    },
     headline: weather.summary,
     bullets: bullets.slice(0, 5),
   };
@@ -367,8 +478,8 @@ async function maybeGenerateAiSummary(payload) {
   const prompt = [
     'สรุปข่าวอากาศและภัยพิบัติเป็นภาษาไทยแบบกระชับ ใช้งานจริง อ่านง่าย สำหรับหน้า dashboard',
     'ตอบเป็น JSON เท่านั้นในรูปแบบ {"headline":"...","bullets":["..."]}',
-    'เงื่อนไข: headline 1 ประโยค, bullets 3-5 ข้อ, ห้ามแต่งข้อมูลเกินชุดข้อมูลที่ให้',
-    `ข้อมูล: ${JSON.stringify(payload)}`,
+    'headline 1 ประโยค bullets 3-5 ข้อ และห้ามแต่งข้อมูลเกินชุดข้อมูลที่ให้',
+    JSON.stringify(payload),
   ].join('\n');
 
   const client = new GoogleGenerativeAI(apiKey);
@@ -393,9 +504,7 @@ async function maybeGenerateAiSummary(payload) {
 }
 
 function normalizeSourceStatus(label, result, count = 0) {
-  if (result.status === 'fulfilled') {
-    return { label, status: 'ok', count };
-  }
+  if (result.status === 'fulfilled') return { label, status: 'ok', count };
   return {
     label,
     status: 'error',
@@ -420,17 +529,28 @@ export default async function handler(req, res) {
 
   const weatherRaw = tasks[0].status === 'fulfilled' ? tasks[0].value : null;
   const tmd = tasks[1].status === 'fulfilled' ? tasks[1].value : { forecast: [], warnings: [], storm: [], earthquake: [] };
-  const gdacs = tasks[2].status === 'fulfilled' ? tasks[2].value : [];
-  const usgs = tasks[3].status === 'fulfilled' ? tasks[3].value : [];
-  const thaiDisasters = tasks[4].status === 'fulfilled' ? tasks[4].value : [];
-  const globalDisasters = tasks[5].status === 'fulfilled' ? tasks[5].value : [];
+  const gdacsRaw = tasks[2].status === 'fulfilled' ? tasks[2].value : [];
+  const usgsRaw = tasks[3].status === 'fulfilled' ? tasks[3].value : [];
+  const thaiDisastersRaw = tasks[4].status === 'fulfilled' ? tasks[4].value : [];
+  const globalDisastersRaw = tasks[5].status === 'fulfilled' ? tasks[5].value : [];
+
+  const [gdacsTranslated, usgsTranslated, globalDisastersTranslated] = await Promise.all([
+    maybeTranslateGlobalItems(gdacsRaw),
+    maybeTranslateGlobalItems(usgsRaw),
+    maybeTranslateGlobalItems(globalDisastersRaw),
+  ]);
 
   const weather = buildWeatherSummary(weatherRaw);
+  const thaiDisasters = thaiDisastersRaw.map(enrichItem);
+  const globalAlerts = gdacsTranslated.map(enrichItem);
+  const globalEarthquakes = usgsTranslated.map(enrichItem);
+  const globalDisasters = globalDisastersTranslated.map(enrichItem);
+
   const sourceStatus = [
     normalizeSourceStatus('Open-Meteo', tasks[0], weather.days?.length || 0),
     normalizeSourceStatus('TMD', tasks[1], tmd.forecast.length + tmd.warnings.length + tmd.storm.length + tmd.earthquake.length),
-    normalizeSourceStatus('GDACS', tasks[2], gdacs.length),
-    normalizeSourceStatus('USGS', tasks[3], usgs.length),
+    normalizeSourceStatus('GDACS', tasks[2], globalAlerts.length),
+    normalizeSourceStatus('USGS', tasks[3], globalEarthquakes.length),
     normalizeSourceStatus('ReliefWeb Thailand', tasks[4], thaiDisasters.length),
     normalizeSourceStatus('ReliefWeb Global', tasks[5], globalDisasters.length),
   ];
@@ -438,8 +558,8 @@ export default async function handler(req, res) {
   const deterministicDigest = buildDigest({
     weather,
     tmd,
-    gdacs,
-    usgs,
+    gdacs: globalAlerts,
+    usgs: globalEarthquakes,
     thaiDisasters,
     globalDisasters,
     sourceStatus,
@@ -450,9 +570,8 @@ export default async function handler(req, res) {
     thaiWarnings: tmd.warnings.slice(0, 4).map((item) => item.title),
     thaiStorms: tmd.storm.slice(0, 3).map((item) => item.title),
     thaiDisasters: thaiDisasters.slice(0, 4).map((item) => item.title),
-    globalAlerts: gdacs.slice(0, 4).map((item) => `${item.eventLabel} ${item.country} ${item.alertLevel}`.trim()),
-    earthquakes: usgs.slice(0, 4).map((item) => item.title),
-    sourceStatus,
+    globalAlerts: globalAlerts.slice(0, 4).map((item) => `${item.eventLabel || ''} ${item.country || ''} ${item.title}`.trim()),
+    earthquakes: globalEarthquakes.slice(0, 4).map((item) => item.title),
   });
 
   const digest = aiDigest
@@ -467,14 +586,14 @@ export default async function handler(req, res) {
     weather,
     thailand: {
       forecast: tmd.forecast,
-      warnings: tmd.warnings,
-      storms: tmd.storm,
-      earthquakes: tmd.earthquake,
+      warnings: tmd.warnings.map(enrichItem),
+      storms: tmd.storm.map(enrichItem),
+      earthquakes: tmd.earthquake.map(enrichItem),
       disasters: thaiDisasters,
     },
     global: {
-      alerts: gdacs,
-      earthquakes: usgs,
+      alerts: globalAlerts,
+      earthquakes: globalEarthquakes,
       disasters: globalDisasters,
     },
     sourceStatus,

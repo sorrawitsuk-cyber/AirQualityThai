@@ -110,38 +110,78 @@ function CardTitle({ eyebrow, title, desc, action, light = false }) {
   );
 }
 
-function MetricCard({ label, value, accent, note }) {
+function MetricCard({ label, value, accent, note, isDark }) {
   return (
     <div
       style={{
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.38))',
+        background: isDark
+          ? 'linear-gradient(180deg, rgba(7,18,38,0.78), rgba(20,39,69,0.92))'
+          : 'linear-gradient(180deg, rgba(9,27,56,0.28), rgba(20,55,100,0.42))',
         borderRadius: '20px',
-        border: '1px solid rgba(255,255,255,0.24)',
+        border: isDark ? '1px solid rgba(125,211,252,0.16)' : '1px solid rgba(255,255,255,0.22)',
         padding: '16px',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)',
+        boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : 'inset 0 1px 0 rgba(255,255,255,0.16)',
       }}
     >
-      <div style={{ color: 'rgba(255,255,255,0.76)', fontSize: '0.74rem', marginBottom: '8px' }}>{label}</div>
+      <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: '0.74rem', marginBottom: '8px', fontWeight: 700 }}>{label}</div>
       <div style={{ color: '#ffffff', fontWeight: 900, fontSize: '1.55rem', lineHeight: 1 }}>{value}</div>
       <div style={{ color: accent, fontWeight: 800, fontSize: '0.74rem', marginTop: '8px' }}>{note}</div>
     </div>
   );
 }
 
-function NewsItem({ item, compact = false }) {
+function NewsItem({ item, compact = false, isDark = false }) {
   const severity = severityStyles[item.severity] || severityStyles.normal;
+  const visual = item.visual || {
+    emoji: '📰',
+    gradient: 'linear-gradient(135deg, #0f766e 0%, #0369a1 100%)',
+    kicker: item.source || 'ข่าวเด่น',
+    label: item.title,
+  };
 
   return (
     <article
       style={{
-        background: 'var(--bg-secondary)',
+        background: isDark ? '#132745' : '#f7fbff',
         borderRadius: compact ? '16px' : '18px',
-        border: `1px solid ${severity.border}`,
+        border: `1px solid ${isDark ? 'rgba(125,211,252,0.16)' : severity.border}`,
         padding: compact ? '12px' : '14px',
         display: 'grid',
         gap: compact ? '8px' : '10px',
+        boxShadow: isDark ? '0 10px 28px rgba(0,0,0,0.18)' : '0 10px 22px rgba(14,30,56,0.05)',
       }}
     >
+      <div
+        style={{
+          background: visual.gradient,
+          borderRadius: compact ? '14px' : '16px',
+          minHeight: compact ? '84px' : '112px',
+          padding: compact ? '12px' : '14px',
+          color: '#ffffff',
+          display: 'grid',
+          alignContent: 'space-between',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'start' }}>
+          <span
+            style={{
+              background: 'rgba(255,255,255,0.22)',
+              borderRadius: '999px',
+              padding: '4px 10px',
+              fontSize: '0.68rem',
+              fontWeight: 800,
+            }}
+          >
+            {visual.kicker}
+          </span>
+          <span style={{ fontSize: compact ? '1.6rem' : '1.9rem', lineHeight: 1 }}>{visual.emoji}</span>
+        </div>
+        <div style={{ fontSize: compact ? '0.78rem' : '0.84rem', fontWeight: 800, lineHeight: 1.5, opacity: 0.96 }}>
+          {visual.label}
+        </div>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <span
@@ -157,7 +197,7 @@ function NewsItem({ item, compact = false }) {
           >
             {severity.label}
           </span>
-          {item.source ? <MetaBadge text={item.source} tone="#0f172a" subtle /> : null}
+          {item.source ? <MetaBadge text={item.source} tone={isDark ? '#e2f0fb' : '#0f172a'} subtle isDark={isDark} /> : null}
         </div>
         <span style={{ color: 'var(--text-sub)', fontSize: '0.7rem' }}>{item.publishedAtLabel || '-'}</span>
       </div>
@@ -175,10 +215,10 @@ function NewsItem({ item, compact = false }) {
 
       {(item.eventLabel || item.country || item.status || item.magnitude) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {item.eventLabel ? <MetaBadge text={item.eventLabel} /> : null}
-          {item.country ? <MetaBadge text={item.country} /> : null}
-          {item.status ? <MetaBadge text={item.status} /> : null}
-          {item.magnitude ? <MetaBadge text={`M ${item.magnitude}`} /> : null}
+          {item.eventLabel ? <MetaBadge text={item.eventLabel} isDark={isDark} /> : null}
+          {item.country ? <MetaBadge text={item.country} isDark={isDark} /> : null}
+          {item.status ? <MetaBadge text={item.status} isDark={isDark} /> : null}
+          {item.magnitude ? <MetaBadge text={`M ${item.magnitude}`} isDark={isDark} /> : null}
         </div>
       )}
 
@@ -196,12 +236,19 @@ function NewsItem({ item, compact = false }) {
   );
 }
 
-function MetaBadge({ text, subtle = false, tone }) {
+function MetaBadge({ text, subtle = false, tone, isDark = false }) {
   return (
     <span
       style={{
-        background: subtle ? 'rgba(255,255,255,0.62)' : 'rgba(148,163,184,0.16)',
+        background: subtle
+          ? isDark
+            ? 'rgba(8,19,38,0.7)'
+            : 'rgba(255,255,255,0.92)'
+          : isDark
+            ? 'rgba(96,202,242,0.14)'
+            : 'rgba(148,163,184,0.16)',
         color: tone || 'var(--text-main)',
+        border: `1px solid ${isDark ? 'rgba(125,211,252,0.16)' : 'rgba(148,163,184,0.2)'}`,
         borderRadius: '999px',
         padding: '4px 9px',
         fontSize: '0.68rem',
@@ -213,7 +260,7 @@ function MetaBadge({ text, subtle = false, tone }) {
   );
 }
 
-function EmptyState({ title, desc }) {
+function EmptyState({ title, desc, isDark = false }) {
   return (
     <div
       style={{
@@ -221,7 +268,7 @@ function EmptyState({ title, desc }) {
         border: '1px dashed var(--border-color)',
         padding: '24px',
         textAlign: 'center',
-        background: 'var(--bg-secondary)',
+        background: isDark ? '#132745' : '#f7fbff',
       }}
     >
       <div style={{ color: 'var(--text-main)', fontWeight: 900 }}>{title}</div>
@@ -230,16 +277,16 @@ function EmptyState({ title, desc }) {
   );
 }
 
-function BentoSection({ icon, title, desc, items }) {
+function BentoSection({ icon, title, desc, items, isDark = false }) {
   return (
     <SectionCard>
       <CardTitle eyebrow={icon} title={title} desc={desc} />
       {!items.length ? (
-        <EmptyState title={`ยังไม่มี${title}`} desc="ตอนนี้ยังไม่มีประเด็นใหม่ในหมวดนี้" />
+        <EmptyState title={`ยังไม่มี${title}`} desc="ตอนนี้ยังไม่มีประเด็นใหม่ในหมวดนี้" isDark={isDark} />
       ) : (
         <div style={{ display: 'grid', gap: '10px' }}>
           {items.map((item, index) => (
-            <NewsItem key={`${title}-${item.title}-${index}`} item={item} compact />
+            <NewsItem key={`${title}-${item.title}-${index}`} item={item} compact isDark={isDark} />
           ))}
         </div>
       )}
@@ -247,16 +294,20 @@ function BentoSection({ icon, title, desc, items }) {
   );
 }
 
-function WeatherDayCard({ day, index }) {
+function WeatherDayCard({ day, index, isDark = false }) {
   return (
     <div
       style={{
         background:
           index === 0
-            ? 'linear-gradient(180deg, rgba(14,165,233,0.18), rgba(255,255,255,0.42))'
-            : 'linear-gradient(180deg, rgba(255,255,255,0.8), rgba(221,240,255,0.65))',
+            ? isDark
+              ? 'linear-gradient(180deg, rgba(14,165,233,0.38), rgba(19,39,69,0.96))'
+              : 'linear-gradient(180deg, rgba(14,165,233,0.18), rgba(255,255,255,0.68))'
+            : isDark
+              ? 'linear-gradient(180deg, rgba(8,19,38,0.92), rgba(19,39,69,0.9))'
+              : 'linear-gradient(180deg, rgba(255,255,255,0.92), rgba(221,240,255,0.8))',
         borderRadius: '18px',
-        border: '1px solid var(--border-color)',
+        border: `1px solid ${isDark ? 'rgba(125,211,252,0.16)' : 'var(--border-color)'}`,
         padding: '14px',
         display: 'grid',
         gap: '7px',
@@ -303,11 +354,22 @@ export default function NewsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isDark, setIsDark] = useState(document.body.classList.contains('dark-theme'));
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    const syncTheme = () => setIsDark(document.body.classList.contains('dark-theme'));
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
   }, []);
 
   const loadNews = async () => {
@@ -421,10 +483,10 @@ export default function NewsPage() {
             >
               <div
                 style={{
-                  background: 'rgba(255,255,255,0.14)',
+                  background: isDark ? 'rgba(8,19,38,0.42)' : 'rgba(255,255,255,0.18)',
                   borderRadius: '24px',
                   padding: isMobile ? '16px' : '20px',
-                  border: '1px solid rgba(255,255,255,0.18)',
+                  border: isDark ? '1px solid rgba(125,211,252,0.16)' : '1px solid rgba(255,255,255,0.22)',
                   backdropFilter: 'blur(12px)',
                 }}
               >
@@ -463,10 +525,10 @@ export default function NewsPage() {
                   gap: '10px',
                 }}
               >
-                <MetricCard label="เตือนไทย" value={data?.digest?.overview?.thaiWarningCount ?? 0} accent="#fca5a5" note="ประกาศที่ควรจับตา" />
-                <MetricCard label="เหตุไทย" value={data?.digest?.overview?.thaiDisasterCount ?? 0} accent="#fdba74" note="เหตุการณ์ในประเทศ" />
-                <MetricCard label="เตือนโลก" value={data?.digest?.overview?.globalAlertCount ?? 0} accent="#ddd6fe" note="สัญญาณจากต่างประเทศ" />
-                <MetricCard label="แผ่นดินไหว" value={data?.digest?.overview?.earthquakeCount ?? 0} accent="#86efac" note="เหตุเด่นรอบสัปดาห์" />
+                <MetricCard label="เตือนไทย" value={data?.digest?.overview?.thaiWarningCount ?? 0} accent="#fecaca" note="ประกาศที่ควรจับตา" isDark={isDark} />
+                <MetricCard label="เหตุไทย" value={data?.digest?.overview?.thaiDisasterCount ?? 0} accent="#fdba74" note="เหตุการณ์ในประเทศ" isDark={isDark} />
+                <MetricCard label="เตือนโลก" value={data?.digest?.overview?.globalAlertCount ?? 0} accent="#e9d5ff" note="สัญญาณจากต่างประเทศ" isDark={isDark} />
+                <MetricCard label="แผ่นดินไหว" value={data?.digest?.overview?.earthquakeCount ?? 0} accent="#86efac" note="เหตุเด่นรอบสัปดาห์" isDark={isDark} />
               </div>
             </div>
 
@@ -519,7 +581,9 @@ export default function NewsPage() {
             <div style={{ display: 'grid', gap: '16px' }}>
               <SectionCard
                 style={{
-                  background: 'linear-gradient(180deg, rgba(255,255,255,0.94), rgba(221,240,255,0.86))',
+                  background: isDark
+                    ? 'linear-gradient(180deg, rgba(8,19,38,0.95), rgba(15,33,63,0.96))'
+                    : 'linear-gradient(180deg, rgba(255,255,255,0.96), rgba(221,240,255,0.9))',
                 }}
               >
                 <CardTitle
@@ -536,33 +600,37 @@ export default function NewsPage() {
                 >
                   <div
                     style={{
-                      background: 'linear-gradient(135deg, rgba(20,184,166,0.16), rgba(6,182,212,0.12))',
+                      background: isDark
+                        ? 'linear-gradient(135deg, rgba(20,184,166,0.24), rgba(6,182,212,0.18))'
+                        : 'linear-gradient(135deg, rgba(20,184,166,0.16), rgba(6,182,212,0.12))',
                       borderRadius: '20px',
-                      border: '1px solid rgba(20,184,166,0.18)',
+                      border: isDark ? '1px solid rgba(45,212,191,0.18)' : '1px solid rgba(20,184,166,0.18)',
                       padding: '16px',
                     }}
                   >
                     <div style={{ color: '#0f766e', fontWeight: 900, fontSize: '0.76rem', marginBottom: '8px' }}>THAILAND FOCUS</div>
                     {leadThaiStory ? (
-                      <NewsItem item={leadThaiStory} />
+                      <NewsItem item={leadThaiStory} isDark={isDark} />
                     ) : (
-                      <EmptyState title="วันนี้ยังไม่มีประเด็นเด่นในไทย" desc="สามารถติดตามหมวดข่าวไทยเพิ่มเติมได้ด้านบน" />
+                      <EmptyState title="วันนี้ยังไม่มีประเด็นเด่นในไทย" desc="สามารถติดตามหมวดข่าวไทยเพิ่มเติมได้ด้านบน" isDark={isDark} />
                     )}
                   </div>
 
                   <div
                     style={{
-                      background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(124,58,237,0.12))',
+                      background: isDark
+                        ? 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(124,58,237,0.18))'
+                        : 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(124,58,237,0.12))',
                       borderRadius: '20px',
-                      border: '1px solid rgba(59,130,246,0.18)',
+                      border: isDark ? '1px solid rgba(96,165,250,0.18)' : '1px solid rgba(59,130,246,0.18)',
                       padding: '16px',
                     }}
                   >
                     <div style={{ color: '#1d4ed8', fontWeight: 900, fontSize: '0.76rem', marginBottom: '8px' }}>GLOBAL WATCH</div>
                     {leadGlobalStory ? (
-                      <NewsItem item={leadGlobalStory} />
+                      <NewsItem item={leadGlobalStory} isDark={isDark} />
                     ) : (
-                      <EmptyState title="วันนี้ยังไม่มีประเด็นเด่นต่างประเทศ" desc="สามารถติดตามหมวดต่างประเทศเพิ่มเติมได้ด้านบน" />
+                      <EmptyState title="วันนี้ยังไม่มีประเด็นเด่นต่างประเทศ" desc="สามารถติดตามหมวดต่างประเทศเพิ่มเติมได้ด้านบน" isDark={isDark} />
                     )}
                   </div>
                 </div>
@@ -575,7 +643,7 @@ export default function NewsPage() {
                   desc={data.weather?.summary || 'ดูแนวโน้มอากาศกรุงเทพฯ สำหรับสัปดาห์นี้'}
                 />
                 {!weatherDays.length ? (
-                  <EmptyState title="ยังไม่มีพยากรณ์อากาศ" desc="โปรดลองใหม่อีกครั้งในอีกสักครู่" />
+                  <EmptyState title="ยังไม่มีพยากรณ์อากาศ" desc="โปรดลองใหม่อีกครั้งในอีกสักครู่" isDark={isDark} />
                 ) : (
                   <div
                     style={{
@@ -585,7 +653,7 @@ export default function NewsPage() {
                     }}
                   >
                     {weatherDays.slice(0, isMobile ? 6 : 7).map((day, index) => (
-                      <WeatherDayCard key={day.time} day={day} index={index} />
+                      <WeatherDayCard key={day.time} day={day} index={index} isDark={isDark} />
                     ))}
                   </div>
                 )}
@@ -598,12 +666,14 @@ export default function NewsPage() {
                 title="ประกาศเตือนในไทย"
                 desc="หยิบข่าวที่ควรรู้ก่อนออกจากบ้าน"
                 items={(thaiGroups.warnings || []).slice(0, 3)}
+                isDark={isDark}
               />
               <BentoSection
                 icon="🌐"
                 title="จับตาสถานการณ์โลก"
                 desc="เหตุการณ์ต่างประเทศที่น่าสนใจในช่วงนี้"
                 items={(globalGroups.alerts || []).slice(0, 3)}
+                isDark={isDark}
               />
               <SectionCard>
                 <CardTitle eyebrow="Links" title="ติดตามจากต้นทาง" desc="เปิดดูประกาศหรือข่าวฉบับเต็มจากหน่วยงานต่าง ๆ" />
@@ -621,7 +691,7 @@ export default function NewsPage() {
                         gap: '12px',
                         alignItems: 'center',
                         background: 'var(--bg-secondary)',
-                        border: `1px solid ${item.accent}33`,
+                        border: `1px solid ${isDark ? 'rgba(125,211,252,0.14)' : `${item.accent}33`}`,
                         borderRadius: '16px',
                         padding: '12px 14px',
                         color: 'var(--text-main)',
@@ -651,11 +721,11 @@ export default function NewsPage() {
               <SectionCard key={section.key}>
                 <CardTitle eyebrow={section.icon} title={section.title} desc={section.desc} />
                 {!thaiGroups[section.key]?.length ? (
-                  <EmptyState title={`ยังไม่มี${section.title}`} desc="ตอนนี้ยังไม่มีประเด็นใหม่ในหมวดนี้" />
+                  <EmptyState title={`ยังไม่มี${section.title}`} desc="ตอนนี้ยังไม่มีประเด็นใหม่ในหมวดนี้" isDark={isDark} />
                 ) : (
                   <div style={{ display: 'grid', gap: '10px' }}>
                     {thaiGroups[section.key].slice(0, 5).map((item, index) => (
-                      <NewsItem key={`${section.key}-${item.title}-${index}`} item={item} compact />
+                      <NewsItem key={`${section.key}-${item.title}-${index}`} item={item} compact isDark={isDark} />
                     ))}
                   </div>
                 )}
@@ -676,11 +746,11 @@ export default function NewsPage() {
               <SectionCard key={section.key}>
                 <CardTitle eyebrow={section.icon} title={section.title} desc={section.desc} />
                 {!globalGroups[section.key]?.length ? (
-                  <EmptyState title={`ยังไม่มี${section.title}`} desc="ตอนนี้ยังไม่มีประเด็นใหม่ในหมวดนี้" />
+                  <EmptyState title={`ยังไม่มี${section.title}`} desc="ตอนนี้ยังไม่มีประเด็นใหม่ในหมวดนี้" isDark={isDark} />
                 ) : (
                   <div style={{ display: 'grid', gap: '10px' }}>
                     {globalGroups[section.key].slice(0, 5).map((item, index) => (
-                      <NewsItem key={`${section.key}-${item.title}-${index}`} item={item} compact />
+                      <NewsItem key={`${section.key}-${item.title}-${index}`} item={item} compact isDark={isDark} />
                     ))}
                   </div>
                 )}
