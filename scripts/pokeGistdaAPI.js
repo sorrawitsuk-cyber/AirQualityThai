@@ -17,7 +17,7 @@ import puppeteer from 'puppeteer';
                 if (url.includes('burn_10_days') || url.includes('burn')) {
                     burnEndpoint = url;
                 }
-            } catch(e) {}
+            } catch {}
         }
     });
 

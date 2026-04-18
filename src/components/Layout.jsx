@@ -13,10 +13,7 @@ export default function Layout() {
   const { permission: notifPermission, requestPermission: requestNotif, isSupported: notifSupported } = usePushNotification();
 
   // ✅ ให้ GPS location พร้อมใน context ทั่วทั้งแอป
-  const [userLocation, setUserLocation] = useState(null);
-  useEffect(() => {
-    if (location) setUserLocation(location);
-  }, [location]);
+  const userLocation = location;
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);

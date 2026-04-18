@@ -81,7 +81,7 @@ export const WeatherProvider = ({ children }) => {
               rainProb: 0, 
               windSpeed: Math.round(data.current?.wind_kph || 0) 
             };
-          } catch (e) {
+          } catch {
              // ซ่อน Error ปล่อยข้ามไปเลยกันแอปพัง
           }
         });

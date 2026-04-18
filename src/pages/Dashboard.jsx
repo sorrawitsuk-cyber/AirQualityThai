@@ -14,7 +14,7 @@ import WeatherRadar from '../components/Dashboard/WeatherRadar';
 import DisasterSummary from '../components/Dashboard/DisasterSummary';
 
 export default function Dashboard() {
-  const { stations, stationTemps, darkMode, lastUpdated, amphoeData, tmdAvailable } = useContext(WeatherContext);
+  const { stations, stationTemps, lastUpdated, amphoeData, tmdAvailable } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
@@ -57,7 +57,7 @@ export default function Dashboard() {
     fetch('/thai_geo.json')
       .then(res => res.json())
       .then(data => setGeoData(Array.isArray(data) ? data : (data.data || [])))
-      .catch(e => setGeoError(true));
+      .catch(() => setGeoError(true));
   }, []);
 
   const sortedStations = useMemo(() => {
@@ -154,7 +154,7 @@ export default function Dashboard() {
   }, [stations, stationMaxYesterday]);
 
   useEffect(() => {
-    const useDefaultLocation = () => {
+    const fallbackToDefaultLocation = () => {
       fetchWeatherByCoords(13.75, 100.5); 
       setLocationName('กรุงเทพมหานคร');
     };
@@ -167,12 +167,12 @@ export default function Dashboard() {
         }, 
         (err) => { 
           console.warn("Geolocation error/timeout:", err.message);
-          useDefaultLocation(); 
+          fallbackToDefaultLocation(); 
         },
         { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
       );
     } else {
-      useDefaultLocation();
+      fallbackToDefaultLocation();
     }
   }, [fetchWeatherByCoords]);
 
@@ -283,7 +283,6 @@ export default function Dashboard() {
   });
 
   const maxTemp = Math.round(daily?.temperature_2m_max?.[0] || 0);
-  const minTemp = Math.round(daily?.temperature_2m_min?.[0] || 0);
   const dailyRainProb = daily?.precipitation_probability_max?.[0] || 0;
   
   const tomorrowMaxTemp = daily?.temperature_2m_max?.[1] ? Math.round(daily.temperature_2m_max[1]) : null;

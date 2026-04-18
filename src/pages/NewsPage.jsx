@@ -220,7 +220,7 @@ const SectionHeader = ({ title, lastTime, onRefresh, loading, source, textColor,
 //  NewsPage — สรุปข่าวอากาศ & ภัยพิบัติ
 // ══════════════════════════════════════════════════
 export default function NewsPage() {
-  const { darkMode } = useContext(WeatherContext);
+  useContext(WeatherContext);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState('weather');
@@ -435,7 +435,6 @@ export default function NewsPage() {
 
   // ── Derived weather data ─────────────────────────
   const daily   = forecast?.daily;
-  const today   = daily ? getWMO(daily.weathercode?.[0]) : null;
   const weekly  = daily ? genWeeklyOutlook(daily) : null;
   const nowDate = new Date();
 

@@ -1,7 +1,7 @@
 // api/hotspots.js
 export default async function handler(req, res) {
   // ดึง Key จาก Environment Variable ของ Vercel
-  const NASA_API_KEY = process.env.VITE_NASA_API_KEY; 
+  const NASA_API_KEY = process.env.NASA_API_KEY || process.env.VITE_NASA_API_KEY; 
 
   if (!NASA_API_KEY) {
     return res.status(500).json({ error: 'Missing NASA API KEY' });

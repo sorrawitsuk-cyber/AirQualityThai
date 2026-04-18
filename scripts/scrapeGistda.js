@@ -43,7 +43,7 @@ const runScraper = async () => {
                         apiDataList[url] = data;
                     }
                 }
-            } catch(e) {}
+            } catch {}
         }
     });
 

@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, YAxis, CartesianGrid } from 'recharts';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { useWeatherData } from '../hooks/useWeatherData';
 
 // 🌟 Component ลูกศรบอกแนวโน้ม (บังคับสี: แดง=เพิ่ม/แย่ลง, เขียว=ลด/ดีขึ้น)
 const TrendIndicator = ({ current, prev, hideText = false }) => {
@@ -81,8 +81,7 @@ export default function AIPage() {
     return [];
   }, [amphoeData, geoData, selectedProv]);
   
-  const [weatherData, setWeatherData] = useState(null);
-  const [loadingWeather, setLoadingWeather] = useState(true);
+  const { weatherData, loadingWeather, fetchWeatherByCoords } = useWeatherData();
 
   const [chatInput, setChatInput] = useState('');
   const [chatLogs, setChatLogs] = useState([]);
@@ -171,71 +170,6 @@ export default function AIPage() {
       return filtered;
   }, [activeWarningTabData.data, warningSearchTerm]);
 
-  const fetchWeatherByCoords = async (lat, lon) => {
-    try {
-      setLoadingWeather(true);
-      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,visibility&hourly=temperature_2m,precipitation_probability,pm2_5,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=Asia%2FBangkok`;
-      const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=Asia%2FBangkok`;
-
-      const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
-      const wData = await wRes.json();
-      const aData = await aRes.json();
-
-      if (wRes.ok && aRes.ok) {
-        setWeatherData({
-          current: {
-            temp: wData.current.temperature_2m,
-            feelsLike: wData.current.apparent_temperature,
-            humidity: wData.current.relative_humidity_2m,
-            windSpeed: wData.current.wind_speed_10m,
-            pressure: wData.current.surface_pressure,
-            visibility: wData.current.visibility,
-            uv: wData.daily.uv_index_max[0],
-            pm25: aData.current.pm2_5,
-            sunrise: wData.daily.sunrise[0],
-            sunset: wData.daily.sunset[0],
-            rainProb: wData.hourly.precipitation_probability[new Date().getHours()],
-          },
-          hourly: {
-            time: wData.hourly.time,
-            temperature_2m: wData.hourly.temperature_2m,
-            precipitation_probability: wData.hourly.precipitation_probability,
-            pm25: aData.hourly.pm2_5,
-            wind_speed_10m: wData.hourly.wind_speed_10m
-          },
-          daily: {
-            time: wData.daily.time,
-            weathercode: wData.daily.weather_code,
-            temperature_2m_max: wData.daily.temperature_2m_max,
-            temperature_2m_min: wData.daily.temperature_2m_min,
-            apparent_temperature_max: wData.daily.apparent_temperature_max,
-            pm25_max: wData.daily.time.map(dateStr => {
-              let maxPm = null;
-              if (aData.hourly && aData.hourly.time) {
-                aData.hourly.time.forEach((t, i) => {
-                  if (t.startsWith(dateStr) && aData.hourly.pm2_5[i] != null) {
-                    if (maxPm === null || aData.hourly.pm2_5[i] > maxPm) {
-                      maxPm = aData.hourly.pm2_5[i];
-                    }
-                  }
-                });
-              }
-              return maxPm !== null ? Math.round(maxPm) : Math.round(aData.current?.pm2_5 || 0);
-            }), 
-            precipitation_probability_max: wData.daily.precipitation_probability_max,
-            uv_index_max: wData.daily.uv_index_max,
-            wind_speed_10m_max: wData.daily.wind_speed_10m_max
-          },
-          coords: { lat, lon }
-        });
-      }
-    } catch (err) {
-        console.error("Fetch local weather failed", err);
-    } finally {
-      setLoadingWeather(false);
-    }
-  };
-
   const fetchLocationName = async (lat, lon) => {
     try {
       const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=th`);
@@ -256,15 +190,12 @@ export default function AIPage() {
 
   const handleCurrentLocation = () => {
     if (navigator.geolocation) {
-      setLoadingWeather(true);
       navigator.geolocation.getCurrentPosition((pos) => {
         fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
         fetchLocationName(pos.coords.latitude, pos.coords.longitude);
         setSelectedProv('');
         setSelectedDist('');
-      }, () => {
-        setLoadingWeather(false);
-      }, { timeout: 5000 });
+      }, () => {}, { timeout: 5000 });
     }
   };
 
@@ -285,7 +216,7 @@ export default function AIPage() {
         setLocationName('กรุงเทพมหานคร');
     }
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [fetchWeatherByCoords, weatherData]);
 
   const cleanMd = (text) => text ? text.replace(/\*\*/g, '') : '';
   const renderHighlightedText = (text, defaultColor) => {
@@ -301,7 +232,7 @@ export default function AIPage() {
     });
   };
 
-  const getWeatherFactorsForDay = (dayIdx) => {
+  const getWeatherFactorsForDay = useCallback((dayIdx) => {
     if (!weatherData || !weatherData.daily) return null;
     if (dayIdx === -1) {
         return {
@@ -324,12 +255,12 @@ export default function AIPage() {
     const pm25 = d.pm25_max?.[dayIdx] !== undefined ? Math.round(d.pm25_max[dayIdx]) : Math.round(weatherData.current?.pm25 ?? 0);
     const heatMax = Math.round(d.apparent_temperature_max?.[dayIdx] ?? tMax);
     return { tMax, tMin, rain, uvMax, windMax, pm25, heatMax };
-  };
+  }, [weatherData]);
 
-  const calcScore = (tabId, dayIdx) => {
+  const calcScore = useCallback((tabId, dayIdx) => {
     const factors = getWeatherFactorsForDay(dayIdx);
     if (!factors) return 0;
-    const { rain, tMax, uvMax, windMax, pm25, tMin, heatMax } = factors;
+    const { rain, tMax, uvMax, windMax, pm25, heatMax } = factors;
     // Base 7: realistic starting point for Thai climate (not 10, since 10/10 should be rare)
     let baseScore = 7;
     switch (tabId) {
@@ -437,7 +368,7 @@ export default function AIPage() {
         if (pm25 > 50) baseScore -= 1;
     }
     return Math.max(1, Math.min(10, baseScore)); 
-  };
+  }, [getWeatherFactorsForDay]);
 
   const currentScores = useMemo(() => {
     if (!weatherData) return {};
@@ -456,7 +387,7 @@ export default function AIPage() {
       vending: calcScore('vending', targetDateIdx),
       solar: calcScore('solar', targetDateIdx)
     };
-  }, [weatherData, targetDateIdx]);
+  }, [calcScore, targetDateIdx, weatherData]);
 
   const forecastChartData = useMemo(() => {
     if (!weatherData?.daily?.time) return [];
@@ -470,7 +401,7 @@ export default function AIPage() {
       }
       return { name: dayStr, score: score, index: idx };
     });
-  }, [weatherData, activeTab]);
+  }, [activeTab, calcScore, getWeatherFactorsForDay, weatherData]);
 
   const tabConfigs = [
     { id: 'summary', icon: '📋', label: 'ภาพรวม', color: '#8b5cf6' },
@@ -499,15 +430,6 @@ export default function AIPage() {
     setIsChatLoading(true);
     
     try {
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (!apiKey) {
-            setChatLogs([...newLogs, { role: 'ai', text: '⚠️ ระบบตอบกลับอัตโนมัติ AI ยังไม่สามารถใช้งานได้ กรุณาตั้งค่า VITE_GEMINI_API_KEY ก่อนครับ' }]);
-            setIsChatLoading(false);
-            return;
-        }
-        
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const factors = getWeatherFactorsForDay(targetDateIdx);
         const modeLabel = tabConfigs.find(t=>t.id===activeTab)?.label || "ทั่วไป";
         
@@ -516,9 +438,20 @@ export default function AIPage() {
 ประวัติแชท: ${newLogs.map(l => l.role + ': ' + l.text).join(' | ')}.
 ตอบคำถามล่าสุดได้เลย:`;
 
-        const result = await model.generateContent(context);
-        const text = await result.response.text();
-        setChatLogs([...newLogs, { role: 'ai', text: text }]);
+        const response = await fetch('/api/summary', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt: context }),
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload.text) {
+          throw new Error(payload.error || payload.details || 'AI request failed');
+        }
+
+        setChatLogs([...newLogs, { role: 'ai', text: payload.text }]);
     } catch (err) {
         console.error(err);
         setChatLogs([...newLogs, { role: 'ai', text: 'ขออภัย เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง' }]);
@@ -690,7 +623,7 @@ export default function AIPage() {
       advice: getMainAdvice(), 
       timeline: getTimeline() 
     };
-  }, [activeTab, currentScores, targetDateIdx, weatherData]);
+  }, [activeTab, currentScores, getWeatherFactorsForDay, targetDateIdx, weatherData]);
 
   const downloadFile = (content, filename, mimeType) => {
     const blob = new Blob([content], { type: mimeType });
@@ -752,7 +685,9 @@ export default function AIPage() {
           title: 'รายงานสภาพอากาศ',
           text: text,
         });
-      } catch { }
+      } catch {
+        // User dismissed the share sheet.
+      }
     } else {
       navigator.clipboard.writeText(text);
       alert("คัดลอกข้อความแล้ว");

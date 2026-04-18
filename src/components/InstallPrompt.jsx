@@ -9,8 +9,10 @@ import React, { useState, useEffect } from 'react';
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showBanner, setShowBanner] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const isIOS = typeof navigator !== 'undefined'
+    && /iphone|ipad|ipod/i.test(navigator.userAgent)
+    && !window.MSStream;
 
   useEffect(() => {
     // ถ้าเปิดใน standalone (ติดตั้งแล้ว) ไม่ต้องแสดง
@@ -22,10 +24,7 @@ export default function InstallPrompt() {
     if (wasDismissed) return;
 
     // ตรวจสอบ iOS
-    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-    setIsIOS(ios);
-
-    if (ios) {
+    if (isIOS) {
       // iOS: แสดง instruction หลัง 3 วินาที
       const t = setTimeout(() => setShowBanner(true), 3000);
       return () => clearTimeout(t);
@@ -47,7 +46,7 @@ export default function InstallPrompt() {
       window.removeEventListener('beforeinstallprompt', handler);
       window.removeEventListener('appinstalled', installedHandler);
     };
-  }, []);
+  }, [isIOS]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;

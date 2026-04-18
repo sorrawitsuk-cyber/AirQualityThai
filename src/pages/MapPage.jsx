@@ -99,7 +99,6 @@ export default function MapPage() {
   const [activeBasicMode, setActiveBasicMode] = useState('pm25'); 
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
   const [activeGistdaMode, setActiveGistdaMode] = useState('hotspots');
-  const [dayOffset, setDayOffset] = useState(0);
   const [timeMode, setTimeMode] = useState('today'); // 'today' | 'tomorrow' | 'avg7'
   const [activeYesterdayMode, setActiveYesterdayMode] = useState('maxTemp');
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,7 +108,6 @@ export default function MapPage() {
   
   const [basemapStyle, setBasemapStyle] = useState('dark'); 
   const [flyToPos, setFlyToPos] = useState(null);
-  const [showControls, setShowControls] = useState(window.innerWidth >= 1024);
   const [isLocating, setIsLocating] = useState(false);
   const [activePanel, setActivePanel] = useState(null); // 'legend' | 'layer' | 'time' | 'rank'
 
@@ -117,8 +115,6 @@ export default function MapPage() {
   const hasAutoLocated = useRef(false);
   const flashTimeoutRef = useRef(null);
   const geoJsonRef = useRef(null);
-  const touchStartXRef = useRef(null);
-  const touchStartYRef = useRef(null);
 
   const basemapUrls = {
     dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -196,7 +192,7 @@ export default function MapPage() {
   }, []);
 
   useEffect(() => {
-    const handleResize = () => { setIsMobile(window.innerWidth < 1024); if (window.innerWidth >= 1024) setShowControls(true); };
+    const handleResize = () => { setIsMobile(window.innerWidth < 1024); };
     window.addEventListener('resize', handleResize);
     fetchGeoData();
     return () => window.removeEventListener('resize', handleResize);
@@ -241,13 +237,13 @@ export default function MapPage() {
     { id: 'heatstroke', name: '🥵 เฝ้าระวังโรคลมแดด', color: '#ef4444', desc: 'คำนวณจาก: อุณหภูมิความร้อน (45%), ความชื้นสูง (30%), และรังสี UV (25%)' }
   ];
 
-  const gistdaModes = [
+  const gistdaModes = useMemo(() => [
     { id: 'hotspots', name: '🔥 จุดความร้อน (7 วัน)', color: '#ef4444', unit: 'จุด', desc: '🟢 ข้อมูลสดจาก GISTDA — จุดความร้อนสะสม 7 วันย้อนหลัง (Top 5)' },
     { id: 'burntArea', name: '🔥 พื้นที่เผาไหม้', color: '#ea580c', unit: 'ไร่', desc: '🟢 ข้อมูลสดจาก GISTDA — พื้นที่เผาไหม้สะสม 10 วัน (Top 5)' },
     { id: 'lowSoilMoisture', name: '🏜️ ความชื้นในดินต่ำ', color: '#f59e0b', unit: '%vol', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true },
     { id: 'lowVegetationMoisture', name: '🍂 ความชื้นพืชพรรณต่ำ', color: '#d97706', unit: 'ดัชนี', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true },
     { id: 'floodArea', name: '🌊 พื้นที่น้ำท่วม', color: '#3b82f6', unit: 'ไร่', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true }
-  ];
+  ], []);
 
   const getGistdaColor = useCallback((val, mode, rank) => {
     if (!val) return darkMode ? '#1a3050' : '#b8d9f5';
@@ -259,7 +255,7 @@ export default function MapPage() {
       return baseColor + (opacities[rank] || 'ff');
     }
     return baseColor;
-  }, [darkMode]);
+  }, [darkMode, gistdaModes]);
 
   // Derived from timeMode — backward compat for popup labels
   const effectiveDayOffset = timeMode === 'today' ? 0 : timeMode === 'tomorrow' ? 1 : 0;
@@ -464,33 +460,6 @@ export default function MapPage() {
           tomorrowWind: daily.wind?.[8] ? Math.round(daily.wind[8]) : null,
       };
   }, [stationDaily]);
-
-  // ===== Mobile swipe handlers =====
-  const handleTouchStart = useCallback((e) => {
-      touchStartXRef.current = e.touches[0].clientX;
-      touchStartYRef.current = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback((e) => {
-      if (touchStartXRef.current === null) return;
-      const dx = e.changedTouches[0].clientX - touchStartXRef.current;
-      const dy = e.changedTouches[0].clientY - touchStartYRef.current;
-      touchStartXRef.current = null;
-      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      if (mapCategory === 'basic') {
-          const modes = basicModes.map(m => m.id);
-          const cur = modes.indexOf(activeBasicMode);
-          setActiveBasicMode(modes[dx < 0 ? (cur + 1) % modes.length : (cur - 1 + modes.length) % modes.length]);
-      } else if (mapCategory === 'risk') {
-          const modes = riskModes.map(m => m.id);
-          const cur = modes.indexOf(activeRiskMode);
-          setActiveRiskMode(modes[dx < 0 ? (cur + 1) % modes.length : (cur - 1 + modes.length) % modes.length]);
-      } else if (mapCategory === 'yesterday') {
-          const modes = yesterdayModes.map(m => m.id);
-          const cur = modes.indexOf(activeYesterdayMode);
-          setActiveYesterdayMode(modes[dx < 0 ? (cur + 1) % modes.length : (cur - 1 + modes.length) % modes.length]);
-      }
-  }, [mapCategory, basicModes, riskModes, yesterdayModes, activeBasicMode, activeRiskMode, activeYesterdayMode]);
 
   const allMapData = useMemo(() => {
     return (stations || []).map(st => {

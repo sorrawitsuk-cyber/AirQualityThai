@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 /**
  * Hook สำหรับ Push Notification (Web Push API)
@@ -8,11 +8,7 @@ export function usePushNotification() {
   const [permission, setPermission] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
-  const [isSupported, setIsSupported] = useState(false);
-
-  useEffect(() => {
-    setIsSupported('Notification' in window && 'serviceWorker' in navigator);
-  }, []);
+  const isSupported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
 
   // ขอ permission จาก user (native dialog)
   const requestPermission = useCallback(async () => {
@@ -61,7 +57,7 @@ export function usePushNotification() {
       tag: 'aqi-alert',
       renotify: true,
       requireInteraction: aqiValue >= 200,
-      data: { aqiValue, province, url: '/alerts' },
+      data: { aqiValue, province, url: '/news' },
       actions: [
         { action: 'view', title: '📊 ดูรายละเอียด' },
         { action: 'dismiss', title: 'ยกเลิก' },

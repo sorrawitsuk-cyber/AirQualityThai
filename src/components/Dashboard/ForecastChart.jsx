@@ -1,7 +1,7 @@
 import React from 'react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, LabelList } from 'recharts';
 
-const CustomXAxisTick = ({ x, y, payload, chartData, subTextColor }) => {
+const CustomXAxisTick = ({ x, y, payload, chartData }) => {
   const item = chartData[payload.index];
   if (!item) return null;
   const pmColor = item.pm25 > 75 ? '#ef4444' : item.pm25 > 37.5 ? '#f97316' : item.pm25 > 25 ? '#eab308' : item.pm25 > 15 ? '#22c55e' : '#0ea5e9';
@@ -22,7 +22,7 @@ const CustomXAxisTick = ({ x, y, payload, chartData, subTextColor }) => {
   );
 };
 
-export default function ForecastChart({ chartData, isMobile, cardBg, borderColor, textColor, subTextColor, scrollRef, isDragging, scrollEvents }) {
+export default function ForecastChart({ chartData, isMobile, cardBg, borderColor, textColor, scrollRef, isDragging, scrollEvents }) {
   return (
     <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, flexShrink: 0 }}>
        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: textColor }}>⏱️ 24 ชั่วโมงข้างหน้า</h3>
@@ -47,7 +47,7 @@ export default function ForecastChart({ chartData, isMobile, cardBg, borderColor
                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={1}/>
                  </linearGradient>
                </defs>
-               <XAxis dataKey="time" axisLine={false} tickLine={false} interval={0} tick={<CustomXAxisTick chartData={chartData} subTextColor={subTextColor} />} />
+               <XAxis dataKey="time" axisLine={false} tickLine={false} interval={0} tick={<CustomXAxisTick chartData={chartData} />} />
                <Area type="monotone" dataKey="temp" stroke="url(#lineTemp)" strokeWidth={4} fillOpacity={1} fill="url(#colorTemp)">
                  <LabelList dataKey="temp" position="top" offset={10} style={{ fill: textColor, fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'Kanit' }} formatter={(val) => `${val}°`} />
                </Area>

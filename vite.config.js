@@ -114,7 +114,7 @@ export default defineConfig({
             name: 'เตือนภัย',
             short_name: 'เตือนภัย',
             description: 'ดูการแจ้งเตือนสภาพอากาศและภัยธรรมชาติ',
-            url: '/alerts?shortcut=alerts',
+            url: '/news?shortcut=alerts',
             icons: [{ src: 'icon-192x192.png', sizes: '192x192' }],
           },
         ],

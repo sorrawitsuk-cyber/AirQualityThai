@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function SunriseSunsetArc({ current, cardBg, borderColor, textColor, subTextColor, isMobile }) {
+export default function SunriseSunsetArc({ current, cardBg, borderColor, textColor, subTextColor }) {
     const [progress, setProgress] = useState(0);
     const [isDay, setIsDay] = useState(true);
 

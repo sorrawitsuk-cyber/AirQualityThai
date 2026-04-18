@@ -113,17 +113,17 @@ export default async function handler(req, res) {
   try {
     console.log("Cron: เริ่มทำงาน — Hybrid TMD + Open-Meteo Pipeline...");
 
-    const dbUrl = process.env.VITE_FIREBASE_DATABASE_URL;
+    const dbUrl = process.env.FIREBASE_DATABASE_URL || process.env.VITE_FIREBASE_DATABASE_URL;
     if (!dbUrl) return res.status(500).json({ success: false, error: "🚨 หา VITE_FIREBASE_DATABASE_URL ไม่เจอ!" });
 
     const firebaseConfig = {
-      apiKey: process.env.VITE_FIREBASE_API_KEY,
-      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+      apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
       databaseURL: dbUrl,
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.VITE_FIREBASE_APP_ID
+      projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID
     };
 
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
