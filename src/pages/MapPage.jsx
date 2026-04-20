@@ -679,6 +679,7 @@ export default function MapPage() {
                         gistdaModes.find(m => m.id === activeGistdaMode);
   const activeModeList = mapCategory === 'basic' ? basicModes :
                          mapCategory === 'risk' ? riskModes :
+                         mapCategory === 'yesterday' ? yesterdayModes :
                          gistdaModes;
   const activeModeIndex = Math.max(0, activeModeList.findIndex(m => m.id === activeModeObj?.id));
   const activeCategoryLabel = mapCategory === 'basic' ? 'ข้อมูลทั่วไป' :
@@ -806,11 +807,6 @@ export default function MapPage() {
     { id: 'tomorrow', label: `🔮 พรุ่งนี้ ${getDateLabel(1)}`, sub: 'พยากรณ์', color: '#a855f7' },
     { id: 'avg7', label: '📊 7 วันข้างหน้า', sub: 'มองภาพรวมล่วงหน้า', color: '#0ea5e9' },
   ];
-
-  const activeModeList = mapCategory === 'basic' ? basicModes :
-    mapCategory === 'risk' ? riskModes :
-    mapCategory === 'yesterday' ? yesterdayModes :
-    gistdaModes;
 
   const activeModeId = mapCategory === 'basic' ? activeBasicMode :
     mapCategory === 'risk' ? activeRiskMode :
@@ -955,7 +951,6 @@ export default function MapPage() {
                     </div>
                   )}
               </div>
-          </div>
 
           {(mapCategory === 'basic' || mapCategory === 'risk') ? (
               <div style={{ background: cardBg, padding: '8px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexShrink: 0, boxShadow: '0 4px 10px rgba(0,0,0,0.05)', flexWrap: 'wrap' }}>
@@ -994,9 +989,6 @@ export default function MapPage() {
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, gap: isMobile ? '0' : '12px', overflow: 'hidden', minHeight: 0 }}>
           
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '0' : '12px', minHeight: 0 }}>
-              <div style={{ flex: 1, borderRadius: isMobile ? '0' : '20px', overflow: 'hidden', border: isMobile ? 'none' : `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? 'calc(100vh - 120px)' : 0, background: cardBg }}>
-                <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 5 : 6} style={{ height: '100%', width: '100%', background: appBg }} zoomControl={false}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '0' : '12px', minHeight: 0 }}>
               <div style={{ flex: 1, borderRadius: isMobile ? '0' : '20px', overflow: 'hidden', border: isMobile ? 'none' : `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? 'calc(100vh - 120px)' : 0, background: cardBg }}>
 
