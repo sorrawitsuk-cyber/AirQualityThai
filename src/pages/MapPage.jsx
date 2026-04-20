@@ -115,7 +115,6 @@ export default function MapPage() {
   const hasAutoLocated = useRef(false);
   const flashTimeoutRef = useRef(null);
   const geoJsonRef = useRef(null);
-  const mobileLayerSwipeStartX = useRef(null);
   const desktopViewportHeight = 'calc(100vh - 28px)';
 
   const basemapUrls = {
@@ -698,18 +697,6 @@ export default function MapPage() {
     setActiveModeById(activeModeList[nextIndex].id);
   }, [activeModeIndex, activeModeList, setActiveModeById]);
 
-  const handleMobileLayerSwipeStart = useCallback((e) => {
-    mobileLayerSwipeStartX.current = e.touches[0].clientX;
-  }, []);
-
-  const handleMobileLayerSwipeEnd = useCallback((e) => {
-    if (mobileLayerSwipeStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - mobileLayerSwipeStartX.current;
-    mobileLayerSwipeStartX.current = null;
-    if (Math.abs(dx) < 36) return;
-    cycleActiveMode(dx < 0 ? 1 : -1);
-  }, [cycleActiveMode]);
-
   const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const getDateLabel = (offset) => {
       const d = new Date();
@@ -869,6 +856,43 @@ export default function MapPage() {
     }
   ];
 
+  const canChooseTimeMode = mapCategory === 'basic' || mapCategory === 'risk';
+  const activeTimeOption = mobileTimeOptions.find(opt => opt.id === timeMode);
+  const mobileDockButtons = [
+    {
+      id: 'category',
+      icon: activeCategoryOption?.icon || '🗺️',
+      label: 'ประเภท',
+      value: activeCategoryOption?.shortLabel || activeCategoryOption?.label || '-',
+      color: activeCategoryOption?.color || '#0ea5e9',
+      disabled: false,
+    },
+    {
+      id: 'layer',
+      icon: '🧩',
+      label: 'ชั้นข้อมูล',
+      value: activeModeObj?.name || '-',
+      color: activeModeObj?.color || '#0ea5e9',
+      disabled: false,
+    },
+    {
+      id: 'time',
+      icon: activeTimeOption?.color === '#a855f7' ? '🔮' : activeTimeOption?.color === '#0ea5e9' ? '📊' : '📅',
+      label: 'วันที่',
+      value: canChooseTimeMode ? (activeTimeOption?.sub || activeTimeOption?.label || '-') : 'คงที่',
+      color: canChooseTimeMode ? (activeTimeOption?.color || '#22c55e') : '#64748b',
+      disabled: !canChooseTimeMode,
+    },
+    {
+      id: 'rank',
+      icon: '📊',
+      label: 'อันดับ',
+      value: 'จังหวัด',
+      color: '#f97316',
+      disabled: false,
+    }
+  ];
+
   return (
     <div style={{ height: isMobile ? '100%' : desktopViewportHeight, width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '0' : '12px', boxSizing: 'border-box', overflow: 'hidden' }}>
       
@@ -987,9 +1011,9 @@ export default function MapPage() {
         </>
       )}
 
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, gap: isMobile ? '0' : '12px', overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, gap: isMobile ? '0' : '16px', overflow: 'hidden', minHeight: 0 }}>
           
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '0' : '12px', minHeight: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '0' : '16px', minHeight: 0 }}>
               <div style={{ flex: 1, borderRadius: isMobile ? '0' : '20px', overflow: 'hidden', border: isMobile ? 'none' : `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? 'calc(100vh - 120px)' : 0, background: cardBg }}>
 
                 <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 5 : 6} style={{ height: '100%', width: '100%', background: appBg }} zoomControl={false}>
@@ -1055,7 +1079,7 @@ export default function MapPage() {
                     })()}
                 </MapContainer>
 
-                {isMobile && (
+                {false && isMobile && (
                   <div
                     className="fade-in"
                     onClick={() => setActivePanel(p => p === 'layer' ? null : 'layer')}
@@ -1102,14 +1126,14 @@ export default function MapPage() {
                     {/* Legend toggle chip */}
                     <button
                       onClick={() => setActivePanel(p => p === 'legend' ? null : 'legend')}
-                      style={{ position: 'absolute', bottom: '50px', left: '12px', zIndex: 1001, background: cardBg, border: `1px solid ${borderColor}`, borderRadius: '20px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 10px rgba(0,0,0,0.25)', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.7rem', color: textColor, fontWeight: 'bold' }}
+                      style={{ position: 'absolute', bottom: '86px', left: '12px', zIndex: 1001, background: cardBg, border: `1px solid ${borderColor}`, borderRadius: '20px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 10px rgba(0,0,0,0.25)', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.7rem', color: textColor, fontWeight: 'bold' }}
                       aria-label="แสดง/ซ่อนสัญลักษณ์แผนที่"
                     >
                       <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: activeModeObj?.color || '#0ea5e9', display: 'inline-block', flexShrink: 0 }}></span>
                       {activePanel === 'legend' ? '✕' : '📋 สัญลักษณ์'}
                     </button>
                     {activePanel === 'legend' && (
-                      <div className="fade-in" style={{ position: 'absolute', bottom: '82px', left: '12px', zIndex: 1001, background: cardBg, padding: '10px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', maxWidth: 'calc(100vw - 80px)' }}>
+                      <div className="fade-in" style={{ position: 'absolute', bottom: '122px', left: '12px', zIndex: 1001, background: cardBg, padding: '10px 12px', borderRadius: '12px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', maxWidth: 'calc(100vw - 80px)' }}>
                         <div style={{ fontSize: '0.65rem', fontWeight: 'bold', color: subTextColor, marginBottom: '6px' }}>เกณฑ์ระดับ {activeModeObj?.name}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {getDynamicLegendContent().map((item, idx) => (
@@ -1143,6 +1167,41 @@ export default function MapPage() {
                   {isMobile ? (
                     /* ---- MOBILE floating icon row ---- */
                     <>
+                      <div style={{ position: 'fixed', left: '12px', right: '12px', bottom: '12px', zIndex: 1002, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px' }}>
+                        {mobileDockButtons.map(btn => {
+                          const isActive = activePanel === btn.id;
+                          return (
+                            <button
+                              key={btn.id}
+                              aria-label={btn.label}
+                              disabled={btn.disabled}
+                              onClick={() => !btn.disabled && setActivePanel(p => p === btn.id ? null : btn.id)}
+                              style={{
+                                minWidth: 0,
+                                background: isActive ? btn.color : 'var(--bg-nav-blur)',
+                                color: isActive ? '#fff' : (btn.disabled ? subTextColor : textColor),
+                                border: `1px solid ${isActive ? btn.color : borderColor}`,
+                                backdropFilter: 'blur(12px)',
+                                borderRadius: '16px',
+                                padding: '8px 6px 9px',
+                                boxShadow: '0 6px 20px rgba(0,0,0,0.18)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontFamily: 'Kanit',
+                                cursor: btn.disabled ? 'default' : 'pointer',
+                                opacity: btn.disabled ? 0.65 : 1
+                              }}
+                            >
+                              <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>{btn.icon}</span>
+                              <span style={{ fontSize: '0.64rem', fontWeight: 'bold', lineHeight: 1.1 }}>{btn.label}</span>
+                              <span style={{ fontSize: '0.56rem', lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{btn.value}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       {/* Row of quick icon buttons */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
@@ -1156,9 +1215,9 @@ export default function MapPage() {
                         {/* 📊 Rank panel toggle */}
                         <button
                           aria-label="อันดับจังหวัด"
-                          onClick={() => setActivePanel(p => p === 'rank' ? null : 'rank')}
-                          style={{ width: '40px', height: '40px', borderRadius: '50%', background: activePanel === 'rank' ? '#f97316' : cardBg, border: `1px solid ${activePanel === 'rank' ? '#f97316' : borderColor}`, fontSize: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >📊</button>
+                          onClick={() => setActivePanel(p => p === 'filter' ? null : 'filter')}
+                          style={{ width: '40px', height: '40px', borderRadius: '50%', background: activePanel === 'filter' ? '#0ea5e9' : cardBg, color: activePanel === 'filter' ? '#fff' : textColor, border: `1px solid ${activePanel === 'filter' ? '#0ea5e9' : borderColor}`, fontSize: '1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >⚙️</button>
 
                         {/* 📚 Reference (risk mode only) */}
                         {mapCategory === 'risk' && (
@@ -1172,7 +1231,7 @@ export default function MapPage() {
 
                       {/* === FILTER PANEL dropdown === */}
                       {activePanel === 'filter' && (
-                        <div className="fade-in" style={{ position: 'absolute', top: '0', right: '52px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(12px)', padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, width: '220px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 1002 }}>
+                        <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: '84px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003 }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '10px' }}>⚙️ ตัวกรองแผนที่</div>
                           <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '2px' }}>
                             <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: textColor, marginBottom: '6px' }}>รูปแบบแผนที่</div>
@@ -1187,7 +1246,7 @@ export default function MapPage() {
 
                       {/* === CATEGORY PANEL dropdown === */}
                       {activePanel === 'category' && (
-                        <div className="fade-in" style={{ position: 'absolute', top: '0', right: '52px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(12px)', padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, width: '220px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 1002 }}>
+                        <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: '84px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003, maxHeight: '52vh', overflowY: 'auto' }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '6px' }}>🗺️ ประเภทแผนที่</div>
                           <div style={{ fontSize: '0.66rem', color: subTextColor, marginBottom: '10px', lineHeight: 1.45 }}>เลือกตามสิ่งที่อยากดู: สภาพอากาศปัจจุบัน, พื้นที่เสี่ยง, ข้อมูลเมื่อวาน หรือข้อมูลดาวเทียม</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1207,7 +1266,7 @@ export default function MapPage() {
 
                       {/* === LAYER PANEL dropdown === */}
                       {activePanel === 'layer' && (
-                        <div className="fade-in" style={{ position: 'absolute', top: '0', right: '52px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(12px)', padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, width: '240px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 1002 }}>
+                        <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: '84px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003, maxHeight: '52vh', overflowY: 'auto' }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🧩 ชั้นข้อมูล</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '260px', overflowY: 'auto' }} className="custom-scrollbar">
                             {activeModeList.map(m => (
@@ -1224,8 +1283,8 @@ export default function MapPage() {
                       )}
 
                       {/* === TIME PANEL dropdown (3 buttons) === */}
-                      {activePanel === 'time' && (mapCategory === 'basic' || mapCategory === 'risk') && (
-                        <div className="fade-in" style={{ position: 'absolute', top: '96px', right: '52px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(12px)', padding: '12px', borderRadius: '16px', border: `1px solid ${borderColor}`, width: '220px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 1002 }}>
+                      {activePanel === 'time' && canChooseTimeMode && (
+                        <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: '84px', background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003 }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>📅 ช่วงเวลา</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             {mobileTimeOptions.map(opt => (
@@ -1240,7 +1299,7 @@ export default function MapPage() {
 
                       {/* === RANK PANEL (slide up from bottom on mobile) === */}
                       {activePanel === 'rank' && (
-                        <div className="fade-in" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 2000, background: cardBg, borderRadius: '20px 20px 0 0', border: `1px solid ${borderColor}`, boxShadow: '0 -4px 30px rgba(0,0,0,0.3)', maxHeight: '65vh', display: 'flex', flexDirection: 'column', padding: '16px' }}>
+                        <div className="fade-in" style={{ position: 'fixed', bottom: '78px', left: '12px', right: '12px', zIndex: 2000, background: cardBg, borderRadius: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.3)', maxHeight: '62vh', display: 'flex', flexDirection: 'column', padding: '16px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                             <h3 style={{ margin: 0, fontSize: '1rem', color: textColor }}>📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด' : mapCategory === 'gistda' ? 'พื้นที่วิกฤต' : mapCategory === 'yesterday' ? 'สถิติเมื่อวาน' : 'อันดับสูงสุด'}</h3>
                             <button onClick={() => setActivePanel(null)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: textColor, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>✕</button>
@@ -1299,7 +1358,7 @@ export default function MapPage() {
 
           {/* === DESKTOP SIDEBAR (ซ่อนบนมือถือ — ใช้ Bottom Sheet แทน) === */}
           {!isMobile && (
-            <div style={{ width: '300px', background: cardBg, borderRadius: '20px', padding: '14px', border: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0, minHeight: 0 }}>
+            <div style={{ width: '320px', background: cardBg, borderRadius: '24px', padding: '16px', border: `1px solid ${borderColor}`, boxShadow: '0 10px 30px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0, minHeight: 0 }}>
                <h3 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: textColor }}>
                   📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 15)' : mapCategory === 'gistda' ? 'พื้นที่วิกฤต (Top 5)' : mapCategory === 'yesterday' ? `สถิติเมื่อวาน ${getDateLabel(-1)}` : 'จัดอันดับค่าสูงสุด (Top 15)'}
                </h3>
