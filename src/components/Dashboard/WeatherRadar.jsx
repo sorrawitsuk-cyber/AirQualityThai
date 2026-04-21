@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 
 export default function WeatherRadar({ coords, isMobile, cardBg, borderColor, textColor }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const defaultOverlay = 'rain';
+  const defaultOverlay = 'radar';
+  const defaultProduct = 'radar';
   
   return (
     <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0 }}>
@@ -28,7 +29,7 @@ export default function WeatherRadar({ coords, isMobile, cardBg, borderColor, te
             )}
             <iframe 
                 width="100%" height="100%" 
-                src={`https://embed.windy.com/embed2.html?lat=${coords?.lat || 13.75}&lon=${coords?.lon || 100.5}&detailLat=${coords?.lat || 13.75}&detailLon=${coords?.lon || 100.5}&zoom=8&level=surface&overlay=${defaultOverlay}&product=ecmwf&menu=&message=true&marker=true`} 
+                src={`https://embed.windy.com/embed2.html?lat=${coords?.lat || 13.75}&lon=${coords?.lon || 100.5}&detailLat=${coords?.lat || 13.75}&detailLon=${coords?.lon || 100.5}&zoom=8&level=surface&overlay=${defaultOverlay}&product=${defaultProduct}&menu=&message=true&marker=true`} 
                 style={{ border: 'none', opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.5s ease' }}
                 title="Radar Map"
                 onLoad={() => setIframeLoaded(true)}
