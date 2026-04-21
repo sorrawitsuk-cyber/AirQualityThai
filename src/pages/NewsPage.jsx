@@ -749,7 +749,24 @@ export default function NewsPage() {
     };
   }, [data]);
 
-    // 🎖️ Thai-First Prioritization Algorithm
+  const allItems = useMemo(
+    () => [
+      ...(thaiGroups.warnings || []),
+      ...(thaiGroups.storms || []),
+      ...(thaiGroups.earthquakes || []),
+      ...(thaiGroups.disasters || []),
+      ...(thaiGroups.ddpm || []),
+      ...(thaiGroups.thaiPbs || []),
+      ...(globalGroups.alerts || []),
+      ...(globalGroups.earthquakes || []),
+      ...(globalGroups.earthquakesRegional || []),
+      ...(globalGroups.disasters || []),
+      ...(globalGroups.eonet || []),
+    ],
+    [thaiGroups, globalGroups],
+  );
+
+  // 🎖️ Thai-First Prioritization Algorithm
   const topStories = useMemo(() => {
     // Start with all formatting logic
     const items = [...allItems].filter(item => item.title);
@@ -773,27 +790,11 @@ export default function NewsPage() {
         return new Date(b.date || b.pubDate || 0) - new Date(a.date || a.pubDate || 0);
     }).slice(0, 15);
   }, [allItems]);
+
   const weatherDays = data?.weather?.days || [];
   const digestBullets = data?.digest?.bullets || [];
   const ensoPhase = useMemo(() => detectEnsoPhase(globalGroups.climate || []), [globalGroups.climate]);
   const riskScore = useMemo(() => computeThaiRisk(thaiGroups), [thaiGroups]);
-
-  const allItems = useMemo(
-    () => [
-      ...(thaiGroups.warnings || []),
-      ...(thaiGroups.storms || []),
-      ...(thaiGroups.earthquakes || []),
-      ...(thaiGroups.disasters || []),
-      ...(thaiGroups.ddpm || []),
-      ...(thaiGroups.thaiPbs || []),
-      ...(globalGroups.alerts || []),
-      ...(globalGroups.earthquakes || []),
-      ...(globalGroups.earthquakesRegional || []),
-      ...(globalGroups.disasters || []),
-      ...(globalGroups.eonet || []),
-    ],
-    [thaiGroups, globalGroups],
-  );
 
   const riskItems = useMemo(() => {
     const thai = [
