@@ -485,7 +485,16 @@ export default function Dashboard() {
            scrollEvents={scrollEvents}
         />
 
-        {/* === SECTION 6: Activity Recommendations + SunriseSunsetArc === */}
+        {/* === SECTION 6: Weather Radar === */}
+        <WeatherRadar 
+           coords={coords}
+           isMobile={isMobile}
+           cardBg={cardBg}
+           borderColor={borderColor}
+           textColor={textColor}
+        />
+
+        {/* === SECTION 7: Activity Recommendations + SunriseSunsetArc === */}
         {!isMobile ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', flexShrink: 0 }}>
             <ActivityRecommendations 
@@ -518,7 +527,7 @@ export default function Dashboard() {
           />
         )}
 
-        {/* === SECTION 7: Mobile-only UV and PM2.5 cards === */}
+        {/* === SECTION 8: Mobile-only UV and PM2.5 cards === */}
         {isMobile && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px', flexShrink: 0 }}>
             <div style={{ background: cardBg, borderRadius: '20px', padding: '20px', border: `1px solid ${borderColor}` }}>
@@ -546,7 +555,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* === SECTION 8: Daily Forecast 7 days (full width) === */}
+        {/* === SECTION 9: Daily Forecast 7 days (full width) === */}
         <DailyForecast 
            daily={daily}
            isMobile={isMobile}
@@ -556,7 +565,7 @@ export default function Dashboard() {
            subTextColor={subTextColor}
         />
 
-        {/* === SECTION 9: Top 5 Stats (collapsible) === */}
+        {/* === SECTION 10: Top 5 Stats (collapsible) === */}
         <TopStats 
            top5Heat={top5Heat}
            top5Cool={top5Cool}
@@ -566,15 +575,6 @@ export default function Dashboard() {
            top5CoolY={top5CoolY}
            top5PM25Y={top5PM25Y}
            top5RainY={top5RainY}
-           isMobile={isMobile}
-           cardBg={cardBg}
-           borderColor={borderColor}
-           textColor={textColor}
-        />
-
-        {/* === SECTION 10: Weather Radar === */}
-        <WeatherRadar 
-           coords={coords}
            isMobile={isMobile}
            cardBg={cardBg}
            borderColor={borderColor}
