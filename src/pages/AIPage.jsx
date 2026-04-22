@@ -747,26 +747,26 @@ export default function AIPage() {
         .recharts-tooltip-wrapper { outline: none !important; }
       `}} />
 
-      <div style={{ width: '100%', maxWidth: '1300px', margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', padding: isMobile ? '15px' : '30px', paddingBottom: '120px', boxSizing: 'border-box', alignItems: 'flex-start' }}>
+      <div style={{ width: '100%', maxWidth: '1300px', margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '16px' : '24px', padding: isMobile ? '12px' : '30px', paddingBottom: '120px', boxSizing: 'border-box', alignItems: 'flex-start', overflowX: 'clip' }}>
       {/* 🟢 LEFT COLUMN (65%) */}
       <div style={{ flex: isMobile ? '1' : '0 0 calc(65% - 12px)', display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
 
         {/* 📍 Header & Date Selector */}
         <div className="no-print" style={{ background: cardBg, borderRadius: '24px', padding: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
-                <div>
+                <div style={{ minWidth: 0 }}>
                     <h1 style={{ margin: 0, fontSize: '1.4rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
                         ✨ วิเคราะห์สภาพอากาศ
                     </h1>
-                    <div style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ fontSize: '0.85rem', color: subTextColor, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                         พื้นที่การวิเคราะห์: <span style={{color: '#0ea5e9', fontWeight: 'bold'}}>{locationName}</span> 
                         <button onClick={handleCurrentLocation} title="ใช้ตำแหน่งปัจจุบัน" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 5px', filter: 'grayscale(0.2)' }}>🎯</button>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
+                <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                     {isMobile && (
-                        <select value={targetDateIdx} onChange={(e) => setTargetDateIdx(parseInt(e.target.value))} style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
+                        <select value={targetDateIdx} onChange={(e) => setTargetDateIdx(parseInt(e.target.value))} style={{ flex: '1 1 100%', minWidth: 0, width: '100%', padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
                             {[-1,0,1,2,3,4,5,6].map(idx => {
                                 const date = new Date(weatherData?.daily?.time?.[idx === -1 ? 0 : idx] || Date.now());
                                 const dateStr = idx === -1 ? 'ขณะนี้ (Current)' : idx === 0 ? 'วันนี้ (ภาพรวมตลอดวัน)' : idx === 1 ? 'พรุ่งนี้' : date.toLocaleDateString('th-TH', {weekday:'short', day:'numeric'});
@@ -782,7 +782,7 @@ export default function AIPage() {
                             const st = (stations || []).find(s => s.areaTH === val);
                             if(st) { fetchWeatherByCoords(st.lat, st.long); fetchLocationName(st.lat, st.long); }
                         }
-                    }} style={{ flex: isMobile ? 1 : 'auto', minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
+                    }} style={{ flex: isMobile ? '1 1 calc(50% - 5px)' : 'auto', minWidth: 0, width: isMobile ? 'calc(50% - 5px)' : 'auto', padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none' }}>
                         <option value="">เลือกจังหวัด</option>
                         {(stations || []).map(s => <option key={s.stationID} value={s.areaTH}>{s.areaTH}</option>)}
                     </select>
@@ -797,7 +797,7 @@ export default function AIPage() {
                                 setLocationName(`${val}, ${selectedProv}`); 
                             }
                         }
-                    }} disabled={!selectedProv || currentAmphoes.length === 0} style={{ flex: isMobile ? 1 : 'auto', minWidth: 0, padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none', opacity: (!selectedProv || currentAmphoes.length === 0) ? 0.5 : 1 }}>
+                    }} disabled={!selectedProv || currentAmphoes.length === 0} style={{ flex: isMobile ? '1 1 calc(50% - 5px)' : 'auto', minWidth: 0, width: isMobile ? 'calc(50% - 5px)' : 'auto', padding: '8px 12px', borderRadius: '12px', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontFamily: 'Kanit', outline: 'none', opacity: (!selectedProv || currentAmphoes.length === 0) ? 0.5 : 1 }}>
                         <option value="">เลือกอำเภอ</option>
                         {currentAmphoes.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
                     </select>
@@ -1028,17 +1028,17 @@ export default function AIPage() {
                             ประมวลผลสภาพอากาศเพื่อการตัดสินใจ
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
                         {activeTab !== 'summary' && (
-                            <button onClick={() => setActiveTab('summary')} style={{ background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <button onClick={() => setActiveTab('summary')} style={{ background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}>
                                 🔙 กลับหน้าภาพรวม
                             </button>
                         )}
-                        <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <button onClick={exportToCSV} title="Export to CSV" style={{ background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', backdropFilter: 'blur(5px)' }}>CSV</button>
-                            <button onClick={exportToJSON} title="Export to JSON" style={{ background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', backdropFilter: 'blur(5px)' }}>JSON</button>
-                            <button onClick={exportToPDF} title="Export to PDF (Print)" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(239,68,68,0.3)' }}>PDF</button>
-                            <button onClick={handleShare} title="Share" style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(16,185,129,0.3)' }}><span>📤</span> แชร์</button>
+                        <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                            <button onClick={exportToCSV} title="Export to CSV" style={{ background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', backdropFilter: 'blur(5px)', flex: isMobile ? '1 1 calc(50% - 4px)' : '0 0 auto', minWidth: 0 }}>CSV</button>
+                            <button onClick={exportToJSON} title="Export to JSON" style={{ background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', color: textColor, border: `1px solid ${borderColor}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', backdropFilter: 'blur(5px)', flex: isMobile ? '1 1 calc(50% - 4px)' : '0 0 auto', minWidth: 0 }}>JSON</button>
+                            <button onClick={exportToPDF} title="Export to PDF (Print)" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(239,68,68,0.3)', flex: isMobile ? '1 1 calc(50% - 4px)' : '0 0 auto', minWidth: 0 }}>PDF</button>
+                            <button onClick={handleShare} title="Share" style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(16,185,129,0.3)', flex: isMobile ? '1 1 calc(50% - 4px)' : '0 0 auto', minWidth: 0 }}><span>📤</span> แชร์</button>
                         </div>
                         {(() => {
                             const isRain = activeTab === 'rain_risk';
@@ -1244,16 +1244,16 @@ export default function AIPage() {
                         <div ref={chatEndRef} />
                     </div>
                     
-                    <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '10px' }}>
+                    <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '10px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                         <input 
                             type="text" 
                             value={chatInput} 
                             onChange={(e) => setChatInput(e.target.value)} 
                             placeholder="พิมพ์คำถามของคุณที่นี่..." 
-                            style={{ flex: 1, padding: '12px 16px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0b1629' : '#fff', color: textColor, fontFamily: 'Kanit', outline: 'none' }} 
+                            style={{ flex: 1, minWidth: 0, width: isMobile ? '100%' : 'auto', padding: '12px 16px', borderRadius: '12px', border: `1px solid ${borderColor}`, background: darkMode ? '#0b1629' : '#fff', color: textColor, fontFamily: 'Kanit', outline: 'none' }} 
                             disabled={isChatLoading}
                         />
-                        <button type="submit" disabled={isChatLoading || !chatInput.trim()} style={{ background: activeColor, color: '#fff', border: 'none', padding: '0 20px', borderRadius: '12px', cursor: (isChatLoading || !chatInput.trim()) ? 'not-allowed' : 'pointer', fontWeight: 'bold', opacity: (isChatLoading || !chatInput.trim()) ? 0.6 : 1 }}>
+                        <button type="submit" disabled={isChatLoading || !chatInput.trim()} style={{ background: activeColor, color: '#fff', border: 'none', padding: isMobile ? '12px 20px' : '0 20px', borderRadius: '12px', cursor: (isChatLoading || !chatInput.trim()) ? 'not-allowed' : 'pointer', fontWeight: 'bold', opacity: (isChatLoading || !chatInput.trim()) ? 0.6 : 1, width: isMobile ? '100%' : 'auto' }}>
                             ส่ง
                         </button>
                     </form>
