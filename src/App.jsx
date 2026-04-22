@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import { WeatherProvider } from './context/WeatherContext';
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+import Dashboard from './pages/Dashboard';
 const MapPage = lazy(() => import('./pages/MapPage'));
 const AIPage = lazy(() => import('./pages/AIPage'));
 const NewsPage = lazy(() => import('./pages/NewsPage'));
@@ -32,16 +32,14 @@ function RouteFallback() {
 function App() {
   return (
     <WeatherProvider>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="map" element={<MapPage />} />
-            <Route path="ai" element={<AIPage />} />
-            <Route path="news" element={<NewsPage />} />
-          </Route>
-        </Routes>
-      </Suspense>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="map" element={<Suspense fallback={<RouteFallback />}><MapPage /></Suspense>} />
+          <Route path="ai" element={<Suspense fallback={<RouteFallback />}><AIPage /></Suspense>} />
+          <Route path="news" element={<Suspense fallback={<RouteFallback />}><NewsPage /></Suspense>} />
+        </Route>
+      </Routes>
     </WeatherProvider>
   );
 }
