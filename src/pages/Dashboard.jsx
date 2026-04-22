@@ -497,7 +497,7 @@ export default function Dashboard() {
 
       {briefingCard}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.95fr) minmax(240px, 0.54fr) minmax(0, 1.08fr)', gap: '20px', width: '100%', alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.08fr) minmax(260px, 0.68fr) minmax(0, 1.24fr)', gap: '20px', width: '100%', alignItems: 'stretch' }}>
         <ActivityRecommendations
           current={current}
           chartData={chartData}

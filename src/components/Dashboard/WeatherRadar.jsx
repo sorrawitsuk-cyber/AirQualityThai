@@ -4,10 +4,10 @@ export default function WeatherRadar({ coords, isMobile, cardBg, borderColor, te
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const defaultOverlay = 'radar';
   const defaultProduct = 'radar';
-  const frameHeight = isMobile ? '340px' : '500px';
+  const frameHeight = isMobile ? '340px' : '540px';
   
   return (
-    <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0 }}>
+    <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0, width: '100%' }}>
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ
         </h3>

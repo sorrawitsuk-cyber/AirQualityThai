@@ -169,9 +169,29 @@ export default function ActivityRecommendations({ current, isMobile, cardBg, bor
         </svg>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
+      <div
+        style={
+          isMobile
+            ? { display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }
+            : { display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }
+        }
+        className={!isMobile ? 'hide-scrollbar' : undefined}
+      >
         {items.map((item) => (
-          <div key={item.title} style={{ background: 'var(--bg-secondary)', border: `1px solid ${borderColor}`, borderRadius: '14px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+          <div
+            key={item.title}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: `1px solid ${borderColor}`,
+              borderRadius: '14px',
+              padding: '10px 12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: '10px',
+              minWidth: isMobile ? 0 : '188px',
+              flex: isMobile ? 'unset' : '0 0 188px',
+            }}
+          >
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {item.icon} {item.title}
