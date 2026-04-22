@@ -18,7 +18,7 @@ function normalizeGeoData(data) {
 }
 
 export default function Dashboard() {
-  const { stations, stationTemps, lastUpdated, amphoeData, tmdAvailable } = useContext(WeatherContext);
+  const { stations, stationTemps, lastUpdated, amphoeData, tmdAvailable, darkMode } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
