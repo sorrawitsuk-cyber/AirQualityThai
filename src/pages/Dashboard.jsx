@@ -345,7 +345,7 @@ export default function Dashboard() {
   );
 
   const desktopMetricsGrid = (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '15px', minWidth: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '15px', minWidth: 0 }}>
       <div style={{ background: cardBg, borderRadius: '20px', padding: '16px', border: `1px solid ${borderColor}`, minHeight: '150px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: subTextColor, fontWeight: 'bold', fontSize: '0.95rem' }}>
           <span style={{ fontSize: '1.2rem' }}>☀️</span> รังสี UV
@@ -489,41 +489,33 @@ export default function Dashboard() {
 
   const desktopOverviewLayout = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.08fr) minmax(300px, 0.9fr) minmax(0, 1.04fr)', gap: '20px', width: '100%', alignItems: 'stretch' }}>
-        {heroCard}
-        {desktopMetricsGrid}
-        {hourlyForecastCard}
-      </div>
-
+      {heroCard}
+      {desktopMetricsGrid}
+      {hourlyForecastCard}
       {briefingCard}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.08fr) minmax(260px, 0.68fr) minmax(0, 1.24fr)', gap: '20px', width: '100%', alignItems: 'stretch' }}>
-        <ActivityRecommendations
-          current={current}
-          chartData={chartData}
-          isMobile={isMobile}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          subTextColor={subTextColor}
-        />
-        <div style={{ minWidth: 0, display: 'flex' }}>
-          <SunriseSunsetArc
-            current={current}
-            cardBg={cardBg}
-            borderColor={borderColor}
-            textColor={textColor}
-            subTextColor={subTextColor}
-            isMobile={isMobile}
-          />
-        </div>
-        <WeatherRadar
-          coords={coords}
-          isMobile={isMobile}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          textColor={textColor}
-        />
-      </div>
+      <ActivityRecommendations
+        current={current}
+        chartData={chartData}
+        isMobile={isMobile}
+        cardBg={cardBg}
+        borderColor={borderColor}
+        subTextColor={subTextColor}
+      />
+      <SunriseSunsetArc
+        current={current}
+        cardBg={cardBg}
+        borderColor={borderColor}
+        textColor={textColor}
+        subTextColor={subTextColor}
+        isMobile={isMobile}
+      />
+      <WeatherRadar
+        coords={coords}
+        isMobile={isMobile}
+        cardBg={cardBg}
+        borderColor={borderColor}
+        textColor={textColor}
+      />
     </div>
   );
 
