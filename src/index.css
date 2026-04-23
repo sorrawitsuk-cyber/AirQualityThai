@@ -12,24 +12,26 @@
 
 /* ตั้งค่า CSS Variables (Custom Properties) สำหรับการจัดการ Theme อย่างสะอาด */
 :root {
-  /* ☀️ Light: vivid sky-blue pastel */
-  --bg-app: #b8dcff;
+  /* ☀️ Light: Clean, bright pastel aesthetic */
+  --topbar-height: 64px;
+  --bg-app: #f4f8fb;
   --bg-card: #ffffff;
-  --text-main: #0c1f3d;
-  --text-sub: #1a5c8a;
-  --border-color: #60c4f8;
-  --bg-secondary: #ddf0ff;
-  --bg-tertiary: #b8dcff;
-  --bg-overlay: #d4ebff;
+  --text-main: #1e293b;
+  --text-sub: #64748b;
+  --border-color: #e2e8f0;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-overlay: rgba(244, 248, 251, 0.4);
   --bg-overlay-heavy: rgba(255, 255, 255, 0.90);
   --bg-success: #dcfce7;
   --bg-danger: #fee2e2;
   --bg-warning: #ffedd5;
-  --bg-nav-blur: rgba(184, 220, 255, 0.97);
+  --bg-nav-blur: rgba(255, 255, 255, 0.95);
 }
 
 body.dark-theme {
   /* 🌙 Dark: vivid midnight blue — ฟ้อนสว่าง กราฟสดใส */
+  --topbar-height: 64px;
   --bg-app: #060f1e;
   --bg-card: #0d1c38;
   --text-main: #f0f9ff;

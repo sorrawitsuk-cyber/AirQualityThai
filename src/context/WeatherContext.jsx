@@ -18,7 +18,7 @@ export const WeatherProvider = ({ children }) => {
 
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
-    return savedTheme ? savedTheme === 'dark' : true; 
+    return savedTheme ? savedTheme === 'dark' : false; // Default to Light Mode
   });
 
   useEffect(() => {

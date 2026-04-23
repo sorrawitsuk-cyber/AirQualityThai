@@ -11,7 +11,9 @@
       "WebFetch(domain:www.tmd.go.th)",
       "WebFetch(domain:www.disaster.go.th)",
       "WebFetch(domain:www.gdacs.org)",
-      "WebFetch(domain:fire.gistda.or.th)"
+      "WebFetch(domain:fire.gistda.or.th)",
+      "Bash(npx vite *)",
+      "Bash(start cmd *)"
     ]
   }
 }
