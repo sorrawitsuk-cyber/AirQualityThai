@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 
-export default function WeatherRadar({ coords, isMobile, cardBg, borderColor, textColor }) {
+export default function WeatherRadar({ coords, isMobile, cardBg, borderColor, textColor, frameHeightOverride, title = 'เรดาร์สภาพอากาศ' }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const defaultOverlay = 'radar';
   const defaultProduct = 'radar';
-  const frameHeight = isMobile ? '340px' : '540px';
+  const frameHeight = frameHeightOverride || (isMobile ? '340px' : '540px');
   
   return (
     <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0, width: '100%', position: 'relative', isolation: 'isolate' }}>
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.2rem' }}>⛈️</span> เรดาร์สภาพอากาศ
+            <span style={{ fontSize: '1.2rem' }}>⛈️</span> {title}
         </h3>
         <div style={{ width: '100%', height: frameHeight, minHeight: frameHeight, borderRadius: '12px', overflow: 'hidden', position: 'relative', isolation: 'isolate', contain: 'layout paint', background: 'var(--bg-secondary)' }}>
             {!iframeLoaded && (

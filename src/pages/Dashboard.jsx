@@ -314,6 +314,32 @@ export default function Dashboard() {
   const now = new Date();
   const thaiDate = now.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const thaiTime = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  const currentRainProb = Math.round(current?.rainProb || chartData?.[0]?.rain || 0);
+  const currentRainAmount = chartData?.[0]?.rainAmount || current?.precipitation || 0;
+  const heroStatusChips = [
+    { label: 'โอกาสฝนวันนี้', value: `${currentRainProb}%`, tone: '#2563eb' },
+    { label: 'คุณภาพอากาศ', value: aqiTheme.text, tone: current?.pm25 > 37.5 ? '#f97316' : current?.pm25 > 25 ? '#eab308' : '#22c55e' },
+    { label: 'รู้สึกเหมือน', value: `${Math.round(current?.feelsLike || 0)}°C`, tone: current?.feelsLike >= 38 ? '#ef4444' : '#0ea5e9' },
+  ];
+  const desktopHeroMetrics = [
+    { label: 'อุณหภูมิ', value: `${Math.round(current?.temp || 0)}°C`, note: daily?.temperature_2m_max?.[0] ? `สูงสุด ${Math.round(daily.temperature_2m_max[0])}°` : 'อัปเดตสด', icon: '🌡️', tone: '#f97316' },
+    { label: 'รู้สึกเหมือน', value: `${Math.round(current?.feelsLike || 0)}°C`, note: isHot ? 'ร้อนอบอ้าว' : 'สมดุลกำลังดี', icon: '🥵', tone: '#fb7185' },
+    { label: 'โอกาสฝน', value: `${currentRainProb}%`, note: currentRainAmount > 0 ? `คาด ${Number(currentRainAmount).toFixed(1)} มม.` : 'ยังไม่มีฝนตก', icon: '🌧️', tone: '#2563eb' },
+    { label: 'ลม', value: `${Math.round(current?.windSpeed || 0)} km/h`, note: current?.windDirection != null ? `ทิศ ${current.windDirection}°` : 'ลมค่อนข้างนิ่ง', icon: '💨', tone: '#0ea5e9' },
+    { label: 'PM2.5', value: `${Math.round(current?.pm25 || 0)}`, note: aqiTheme.text, icon: '😷', tone: current?.pm25 > 37.5 ? '#f97316' : current?.pm25 > 25 ? '#eab308' : '#22c55e' },
+    { label: 'ความชื้น', value: `${Math.round(current?.humidity || 0)}%`, note: current?.humidity > 75 ? 'ค่อนข้างชื้น' : 'ค่อนข้างสบาย', icon: '💧', tone: '#38bdf8' },
+  ];
+  const nationalHighlights = [
+    { label: 'ร้อนสุด', value: top5Heat?.[0] ? `${top5Heat[0].name} ${top5Heat[0].val}°` : '-', tone: '#ef4444' },
+    { label: 'ฝุ่นสูงสุด', value: top5PM25?.[0] ? `${top5PM25[0].name} ${top5PM25[0].val}` : '-', tone: '#f97316' },
+    { label: 'ฝนสูงสุด', value: top5Rain?.[0] ? `${top5Rain[0].name} ${top5Rain[0].val}%` : '-', tone: '#2563eb' },
+  ];
+  const surfaceCardStyle = {
+    background: `linear-gradient(180deg, color-mix(in srgb, ${cardBg} 92%, #ffffff), color-mix(in srgb, ${cardBg} 88%, var(--bg-secondary)))`,
+    border: `1px solid ${borderColor}`,
+    borderRadius: '24px',
+    boxShadow: isMobile ? '0 14px 28px rgba(2, 6, 23, 0.08)' : '0 20px 40px rgba(2, 6, 23, 0.08)',
+  };
 
   const scrollToTop = () => {
     mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -321,23 +347,24 @@ export default function Dashboard() {
 
   const heroCard = (
     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-      <div style={{ background: bgGradient, borderRadius: isMobile ? '24px' : '30px', padding: isMobile ? '20px' : '28px 24px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', transition: 'background 0.5s ease', position: 'relative', flex: 1, minHeight: isMobile ? 'auto' : '318px' }}>
+      <div style={{ background: bgGradient, backgroundImage: !isMobile ? `linear-gradient(90deg, rgba(9, 20, 45, 0.18), rgba(9, 20, 45, 0.08)), url("https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=1400&q=80")` : bgGradient, backgroundSize: !isMobile ? 'cover' : undefined, backgroundPosition: !isMobile ? 'center' : undefined, borderRadius: isMobile ? '24px' : '30px', padding: isMobile ? '20px' : '28px 24px', color: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', transition: 'background 0.5s ease', position: 'relative', flex: 1, minHeight: isMobile ? 'auto' : '318px', overflow: 'hidden' }}>
+        {!isMobile && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04) 35%, rgba(15,23,42,0.18) 100%)' }} />}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '5px' }}>
-          <div>
+          <div style={{ position: 'relative', zIndex: 1 }}>
             <h2 style={{ margin: 0, fontSize: isMobile ? '1.3rem' : '1.8rem', fontWeight: '900', lineHeight: 1.2 }}>{locationName}</h2>
             <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '2px' }}>{thaiDate} • {thaiTime} น.</div>
           </div>
-          <button onClick={() => setShowFilter(!showFilter)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', flexShrink: 0, backdropFilter: 'blur(5px)' }}>
+          <button onClick={() => setShowFilter(!showFilter)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', flexShrink: 0, backdropFilter: 'blur(5px)', position: 'relative', zIndex: 1 }}>
             <span style={{ fontSize: '1.2rem' }}>{showFilter ? '✖️' : '🔍'}</span>
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', alignSelf: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', alignSelf: 'center', position: 'relative', zIndex: 1 }}>
           <span style={{ fontSize: isMobile ? '4.5rem' : '5.5rem', lineHeight: 1, animation: 'pulseGlow 3s infinite ease-in-out' }}>{weatherIcon}</span>
           <span style={{ fontSize: isMobile ? '5rem' : '6.5rem', fontWeight: '900', lineHeight: 1 }}>{Math.round(current?.temp || 0)}°</span>
         </div>
-        <div style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 'bold', marginTop: '10px', alignSelf: 'center' }}>{weatherText}</div>
-        <div style={{ fontSize: '0.9rem', opacity: 0.9, alignSelf: 'center', marginTop: '6px', background: 'rgba(0,0,0,0.15)', padding: '4px 12px', borderRadius: '20px' }}>
+        <div style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 'bold', marginTop: '10px', alignSelf: 'center', position: 'relative', zIndex: 1 }}>{weatherText}</div>
+        <div style={{ fontSize: '0.9rem', opacity: 0.9, alignSelf: 'center', marginTop: '6px', background: 'rgba(0,0,0,0.15)', padding: '4px 12px', borderRadius: '20px', position: 'relative', zIndex: 1 }}>
           รู้สึกเหมือน {Math.round(current?.feelsLike || 0)}°C <span style={{ opacity: 0.5, margin: '0 5px' }}>|</span> สูงสุด {Math.round(daily?.temperature_2m_max?.[0] || current?.temp)}° <span style={{ opacity: 0.5, margin: '0 5px' }}>|</span> ต่ำสุด {Math.round(daily?.temperature_2m_min?.[0] || current?.temp)}°
         </div>
       </div>
@@ -487,35 +514,106 @@ export default function Dashboard() {
     </div>
   );
 
+  const desktopShowcaseLayout = (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.75fr) minmax(330px, 0.95fr)', gap: '20px', width: '100%', alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+        <div style={{ ...surfaceCardStyle, padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '1.25rem', color: textColor, fontWeight: '900' }}>ภาพรวมวันนี้</div>
+              <div style={{ fontSize: '0.78rem', color: subTextColor, marginTop: '5px', lineHeight: 1.55 }}>
+                สรุปอากาศปัจจุบันของ {locationName} พร้อมเรดาร์ฝนและจุดเด่นระดับประเทศในหน้าเดียว
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {heroStatusChips.map((chip) => (
+                <div key={chip.label} style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '9px 12px', borderRadius: '16px', border: `1px solid ${chip.tone}44`, background: `color-mix(in srgb, ${chip.tone} 10%, ${cardBg})`, minWidth: '118px' }}>
+                  <span style={{ fontSize: '0.66rem', color: subTextColor, fontWeight: 'bold' }}>{chip.label}</span>
+                  <span style={{ fontSize: '0.92rem', color: chip.tone, fontWeight: '900' }}>{chip.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {heroCard}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '12px', marginTop: '16px' }}>
+            {desktopHeroMetrics.map((metric) => (
+              <div key={metric.label} style={{ background: 'color-mix(in srgb, var(--bg-secondary) 82%, white)', border: `1px solid ${borderColor}`, borderRadius: '18px', padding: '14px 14px 15px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.77rem', color: subTextColor, fontWeight: 'bold' }}>
+                  <span style={{ fontSize: '1rem' }}>{metric.icon}</span>
+                  <span>{metric.label}</span>
+                </div>
+                <div style={{ fontSize: '1.8rem', color: textColor, fontWeight: '900', marginTop: '10px', lineHeight: 1 }}>{metric.value}</div>
+                <div style={{ fontSize: '0.7rem', color: metric.tone, fontWeight: 'bold', marginTop: '8px' }}>{metric.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {hourlyForecastCard}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+        <div style={{ ...surfaceCardStyle, padding: '18px' }}>
+          <WeatherRadar
+            coords={coords}
+            isMobile={false}
+            cardBg="transparent"
+            borderColor="transparent"
+            textColor={textColor}
+            frameHeightOverride="312px"
+            title="เรดาร์ฝน"
+          />
+        </div>
+
+        <div style={{ ...surfaceCardStyle, padding: '18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+            <div style={{ fontSize: '1rem', color: textColor, fontWeight: '900' }}>สถานการณ์เด่น</div>
+            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 'bold' }}>อัปเดตล่าสุด</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {(alertBanner ? [{ title: alertBanner.text, tone: alertBanner.color, note: 'คำเตือนสำหรับพื้นที่ปัจจุบัน' }] : [
+              { title: `PM2.5 ${aqiTheme.text}`, tone: current?.pm25 > 37.5 ? '#f97316' : '#22c55e', note: `ค่าปัจจุบัน ${Math.round(current?.pm25 || 0)} µg/m³` },
+              { title: weatherText, tone: isHot ? '#ef4444' : isRaining ? '#2563eb' : '#0ea5e9', note: `รู้สึกเหมือน ${Math.round(current?.feelsLike || 0)}°C` },
+            ]).concat(nationalHighlights.map((item) => ({ title: item.label, tone: item.tone, note: item.value }))).map((item, idx) => (
+              <div key={`${item.title}-${idx}`} style={{ padding: '12px 14px', borderRadius: '18px', border: `1px solid ${item.tone}35`, background: `color-mix(in srgb, ${item.tone} 8%, ${cardBg})` }}>
+                <div style={{ fontSize: '0.78rem', color: item.tone, fontWeight: '900' }}>{item.title}</div>
+                <div style={{ fontSize: '0.78rem', color: textColor, marginTop: '5px', lineHeight: 1.5 }}>{item.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {briefingCard}
+      </div>
+    </div>
+  );
+
   const desktopOverviewLayout = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minWidth: 0 }}>
-      {heroCard}
-      {desktopMetricsGrid}
-      {hourlyForecastCard}
-      {briefingCard}
-      <ActivityRecommendations
-        current={current}
-        chartData={chartData}
-        isMobile={isMobile}
-        cardBg={cardBg}
-        borderColor={borderColor}
-        subTextColor={subTextColor}
-      />
-      <SunriseSunsetArc
-        current={current}
-        cardBg={cardBg}
-        borderColor={borderColor}
-        textColor={textColor}
-        subTextColor={subTextColor}
-        isMobile={isMobile}
-      />
-      <WeatherRadar
-        coords={coords}
-        isMobile={isMobile}
-        cardBg={cardBg}
-        borderColor={borderColor}
-        textColor={textColor}
-      />
+      {desktopShowcaseLayout}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)', gap: '20px', alignItems: 'start' }}>
+        <ActivityRecommendations
+          current={current}
+          chartData={chartData}
+          isMobile={isMobile}
+          cardBg={cardBg}
+          borderColor={borderColor}
+          subTextColor={subTextColor}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <SunriseSunsetArc
+            current={current}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            textColor={textColor}
+            subTextColor={subTextColor}
+            isMobile={isMobile}
+          />
+          {desktopMetricsGrid}
+        </div>
+      </div>
     </div>
   );
 
