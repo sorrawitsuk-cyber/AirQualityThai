@@ -3,6 +3,7 @@ import { WeatherContext } from '../context/WeatherContext';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, AreaChart, Area } from 'recharts';
 import { useWeatherData } from '../hooks/useWeatherData';
 import heroBg from '../assets/hero.png';
+import TopStats from '../components/Dashboard/TopStats';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -22,7 +23,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function AIPage() {
-  const { stations, darkMode } = useContext(WeatherContext);
+  const { stations, stationTemps, stationMaxYesterday } = useContext(WeatherContext);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const { weatherData, loadingWeather, fetchWeatherByCoords } = useWeatherData();
   const [trendTab, setTrendTab] = useState('temp');
@@ -50,11 +51,52 @@ export default function AIPage() {
   const borderColor = 'var(--border-color)';
   const subTextColor = 'var(--text-sub)';
 
+  const { top5Heat, top5Cool, top5PM25, top5Rain, top5HeatY, top5CoolY, top5PM25Y, top5RainY } = useMemo(() => {
+    const heat = [], cool = [], pm25 = [], rain = [];
+    const heatY = [], coolY = [], pm25Y = [], rainY = [];
+
+    (stations || []).forEach((st) => {
+      const name = st.areaTH?.replace('จังหวัด', '') || '-';
+      const live = stationTemps?.[st.stationID] || {};
+      const temp = Math.round(live.temp ?? -99);
+      const pmVal = Math.round(st.AQILast?.PM25?.value || 0);
+      const rainVal = Math.round(live.rainProb || 0);
+      const y = stationMaxYesterday?.[st.stationID] || {};
+      const yTemp = y.temp !== undefined ? Math.round(y.temp) : -99;
+      const yPm = y.pm25 !== undefined ? Math.round(y.pm25) : 0;
+      const yRain = y.rain !== undefined ? Math.round(y.rain) : 0;
+
+      if (temp !== -99) {
+        heat.push({ name, val: temp });
+        cool.push({ name, val: temp });
+      }
+      if (pmVal > 0) pm25.push({ name, val: pmVal });
+      if (rainVal > 0) rain.push({ name, val: rainVal });
+      if (yTemp !== -99) {
+        heatY.push({ name, val: yTemp });
+        coolY.push({ name, val: yTemp });
+      }
+      if (yPm > 0) pm25Y.push({ name, val: yPm });
+      if (yRain > 0) rainY.push({ name, val: yRain });
+    });
+
+    return {
+      top5Heat: heat.sort((a, b) => b.val - a.val).slice(0, 5),
+      top5Cool: cool.sort((a, b) => a.val - b.val).slice(0, 5),
+      top5PM25: pm25.sort((a, b) => b.val - a.val).slice(0, 5),
+      top5Rain: rain.sort((a, b) => b.val - a.val).slice(0, 5),
+      top5HeatY: heatY.sort((a, b) => b.val - a.val).slice(0, 5),
+      top5CoolY: coolY.sort((a, b) => a.val - b.val).slice(0, 5),
+      top5PM25Y: pm25Y.sort((a, b) => b.val - a.val).slice(0, 5),
+      top5RainY: rainY.sort((a, b) => b.val - a.val).slice(0, 5),
+    };
+  }, [stations, stationTemps, stationMaxYesterday]);
+
   if (loadingWeather || !weatherData) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: textColor }}>
         <div className="loading-spinner" />
-        <div style={{ marginTop: '16px', fontWeight: 'bold' }}>กำลังให้ AI ประมวลผล...</div>
+        <div style={{ marginTop: '16px', fontWeight: 'bold' }}>กำลังประมวลผลข้อมูลวิเคราะห์...</div>
       </div>
     );
   }
@@ -110,20 +152,37 @@ export default function AIPage() {
 
   return (
     <div style={{ padding: isMobile ? '16px' : '24px', background: 'var(--bg-app)', minHeight: '100%', color: textColor, fontFamily: 'Sarabun, sans-serif' }} className="hide-scrollbar">
-      {/* Greeting Header */}
+      {/* Analysis Header */}
       <div style={{ background: cardBg, borderRadius: '24px', padding: isMobile ? '20px' : '24px', display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #a855f7)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 'bold', flexShrink: 0, boxShadow: '0 8px 16px rgba(99, 102, 241, 0.3)' }}>AI</div>
+        <div style={{ width: '60px', height: '60px', borderRadius: '18px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 'bold', flexShrink: 0, boxShadow: '0 8px 16px rgba(14, 165, 233, 0.3)' }}>📊</div>
         <div>
-          <h2 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.3rem', color: '#4f46e5', fontWeight: '800' }}>สวัสดีครับ! ผมคือ Thai Weather AI</h2>
-          <p style={{ margin: '4px 0 12px 0', fontSize: '0.9rem', color: subTextColor }}>ผมช่วยวิเคราะห์สภาพอากาศและให้คำแนะนำที่เหมาะกับคุณ</p>
+          <h2 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.3rem', color: '#38bdf8', fontWeight: '800' }}>ศูนย์วิเคราะห์สถิติและสภาพอากาศเชิงลึก</h2>
+          <p style={{ margin: '4px 0 12px 0', fontSize: '0.9rem', color: subTextColor }}>รวมสถิติเมื่อวาน แนวโน้มรายชั่วโมง ความเสี่ยง และคำแนะนำไว้ในหน้าเดียว</p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {['สภาพอากาศวันนี้เป็นอย่างไร?', 'พรุ่งนี้ฝนจะตกไหม?', 'เหมาะกับการออกกำลังกายหรือไม่?'].map(q => (
               <button key={q} style={{ background: 'var(--bg-secondary)', border: `1px solid ${borderColor}`, borderRadius: '20px', padding: '6px 14px', fontSize: '0.75rem', color: '#0ea5e9', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}>
-                <span style={{ opacity: 0.7 }}>🪄</span> {q}
+                <span style={{ opacity: 0.7 }}>📌</span> {q}
               </button>
             ))}
           </div>
         </div>
+      </div>
+
+      <div style={{ marginBottom: '24px' }}>
+        <TopStats
+          top5Heat={top5Heat}
+          top5Cool={top5Cool}
+          top5PM25={top5PM25}
+          top5Rain={top5Rain}
+          top5HeatY={top5HeatY}
+          top5CoolY={top5CoolY}
+          top5PM25Y={top5PM25Y}
+          top5RainY={top5RainY}
+          isMobile={isMobile}
+          cardBg={cardBg}
+          borderColor={borderColor}
+          textColor={textColor}
+        />
       </div>
 
       {/* 3 Columns Layout */}
@@ -234,10 +293,10 @@ export default function AIPage() {
         {/* ================= COLUMN 2 ================= */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* AI วิเคราะห์ */}
+          {/* วิเคราะห์รายช่วงเวลา */}
           <div style={{ background: cardBg, borderRadius: '24px', padding: '24px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
              <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
-               <span>🧠</span> AI วิเคราะห์สภาพอากาศ
+               <span>🧠</span> วิเคราะห์สภาพอากาศรายช่วงเวลา
              </h3>
              <div style={{ fontSize: '0.8rem', color: subTextColor, marginBottom: '16px' }}>ประเมินจากข้อมูลล่าสุด</div>
              
@@ -307,9 +366,9 @@ export default function AIPage() {
              </div>
           </div>
 
-          {/* AI ระยะยาว */}
+          {/* วิเคราะห์ระยะยาว */}
           <div style={{ background: cardBg, borderRadius: '24px', padding: '24px', border: `1px solid ${borderColor}`, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-             <h3 style={{ margin: '0 0 12px 0', fontSize: '1.05rem', fontWeight: '800' }}>AI วิเคราะห์ระยะยาว</h3>
+             <h3 style={{ margin: '0 0 12px 0', fontSize: '1.05rem', fontWeight: '800' }}>วิเคราะห์ระยะยาว</h3>
              <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                <span>🎯</span> แนวโน้ม 7 วันข้างหน้า
              </div>

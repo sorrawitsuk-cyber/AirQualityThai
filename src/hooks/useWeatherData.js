@@ -25,7 +25,7 @@ export function useWeatherData() {
   const fetchWeatherByCoords = useCallback(async (lat, lon) => {
     try {
       setLoadingWeather(true);
-      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,visibility&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,pm2_5,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,sunrise,sunset,uv_index_max,precipitation_probability_max,wind_speed_10m_max&timezone=Asia%2FBangkok`;
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,visibility&minutely_15=precipitation,precipitation_probability&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,pm2_5,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,sunrise,sunset,uv_index_max,precipitation_probability_max,wind_speed_10m_max&forecast_days=2&timezone=Asia%2FBangkok`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=Asia%2FBangkok`;
 
       const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
@@ -61,6 +61,11 @@ export function useWeatherData() {
             pm25: aData.hourly.pm2_5,
             wind_speed_10m: wData.hourly.wind_speed_10m,
             relative_humidity_2m: wData.hourly.relative_humidity_2m,
+          },
+          minutely: {
+            time: wData.minutely_15?.time || [],
+            precipitation_probability: wData.minutely_15?.precipitation_probability || [],
+            precipitation: wData.minutely_15?.precipitation || [],
           },
           daily: {
             time: wData.daily.time,
