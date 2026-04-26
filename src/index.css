@@ -27,6 +27,9 @@
   --bg-danger: #fee2e2;
   --bg-warning: #ffedd5;
   --bg-nav-blur: rgba(255, 255, 255, 0.95);
+  --analysis-glass: rgba(255, 255, 255, 0.62);
+  --analysis-score-bg: rgba(255, 255, 255, 0.50);
+  --analysis-rank-badge: rgba(255, 255, 255, 0.66);
 }
 
 body.dark-theme {
@@ -45,6 +48,9 @@ body.dark-theme {
   --bg-danger: #3d0808;
   --bg-warning: #3a1005;
   --bg-nav-blur: rgba(13, 28, 56, 0.95);
+  --analysis-glass: rgba(15, 30, 54, 0.82);
+  --analysis-score-bg: rgba(15, 30, 54, 0.78);
+  --analysis-rank-badge: rgba(14, 165, 233, 0.18);
 }
 
 html {

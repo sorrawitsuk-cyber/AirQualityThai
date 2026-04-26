@@ -1,18 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle,
   Bell,
   ChevronLeft,
   ChevronRight,
   CloudRain,
   ExternalLink,
-  Flame,
   Newspaper,
   RefreshCw,
   Search,
   ShieldAlert,
   ThermometerSun,
-  Waves,
 } from 'lucide-react';
 import LoadingScreen from '../components/LoadingScreen';
 
@@ -21,11 +18,6 @@ const categoryOptions = [
   { id: 'warning', label: 'เตือนภัย', icon: ShieldAlert, color: '#ef4444' },
   { id: 'news', label: 'ข่าวสาร', icon: Newspaper, color: '#475569' },
   { id: 'weather', label: 'สภาพอากาศ', icon: CloudRain, color: '#0ea5e9' },
-  { id: 'storm', label: 'พายุ', icon: Waves, color: '#2563eb' },
-  { id: 'rain', label: 'ฝนตกหนัก', icon: CloudRain, color: '#2563eb' },
-  { id: 'flood', label: 'น้ำท่วม', icon: Waves, color: '#0f766e' },
-  { id: 'quake', label: 'แผ่นดินไหว', icon: AlertTriangle, color: '#d97706' },
-  { id: 'fire', label: 'ไฟป่า', icon: Flame, color: '#dc2626' },
   { id: 'climate', label: 'Climate', icon: ThermometerSun, color: '#16a34a' },
 ];
 
@@ -507,6 +499,56 @@ function includesQuery(item, query) {
   return haystack.includes(query.toLowerCase());
 }
 
+function buildWeatherPhenomena(items = []) {
+  const text = items.map((item) => `${item.title || ''} ${item.summary || ''} ${item.rawSummary || ''} ${item.label || ''}`).join(' ');
+  const checks = [
+    {
+      title: 'ฝนฟ้าคะนองและลมกระโชกแรง',
+      detail: 'พบสัญญาณจากข่าวพยากรณ์รายวัน เหมาะกับการเฝ้าระวังช่วงบ่ายถึงค่ำและการเดินทางกลางแจ้ง',
+      color: '#2563eb',
+      pattern: /ฝนฟ้าคะนอง|ลมกระโชก|thundershower|gust/i,
+    },
+    {
+      title: 'ฝนตกหนักเฉพาะพื้นที่',
+      detail: 'ควรดูจังหวัดที่เกี่ยวข้องและเรดาร์ฝนใกล้เวลาเดินทาง เพราะมักเกิดเป็นหย่อม ไม่เท่ากันทุกพื้นที่',
+      color: '#0ea5e9',
+      pattern: /ฝนตกหนัก|ฝนหนัก|heavy rain|isolated heavy/i,
+    },
+    {
+      title: 'มรสุมและลมประจำฤดู',
+      detail: 'มีผลต่อฝนและคลื่นลมหลายวันต่อเนื่อง โดยเฉพาะภาคใต้ อ่าวไทย และทะเลอันดามัน',
+      color: '#0f766e',
+      pattern: /มรสุม|monsoon|ลมตะวันตกเฉียงใต้|ลมตะวันออกเฉียงใต้/i,
+    },
+    {
+      title: 'คลื่นลมทะเล',
+      detail: 'เหมาะกับการแจ้งเตือนเดินเรือ ท่องเที่ยวทะเล และกิจกรรมชายฝั่ง ถ้ามีคลื่นสูงควรเลี่ยงออกเรือเล็ก',
+      color: '#0284c7',
+      pattern: /คลื่นสูง|ทะเลมีคลื่น|อ่าวไทย|อันดามัน|wave/i,
+    },
+    {
+      title: 'มวลอากาศเย็นหรือความกดอากาศสูง',
+      detail: 'มักเป็นตัวกระตุ้นฝนฟ้าคะนอง ลมกระโชกแรง หรืออากาศแปรปรวนในไทยตอนบน',
+      color: '#7c3aed',
+      pattern: /ความกดอากาศสูง|มวลอากาศเย็น|ประเทศจีน|high pressure/i,
+    },
+    {
+      title: 'ฝุ่น PM2.5 และหมอกควัน',
+      detail: 'ถ้าพบคู่กับอากาศนิ่งหรือช่วงแห้ง ควรเฝ้าระวังคุณภาพอากาศ โดยเฉพาะภาคเหนือและเมืองใหญ่',
+      color: '#f97316',
+      pattern: /PM2\.5|ฝุ่น|หมอกควัน|haze|dust/i,
+    },
+    {
+      title: 'พายุหมุนเขตร้อน',
+      detail: 'เป็นปรากฏการณ์ที่ต้องติดตามเส้นทางและประกาศเตือนแบบต่อเนื่อง เพราะผลกระทบเปลี่ยนเร็ว',
+      color: '#ef4444',
+      pattern: /พายุ|ดีเปรสชัน|โซนร้อน|ไต้ฝุ่น|cyclone|typhoon|tropical storm/i,
+    },
+  ];
+
+  return checks.filter((item) => item.pattern.test(text)).slice(0, 5);
+}
+
 function openExternal(url) {
   if (!url || typeof window === 'undefined') return;
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -649,6 +691,12 @@ export default function NewsPage() {
   const filteredGlobalStories = useMemo(
     () => filteredStories.filter((item) => item.scope === 'global'),
     [filteredStories],
+  );
+
+  const showClimatePanel = activeCategory === 'all' || activeCategory === 'climate';
+  const detectedPhenomena = useMemo(
+    () => buildWeatherPhenomena([...normalizedAlerts, ...normalizedStories]),
+    [normalizedAlerts, normalizedStories],
   );
 
   const heroItems = useMemo(() => {
@@ -1023,18 +1071,19 @@ export default function NewsPage() {
             )}
           </Panel>
 
-          <Panel style={{ padding: 18, background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, var(--bg-card) 44%, rgba(249, 115, 22, 0.08) 100%)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.05fr) minmax(340px, 0.95fr)', gap: 18, alignItems: 'stretch' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ width: 42, height: 42, borderRadius: 16, background: 'rgba(14, 165, 233, 0.14)', color: '#0284c7', display: 'grid', placeItems: 'center' }}>
-                    <ThermometerSun size={21} />
-                  </span>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900 }}>ENSO: เอลนีโญ / ลานีญา</h2>
-                    <div style={{ color: 'var(--text-sub)', fontSize: '0.76rem', marginTop: 3 }}>{ensoOutlook.sourceNote}</div>
+          {showClimatePanel && (
+            <Panel style={{ padding: 18, background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, var(--bg-card) 44%, rgba(249, 115, 22, 0.08) 100%)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.05fr) minmax(340px, 0.95fr)', gap: 18, alignItems: 'stretch' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ width: 42, height: 42, borderRadius: 16, background: 'rgba(14, 165, 233, 0.14)', color: '#0284c7', display: 'grid', placeItems: 'center' }}>
+                      <ThermometerSun size={21} />
+                    </span>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900 }}>ENSO: เอลนีโญ / ลานีญา</h2>
+                      <div style={{ color: 'var(--text-sub)', fontSize: '0.76rem', marginTop: 3 }}>{ensoOutlook.sourceNote}</div>
+                    </div>
                   </div>
-                </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
                   {[
@@ -1047,6 +1096,23 @@ export default function NewsPage() {
                       <div style={{ color, fontWeight: 950, fontSize: '1rem', marginTop: 3 }}>{value}</div>
                     </div>
                   ))}
+                  {detectedPhenomena.length > 0 && (
+                    <div style={{ marginTop: 16, border: '1px solid rgba(14, 165, 233, 0.18)', background: 'rgba(14, 165, 233, 0.06)', borderRadius: 18, padding: 14 }}>
+                      <div style={{ fontWeight: 950, marginBottom: 4 }}>ปรากฏการณ์สภาพอากาศที่พบในข่าวตอนนี้</div>
+                      <div style={{ color: 'var(--text-sub)', fontSize: '0.76rem', marginBottom: 10 }}>ดึงจากคำสำคัญในประกาศและข่าวล่าสุด เพื่อช่วยแยกว่าควรจับตาเรื่องใด</div>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {detectedPhenomena.map((item) => (
+                          <div key={item.title} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr)', gap: 10, alignItems: 'start', color: 'var(--text-sub)', lineHeight: 1.55, fontSize: '0.82rem' }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 999, background: item.color, marginTop: 8, boxShadow: `0 0 0 4px ${item.color}18` }} />
+                            <span>
+                              <strong style={{ display: 'block', color: 'var(--text-main)', fontSize: '0.86rem', marginBottom: 2 }}>{item.title}</strong>
+                              {item.detail}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <p style={{ color: 'var(--text-sub)', lineHeight: 1.75, margin: '14px 0 0' }}>{ensoOutlook.summary}</p>
@@ -1096,8 +1162,9 @@ export default function NewsPage() {
                   </div>
                 </div>
               </div>
-            </div>
-          </Panel>
+              </div>
+            </Panel>
+          )}
 
           {selectedItem && (
             <Panel ref={detailRef} style={{ padding: 18, borderColor: `${selectedItem.color}40` }}>

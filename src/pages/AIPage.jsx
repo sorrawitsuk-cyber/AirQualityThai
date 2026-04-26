@@ -179,7 +179,7 @@ const GistdaBrief = ({ summary, isMobile }) => {
 const OverallScore = ({ score, meta, title, summary, details, isMobile }) => (
   <div style={{
     alignItems: isMobile ? 'stretch' : 'center',
-    background: `linear-gradient(135deg, ${meta.color}18, rgba(255,255,255,0.48))`,
+    background: `linear-gradient(135deg, ${meta.color}18, var(--analysis-score-bg))`,
     border: `1px solid ${meta.color}33`,
     borderRadius: '22px',
     display: 'grid',
@@ -207,7 +207,7 @@ const OverallScore = ({ score, meta, title, summary, details, isMobile }) => (
       <div style={{ color: 'var(--text-sub)', fontSize: '0.82rem', lineHeight: 1.62 }}>{summary}</div>
       <div style={{ display: 'grid', gap: '8px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', marginTop: '12px' }}>
         {details.map((item) => (
-          <div key={item.label} style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '10px' }}>
+          <div key={item.label} style={{ background: 'var(--analysis-glass)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '10px' }}>
             <div style={{ color: item.color, fontSize: '0.76rem', fontWeight: 950 }}>{item.label}</div>
             <div style={{ color: 'var(--text-main)', fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.45, marginTop: '4px' }}>{item.text}</div>
           </div>
@@ -604,7 +604,7 @@ export default function AIPage() {
             </p>
           </div>
           <div style={{
-            background: 'rgba(255,255,255,0.48)',
+            background: 'var(--analysis-glass)',
             border: '1px solid var(--border-color)',
             borderRadius: '18px',
             display: 'grid',
@@ -915,7 +915,7 @@ export default function AIPage() {
           <div style={{ display: 'grid', gap: '10px' }}>
             {rankings.risk.map((row, index) => (
               <div key={row.id} style={{ alignItems: 'center', background: row.riskMeta.bg, border: `1px solid ${row.riskMeta.border}`, borderRadius: '16px', display: 'grid', gap: '10px', gridTemplateColumns: '34px 1fr auto', padding: '12px' }}>
-                <span style={{ alignItems: 'center', background: '#ffffff66', borderRadius: 999, color: row.riskMeta.color, display: 'flex', fontSize: '0.78rem', fontWeight: 950, height: 30, justifyContent: 'center', width: 30 }}>{index + 1}</span>
+                <span style={{ alignItems: 'center', background: 'var(--analysis-rank-badge)', borderRadius: 999, color: row.riskMeta.color, display: 'flex', fontSize: '0.78rem', fontWeight: 950, height: 30, justifyContent: 'center', width: 30 }}>{index + 1}</span>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: 'var(--text-main)', fontSize: '0.84rem', fontWeight: 950, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</div>
                   <div style={{ color: 'var(--text-sub)', fontSize: '0.7rem', marginTop: 3 }}>ร้อน {row.feelsLike}° · PM2.5 {row.pm25} · ฝน {row.rain}%</div>
