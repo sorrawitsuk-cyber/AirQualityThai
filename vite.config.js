@@ -2,6 +2,38 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+function makeApiDevPlugin(route, file) {
+  return {
+    name: `api-${route}-dev-middleware`,
+    configureServer(server) {
+      server.middlewares.use(`/api/${route}`, async (req, res) => {
+        try {
+          const mod = await server.ssrLoadModule(`/api/${file}`);
+          const handler = mod?.default;
+          if (typeof handler !== 'function') throw new Error(`api/${file} does not export a default handler`);
+          const headers = {};
+          const bridgeRes = {
+            setHeader(name, value) { headers[name] = value; res.setHeader(name, value); },
+            status(code) { res.statusCode = code; return this; },
+            end(body) { res.end(body); return this; },
+            json(payload) {
+              if (!headers['Content-Type']) res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify(payload));
+              return this;
+            },
+          };
+          await handler(req, bridgeRes);
+        } catch (error) {
+          server.ssrFixStacktrace(error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ error: error?.message || `Failed to load /api/${file}` }));
+        }
+      });
+    },
+  };
+}
+
 function apiNewsDevPlugin() {
   return {
     name: 'api-news-dev-middleware',
@@ -61,6 +93,7 @@ export default defineConfig({
   plugins: [
     react(),
     apiNewsDevPlugin(),
+    makeApiDevPlugin('tmd-wind', 'tmd-wind.js'),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',

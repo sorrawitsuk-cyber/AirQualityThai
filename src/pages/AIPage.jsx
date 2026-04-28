@@ -264,6 +264,10 @@ export default function AIPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [chartMode, setChartMode] = useState('temp');
   const { weatherData, loadingWeather, fetchWeatherByCoords } = useWeatherData();
+  const [windAnalysis, setWindAnalysis] = useState(null);
+  const [windLoading, setWindLoading] = useState(false);
+  const [windError, setWindError] = useState(null);
+  const [windLastFetch, setWindLastFetch] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -283,6 +287,30 @@ export default function AIPage() {
       );
     }
   }, [fetchWeatherByCoords, weatherData]);
+
+  const fetchWindAnalysis = async () => {
+    setWindLoading(true);
+    setWindError(null);
+    try {
+      const res = await fetch('/api/tmd-wind');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setWindAnalysis(data);
+      setWindLastFetch(new Date());
+    } catch (err) {
+      setWindError(err.message);
+    } finally {
+      setWindLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWindAnalysis();
+    const interval = setInterval(fetchWindAnalysis, 3 * 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stationRows = useMemo(() => {
     return (stations || []).map((station) => {
@@ -695,6 +723,164 @@ export default function AIPage() {
             </div>
           </div>
         </div>
+      </Panel>
+
+      {/* ─── Upper Air Wind Analysis (TMD + Gemini) ──────────────────── */}
+      <PhaseLabel>วิเคราะห์ลมชั้นบนและโอกาสฝน</PhaseLabel>
+      <Panel style={{ marginBottom: '18px' }}>
+        <div style={{ alignItems: 'flex-start', display: 'flex', gap: '12px', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap' }}>
+          <SectionTitle
+            icon="🌬️"
+            title="วิเคราะห์กระแสลมชั้นบนรายภูมิภาค"
+            subtitle={`ข้อมูลจาก TMD Marine ทุก 3 ชม. · วิเคราะห์ด้วย Gemini ${windAnalysis?.model || 'gemini-2.0-flash-lite'}`}
+          />
+          <button
+            onClick={fetchWindAnalysis}
+            disabled={windLoading}
+            style={{
+              alignItems: 'center',
+              background: windLoading ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #0ea5e9, #2563eb)',
+              border: 'none',
+              borderRadius: '999px',
+              color: windLoading ? 'var(--text-sub)' : '#fff',
+              cursor: windLoading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              fontSize: '0.74rem',
+              fontWeight: 900,
+              gap: '6px',
+              padding: '8px 14px',
+              flexShrink: 0,
+            }}
+          >
+            {windLoading ? '⏳ กำลังวิเคราะห์...' : '🔄 อัปเดตข้อมูล'}
+          </button>
+        </div>
+
+        {windError && (
+          <div style={{ background: '#ef444415', border: '1px solid #ef444430', borderRadius: '14px', color: '#ef4444', fontSize: '0.78rem', marginBottom: '14px', padding: '12px' }}>
+            ⚠️ ดึงข้อมูลไม่ได้: {windError}
+          </div>
+        )}
+
+        {windLoading && !windAnalysis && (
+          <div style={{ alignItems: 'center', color: 'var(--text-sub)', display: 'flex', fontSize: '0.84rem', gap: '10px', justifyContent: 'center', padding: '32px 0' }}>
+            <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>🌀</span>
+            กำลังดึงข้อมูลลมชั้นบนจาก TMD และวิเคราะห์ด้วย AI...
+          </div>
+        )}
+
+        {windAnalysis && (
+          <>
+            {/* Header stats */}
+            <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', marginBottom: '16px' }}>
+              <div style={{ background: `rgba(59,130,246,0.12)`, border: '1px solid rgba(59,130,246,0.25)', borderRadius: '16px', padding: '12px' }}>
+                <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 800 }}>โอกาสฝนทั่วประเทศ</div>
+                <div style={{ color: '#3b82f6', fontSize: '1.6rem', fontWeight: 950, lineHeight: 1.1, marginTop: '6px' }}>
+                  {windAnalysis.nationalRainChance ?? '–'}%
+                </div>
+              </div>
+              <div style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.22)', borderRadius: '16px', padding: '12px' }}>
+                <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 800 }}>เวลาวิเคราะห์ (UTC)</div>
+                <div style={{ color: '#0ea5e9', fontSize: '1rem', fontWeight: 950, lineHeight: 1.2, marginTop: '6px' }}>
+                  {windAnalysis.synopticHourUTC != null ? `${String(windAnalysis.synopticHourUTC).padStart(2,'0')}:00` : '–'}
+                </div>
+                <div style={{ color: 'var(--text-sub)', fontSize: '0.64rem', marginTop: '3px' }}>
+                  {windAnalysis.synopticHourUTC != null ? `${String((windAnalysis.synopticHourUTC + 7) % 24).padStart(2,'0')}:00 น. ไทย` : ''}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.22)', borderRadius: '16px', padding: '12px' }}>
+                <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 800 }}>ความน่าเชื่อถือ</div>
+                <div style={{ color: '#22c55e', fontSize: '0.92rem', fontWeight: 950, marginTop: '6px', textTransform: 'uppercase' }}>
+                  {windAnalysis.confidence === 'high' ? '🟢 สูง' : windAnalysis.confidence === 'medium' ? '🟡 ปานกลาง' : '🔴 ต่ำ'}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.22)', borderRadius: '16px', padding: '12px' }}>
+                <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 800 }}>ข้อมูล TMD</div>
+                <div style={{ color: windAnalysis.tmdAvailable ? '#22c55e' : '#f97316', fontSize: '0.84rem', fontWeight: 950, marginTop: '6px' }}>
+                  {windAnalysis.tmdAvailable ? '✅ เชื่อมต่อได้' : '⚠️ ใช้ข้อมูลสำรอง'}
+                </div>
+                <div style={{ color: 'var(--text-sub)', fontSize: '0.62rem', marginTop: '2px' }}>
+                  {windAnalysis.imageCount > 0 ? `วิเคราะห์จาก ${windAnalysis.imageCount} ภาพ` : 'วิเคราะห์จากข้อความ'}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary */}
+            {windAnalysis.summary && (
+              <div style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.1), rgba(59,130,246,0.07))', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '16px', color: 'var(--text-main)', fontSize: '0.84rem', lineHeight: 1.65, marginBottom: '16px', padding: '14px' }}>
+                <div style={{ color: '#0ea5e9', fontSize: '0.72rem', fontWeight: 900, marginBottom: '6px' }}>🌤️ สรุปสภาพลมชั้นบน</div>
+                {windAnalysis.summary}
+              </div>
+            )}
+
+            {/* Regional rain chance */}
+            {windAnalysis.regions?.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ color: 'var(--text-main)', fontSize: '0.82rem', fontWeight: 900, marginBottom: '10px' }}>โอกาสฝนรายภาค (จากกระแสลมชั้นบน)</div>
+                <div style={{ display: 'grid', gap: '8px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)' }}>
+                  {windAnalysis.regions.map((r) => {
+                    const pct = Math.min(100, Math.max(0, r.rainChance ?? 0));
+                    const color = pct >= 70 ? '#2563eb' : pct >= 45 ? '#3b82f6' : pct >= 25 ? '#60a5fa' : '#16a34a';
+                    return (
+                      <div key={r.name} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '11px 13px' }}>
+                        <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ color: 'var(--text-main)', fontSize: '0.78rem', fontWeight: 900 }}>{r.name}</span>
+                          <span style={{ color, fontSize: '0.88rem', fontWeight: 950 }}>{pct}%</span>
+                        </div>
+                        <div style={{ background: 'var(--border-color)', borderRadius: '99px', height: '5px', marginBottom: '6px', overflow: 'hidden' }}>
+                          <div style={{ background: color, borderRadius: '99px', height: '100%', transition: 'width 0.6s', width: `${pct}%` }} />
+                        </div>
+                        <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', lineHeight: 1.4 }}>
+                          <span style={{ color: '#0ea5e9', fontWeight: 800 }}>{r.windLevel || '850hPa'}</span>
+                          {r.pattern ? ` · ${r.pattern}` : ''}
+                          {r.detail ? ` — ${r.detail}` : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Level insights */}
+            {windAnalysis.levelInsights?.length > 0 && (
+              <div style={{ display: 'grid', gap: '8px', gridTemplateColumns: isMobile ? '1fr' : `repeat(${Math.min(3, windAnalysis.levelInsights.length)}, 1fr)`, marginBottom: '14px' }}>
+                {windAnalysis.levelInsights.map((li) => (
+                  <div key={li.level} style={{ background: 'rgba(14,165,233,0.07)', border: '1px solid rgba(14,165,233,0.18)', borderRadius: '12px', padding: '10px' }}>
+                    <div style={{ color: '#0ea5e9', fontSize: '0.72rem', fontWeight: 950, marginBottom: '4px' }}>{li.level}</div>
+                    <div style={{ color: 'var(--text-main)', fontSize: '0.74rem', lineHeight: 1.45 }}>{li.description}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Main driver + alerts */}
+            <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: windAnalysis.alerts?.length ? (isMobile ? '1fr' : '1fr 1fr') : '1fr' }}>
+              {windAnalysis.mainDriver && (
+                <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '14px', padding: '12px' }}>
+                  <div style={{ color: '#f59e0b', fontSize: '0.72rem', fontWeight: 950, marginBottom: '5px' }}>⚡ ปัจจัยหลัก</div>
+                  <div style={{ color: 'var(--text-main)', fontSize: '0.8rem', lineHeight: 1.5 }}>{windAnalysis.mainDriver}</div>
+                </div>
+              )}
+              {windAnalysis.alerts?.length > 0 && (
+                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: '14px', padding: '12px' }}>
+                  <div style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 950, marginBottom: '5px' }}>⚠️ สังเกตการณ์</div>
+                  <div style={{ display: 'grid', gap: '4px' }}>
+                    {windAnalysis.alerts.map((alert, i) => (
+                      <div key={i} style={{ color: 'var(--text-main)', fontSize: '0.76rem', lineHeight: 1.45 }}>• {alert}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {windLastFetch && (
+              <div style={{ color: 'var(--text-sub)', fontSize: '0.64rem', fontWeight: 800, marginTop: '10px', textAlign: 'right' }}>
+                อัปเดตเมื่อ {windLastFetch.toLocaleTimeString('th-TH')} · อัปเดตอัตโนมัติทุก 3 ชม.
+              </div>
+            )}
+          </>
+        )}
       </Panel>
 
       <PhaseLabel>แนวโน้มและพยากรณ์</PhaseLabel>
