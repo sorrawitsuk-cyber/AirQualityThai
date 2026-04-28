@@ -42,6 +42,19 @@ const getWindDirection = (degree) => {
     return { name: arr[(val % 8)], arrow: arrows[(val % 8)] };
 };
 
+const getAverageWindDirection = (degrees = []) => {
+    const valid = degrees.filter(d => Number.isFinite(d));
+    if (!valid.length) return null;
+    const vector = valid.reduce((acc, degree) => {
+        const rad = degree * Math.PI / 180;
+        acc.sin += Math.sin(rad);
+        acc.cos += Math.cos(rad);
+        return acc;
+    }, { sin: 0, cos: 0 });
+    const avg = (Math.atan2(vector.sin / valid.length, vector.cos / valid.length) * 180 / Math.PI + 360) % 360;
+    return getWindDirection(avg);
+};
+
 const getUvText = (uv) => {
     if (uv > 10) return 'อันตรายรุนแรง';
     if (uv > 7) return 'สูงมาก';
@@ -99,8 +112,8 @@ export default function MapPage() {
   const [mapCategory, setMapCategory] = useState('basic'); 
   const [activeBasicMode, setActiveBasicMode] = useState('pm25'); 
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
-  const [activeGistdaMode, setActiveGistdaMode] = useState('hotspots');
-  const [timeMode, setTimeMode] = useState('today'); // 'today' | 'tomorrow' | 'avg7'
+  const [activeGistdaMode, setActiveGistdaMode] = useState('burntArea');
+  const [timeMode, setTimeMode] = useState('now'); // 'now' | 'today' | 'tomorrow'
   const [activeYesterdayMode, setActiveYesterdayMode] = useState('maxTemp');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -229,15 +242,16 @@ export default function MapPage() {
 
   useEffect(() => {
       setSelectedHotspot(null);
-      if (mapCategory === 'gistda' || mapCategory === 'yesterday') setTimeMode('today');
+      if (mapCategory === 'gistda' || mapCategory === 'yesterday' || mapCategory === 'risk') setTimeMode('now');
   }, [mapCategory]);
 
   const basicModes = [
     { id: 'pm25', name: '😷 PM2.5', color: '#f97316', unit: 'µg/m³', desc: 'ความหนาแน่นของฝุ่นละอองขนาดเล็ก' },
     { id: 'temp', name: '🌡️ อุณหภูมิ', color: '#ef4444', unit: '°C', desc: 'อุณหภูมิอากาศปัจจุบัน' },
     { id: 'heat', name: '🥵 ดัชนีความร้อน', color: '#ea580c', unit: '°C', desc: 'อุณหภูมิที่ร่างกายรู้สึกจริง (รวมความชื้น)' },
+    { id: 'humidity', name: '💧 ความชื้นสัมพัทธ์', color: '#14b8a6', unit: '%', desc: 'ความชื้นสัมพัทธ์ในอากาศ' },
     { id: 'rain', name: '☔ โอกาสฝน', color: '#3b82f6', unit: '%', desc: 'ความน่าจะเป็นในการเกิดฝนตก' },
-    { id: 'wind', name: '🌬️ ลมกระโชก', color: '#0ea5e9', unit: 'km/h', desc: 'ความเร็วลมกระโชกสูงสุด' },
+    { id: 'wind', name: '🌬️ ความเร็วลม', color: '#0ea5e9', unit: 'km/h', desc: 'ความเร็วลม/ลมกระโชกตามข้อมูลที่มี' },
     { id: 'uv', name: '☀️ รังสี UV', color: '#a855f7', unit: 'ดัชนี', desc: 'ดัชนีรังสีอัลตราไวโอเลต' },
     { id: 'pressure', name: '🧭 ความกดอากาศ', color: '#64748b', unit: 'hPa', desc: 'ความกดบรรยากาศ (ระดับน้ำทะเล)' }
   ];
@@ -259,7 +273,6 @@ export default function MapPage() {
   ];
 
   const gistdaModes = useMemo(() => [
-    { id: 'hotspots', name: '🔥 จุดความร้อน (7 วัน)', color: '#ef4444', unit: 'จุด', desc: '🟢 ข้อมูลสดจาก GISTDA — จุดความร้อนสะสม 7 วันย้อนหลัง (Top 5)' },
     { id: 'burntArea', name: '🔥 พื้นที่เผาไหม้', color: '#ea580c', unit: 'ไร่', desc: '🟢 ข้อมูลสดจาก GISTDA — พื้นที่เผาไหม้สะสม 10 วัน (Top 5)' },
     { id: 'lowSoilMoisture', name: '🏜️ ความชื้นในดินต่ำ', color: '#f59e0b', unit: '%vol', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true },
     { id: 'lowVegetationMoisture', name: '🍂 ความชื้นพืชพรรณต่ำ', color: '#d97706', unit: 'ดัชนี', desc: '🔴 ยังไม่มี API เชื่อมต่อ — รอระบบเชื่อมต่อ GISTDA ดาวเทียม', noApi: true },
@@ -278,34 +291,20 @@ export default function MapPage() {
     return baseColor;
   }, [darkMode, gistdaModes]);
 
-  // Derived from timeMode — backward compat for popup labels
-  const effectiveDayOffset = timeMode === 'today' ? 0 : timeMode === 'tomorrow' ? 1 : 0;
-  const isAvg7Mode = timeMode === 'avg7';
+  // Derived from timeMode — day overview uses daily rollups; now uses the latest observed values.
+  const effectiveDayOffset = timeMode === 'tomorrow' ? 1 : 0;
+  const isNowMode = timeMode === 'now';
 
   const getBasicVal = useCallback((station, mode) => {
     if (!station) return null;
     const daily = stationDaily[station.stationID] || {};
-    // avg7: average of forecast days +1..+7 (indices 8-14)
-    if (isAvg7Mode && daily.temp) {
-        const idxArr = [8, 9, 10, 11, 12, 13, 14];
-        const avg = (arr) => { const v = idxArr.map(i => arr?.[i] || 0); return Math.round(v.reduce((a,b)=>a+b,0)/v.length); };
-        switch(mode) {
-            case 'pm25': return avg(daily.pm25);
-            case 'temp': return avg(daily.temp);
-            case 'heat': return avg(daily.heat);
-            case 'rain': return idxArr.reduce((s,i)=>s+(daily.rain?.[i]||0),0); // cumulative
-            case 'wind': return avg(daily.wind);
-            case 'uv': return avg(daily.uv);
-            case 'pressure': return avg(daily.pressure);
-            default: return 0;
-        }
-    }
-    if (effectiveDayOffset === 0 || !daily.temp) {
+    if (isNowMode || !daily.temp) {
         const data = stationTemps[station.stationID] || {};
         switch(mode) {
             case 'pm25': return station.AQILast?.PM25?.value || 0;
             case 'temp': return Math.round(data.temp || 0);
             case 'heat': return Math.round(data.feelsLike || 0);
+            case 'humidity': return Math.round(data.humidity || 0);
             case 'rain': return data.rainProb || 0;
             case 'wind': return Math.round(data.windSpeed || 0);
             case 'uv': return data.uv || 0;
@@ -313,11 +312,13 @@ export default function MapPage() {
             default: return 0;
         }
     } else {
-        const idx = effectiveDayOffset + 7;
+        const idx = timeMode === 'tomorrow' ? 8 : 7;
+        const currentData = stationTemps[station.stationID] || {};
         switch(mode) {
             case 'pm25': return daily.pm25?.[idx] || 0;
             case 'temp': return daily.temp?.[idx] || 0;
             case 'heat': return daily.heat?.[idx] || 0;
+            case 'humidity': return daily.humidity?.[idx] || currentData.humidity || 0;
             case 'rain': return daily.rain?.[idx] || 0;
             case 'wind': return daily.wind?.[idx] || 0;
             case 'uv': return daily.uv?.[idx] || 0;
@@ -325,7 +326,7 @@ export default function MapPage() {
             default: return 0;
         }
     }
-  }, [stationTemps, stationDaily, effectiveDayOffset, isAvg7Mode]);
+  }, [stationTemps, stationDaily, isNowMode, timeMode]);
 
   const getBasicColor = useCallback((val, mode) => {
     if (val === null || val === undefined || val === '' || val === 0) return darkMode ? '#1a3050' : '#b8d9f5';
@@ -333,6 +334,7 @@ export default function MapPage() {
     if (mode === 'temp' || mode === 'heat' || mode === 'maxTemp' || mode === 'minTemp') return val > 39 ? '#ef4444' : val >= 35 ? '#f97316' : val >= 29 ? '#eab308' : val >= 23 ? '#22c55e' : '#3b82f6';
     if (mode === 'rain') return val > 70 ? '#1e3a8a' : val > 40 ? '#3b82f6' : val > 10 ? '#60a5fa' : '#94a3b8';
     if (mode === 'wind') return val > 40 ? '#ef4444' : val >= 21 ? '#f97316' : val >= 11 ? '#eab308' : '#22c55e';
+    if (mode === 'humidity') return val >= 85 ? '#0f766e' : val >= 70 ? '#14b8a6' : val >= 45 ? '#22c55e' : val >= 30 ? '#f59e0b' : '#ef4444';
     if (mode === 'uv') return val > 10 ? '#a855f7' : val >= 8 ? '#ef4444' : val >= 6 ? '#ea580c' : val >= 3 ? '#eab308' : '#22c55e';
     if (mode === 'pressure') return val > 1015 ? '#3b82f6' : val >= 1010 ? '#22c55e' : val >= 1005 ? '#eab308' : '#ef4444';
     return darkMode ? '#1a3050' : '#b8d9f5';
@@ -343,17 +345,7 @@ export default function MapPage() {
       let humEstimated = false;
       const daily = stationDaily[station.stationID] || {};
 
-      if (isAvg7Mode && daily.temp) {
-          const idxArr = [8, 9, 10, 11, 12, 13, 14];
-          const avg = (arr) => { const v = idxArr.map(i => arr?.[i] || 0); return v.reduce((a,b)=>a+b,0)/v.length; };
-          pm25 = avg(daily.pm25);
-          temp = avg(daily.temp);
-          wind = avg(daily.wind);
-          rain = avg(daily.rain);
-          uv = avg(daily.uv);
-          hum = daily.humidity ? avg(daily.humidity) : (stationTemps[station.stationID]?.humidity || 50);
-          humEstimated = !daily.humidity;
-      } else if (effectiveDayOffset === 0 || !daily.temp) {
+      if (isNowMode || !daily.temp) {
           const data = stationTemps[station.stationID] || {};
           pm25 = station.AQILast?.PM25?.value || 0;
           temp = data.temp || 0;
@@ -363,7 +355,7 @@ export default function MapPage() {
           uv = data.uv || 0;
           hum = data.humidity || 50;
       } else {
-          const idx = effectiveDayOffset + 7;
+          const idx = timeMode === 'tomorrow' ? 8 : 7;
           pm25 = daily.pm25?.[idx] || 0;
           temp = daily.temp?.[idx] || 0;
           feelsLike = daily.heat?.[idx] || temp;
@@ -407,7 +399,7 @@ export default function MapPage() {
       }
 
       return { score: Math.min(Math.round(score * 10) / 10, 10), factors, humEstimated };
-  }, [activeRiskMode, stationTemps, stationDaily, effectiveDayOffset, isAvg7Mode]);
+  }, [activeRiskMode, stationTemps, stationDaily, isNowMode, timeMode]);
 
   const getRiskColor = useCallback((score) => {
       if (score === null || score === undefined) return darkMode ? '#1a3050' : '#b8d9f5';
@@ -591,16 +583,17 @@ export default function MapPage() {
           setSelectedHotspot({ type: 'yesterday', station, maxObj, minObj });
       } else {
           const daily = stationDaily[station.stationID] || {};
-          const idx = effectiveDayOffset + 7;
-          const data = effectiveDayOffset === 0 ? (stationTemps[station.stationID] || {}) : (isAvg7Mode ? (() => {
-              const idxArr = [8,9,10,11,12,13,14];
-              const av = (arr) => { const v = idxArr.map(i=>arr?.[i]||0); return v.reduce((a,b)=>a+b,0)/v.length; };
-              return { temp: av(daily.temp), feelsLike: av(daily.heat), rainProb: av(daily.rain), windSpeed: av(daily.wind), uv: av(daily.uv) };
-          })() : {
+          const currentData = stationTemps[station.stationID] || {};
+          const idx = timeMode === 'tomorrow' ? 8 : 7;
+          const data = isNowMode ? currentData : {
               temp: daily.temp?.[idx], feelsLike: daily.heat?.[idx],
-              rainProb: daily.rain?.[idx], windSpeed: daily.wind?.[idx], uv: daily.uv?.[idx]
-          });
-          const pm25 = effectiveDayOffset === 0 && !isAvg7Mode ? (station.AQILast?.PM25?.value || 0) : (daily.pm25?.[8] || 0);
+              rainProb: daily.rain?.[idx], windSpeed: daily.wind?.[idx], uv: daily.uv?.[idx],
+              humidity: daily.humidity?.[idx] || currentData.humidity,
+              pressure: daily.pressure?.[idx] || currentData.pressure,
+              windDirection: currentData.windDirection,
+              windDir: currentData.windDirection,
+          };
+          const pm25 = isNowMode ? (station.AQILast?.PM25?.value || 0) : (daily.pm25?.[idx] || 0);
           const summary7 = get7DaySummary(station);
           setSelectedHotspot({ type: 'basic', station, data, pm25, summary7 });
       }
@@ -664,7 +657,7 @@ export default function MapPage() {
                  <span style="font-size: 0.7em; opacity: 0.9;">${stationName}</span>
                  <span>${val}</span>
                </div>`,
-        iconSize: isMobile ? [50, 30] : [60, 40], 
+        iconSize: isMobile ? [50, 30] : [60, 40],
         iconAnchor: isMobile ? [25, 15] : [30, 20]
     });
   };
@@ -686,11 +679,13 @@ export default function MapPage() {
   const activeModeIndex = Math.max(0, activeModeList.findIndex(m => m.id === activeModeObj?.id));
   const activeCategoryLabel = mapCategory === 'basic' ? 'ข้อมูลทั่วไป' :
                               mapCategory === 'risk' ? 'วิเคราะห์ความเสี่ยง' :
+                              mapCategory === 'yesterday' ? 'สถิติย้อนหลัง' :
                               'พิบัติภัย GISTDA';
 
   const setActiveModeById = useCallback((modeId) => {
     if (mapCategory === 'basic') setActiveBasicMode(modeId);
     else if (mapCategory === 'risk') setActiveRiskMode(modeId);
+    else if (mapCategory === 'yesterday') setActiveYesterdayMode(modeId);
     else setActiveGistdaMode(modeId);
   }, [mapCategory]);
 
@@ -762,6 +757,7 @@ export default function MapPage() {
         case 'heat': return [{ c: '#ef4444', l: 'ร้อนจัด', r: '> 39' }, { c: '#f97316', l: 'ร้อน', r: '35-39' }, { c: '#eab308', l: 'อบอ้าว', r: '29-34' }, { c: '#22c55e', l: 'ปกติ/อบอุ่น', r: '23-28' }, { c: '#3b82f6', l: 'เย็นสบาย', r: '< 23' }];
         case 'rain': return [{ c: '#1e3a8a', l: 'ตกหนัก/พายุ', r: '> 70%' }, { c: '#3b82f6', l: 'โอกาสตกสูง', r: '41-70%' }, { c: '#60a5fa', l: 'โอกาสตกต่ำ', r: '11-40%' }, { c: '#94a3b8', l: 'ไม่มีฝน', r: '0-10%' }];
         case 'wind': return [{ c: '#ef4444', l: 'พายุ/อันตราย', r: '> 40' }, { c: '#f97316', l: 'ลมแรง', r: '21-40' }, { c: '#eab308', l: 'ลมกำลังดี', r: '11-20' }, { c: '#22c55e', l: 'ลมสงบ', r: '0-10' }];
+        case 'humidity': return [{ c: '#0f766e', l: 'ชื้นมาก', r: '≥ 85%' }, { c: '#14b8a6', l: 'ชื้น', r: '70-84%' }, { c: '#22c55e', l: 'กำลังดี', r: '45-69%' }, { c: '#f59e0b', l: 'ค่อนข้างแห้ง', r: '30-44%' }, { c: '#ef4444', l: 'แห้งมาก', r: '< 30%' }];
         case 'uv': return [{ c: '#a855f7', l: 'อันตรายรุนแรง', r: '> 10' }, { c: '#ef4444', l: 'สูงมาก', r: '8-10' }, { c: '#ea580c', l: 'สูง', r: '6-7' }, { c: '#eab308', l: 'ปานกลาง', r: '3-5' }, { c: '#22c55e', l: 'ต่ำ', r: '0-2' }];
         case 'pressure': return [{ c: '#3b82f6', l: 'ความกดสูง', r: '> 1015' }, { c: '#22c55e', l: 'ปกติ', r: '1010-1015' }, { c: '#eab308', l: 'ค่อนข้างต่ำ', r: '1005-1009' }, { c: '#ef4444', l: 'ต่ำ/พายุ', r: '< 1005' }];
         default: return [];
@@ -802,6 +798,9 @@ export default function MapPage() {
       const sts = allMapData.filter(st => provs.includes(st.areaTH.replace('จังหวัด', '').trim()));
       const vals = sts.map(st => st.displayVal).filter(v => v != null && !Number.isNaN(v));
       const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
+      const windDirection = activeBasicMode === 'wind'
+        ? getAverageWindDirection(sts.map(st => stationTemps[st.stationID]?.windDirection))
+        : null;
       const color = mapCategory === 'basic'
         ? getBasicColor(avg, activeBasicMode)
         : mapCategory === 'risk'
@@ -809,27 +808,29 @@ export default function MapPage() {
           : mapCategory === 'yesterday'
             ? getYesterdayColor(avg, activeYesterdayMode)
             : getGistdaColor(avg, activeGistdaMode);
-      return { name, avg, color, trend: 0 };
+      return { name, avg, color, trend: 0, windDirection };
     });
-  }, [allMapData, mapCategory, activeBasicMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, getBasicColor, getRiskColor, getYesterdayColor, getGistdaColor]);
+  }, [allMapData, mapCategory, activeBasicMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRiskColor, getYesterdayColor, getGistdaColor]);
   const sparkline7d = useMemo(() => {
     return Array.from({ length: 8 }, (_, i) => {
       const vals = (mapCategory === 'basic'
         ? stations.map(st => {
             const daily = stationDaily[st.stationID] || {};
-            if (isAvg7Mode) {
-              const idxArr = [8, 9, 10, 11, 12, 13, 14];
-              const arr = idxArr.map(idx => daily[activeBasicMode]?.[idx] || 0);
-              return arr.reduce((a, b) => a + b, 0) / arr.length;
+            if (i === 7) {
+              const live = stationTemps[st.stationID] || {};
+              if (activeBasicMode === 'temp') return live.temp || 0;
+              if (activeBasicMode === 'heat') return live.feelsLike || 0;
+              if (activeBasicMode === 'humidity') return live.humidity || 0;
+              if (activeBasicMode === 'wind') return live.windSpeed || 0;
+              return live[activeBasicMode] || 0;
             }
-            if (i === 7 && !isAvg7Mode) return stationTemps[st.stationID]?.[activeBasicMode === 'temp' ? 'temp' : activeBasicMode === 'heat' ? 'feelsLike' : activeBasicMode] || 0;
             return stationDaily[st.stationID]?.[activeBasicMode]?.[i] || 0;
           })
         : stations.map(st => stationDaily[st.stationID]?.pm25?.[i] || 0))
         .filter(v => v > 0);
       return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
     });
-  }, [stations, stationDaily, stationTemps, mapCategory, activeBasicMode, isAvg7Mode]);
+  }, [stations, stationDaily, stationTemps, mapCategory, activeBasicMode]);
   const forecastStId = selectedHotspot?.station?.stationID || stations.find(st => st.areaTH.includes('กรุงเทพ'))?.stationID;
   const forecastStName = selectedHotspot?.station?.areaTH?.replace('จังหวัด', '') || 'กรุงเทพมหานคร';
   const forecast7d = useMemo(() => {
@@ -840,6 +841,7 @@ export default function MapPage() {
         case 'pm25': return Math.round(daily.pm25?.[idx] || 0);
         case 'temp': return Math.round(daily.temp?.[idx] || 0);
         case 'heat': return Math.round(daily.heat?.[idx] || 0);
+        case 'humidity': return Math.round(daily.humidity?.[idx] || 0);
         case 'rain': return Math.round(daily.rain?.[idx] || 0);
         case 'wind': return Math.round(daily.wind?.[idx] || 0);
         case 'uv': return Math.round(daily.uv?.[idx] || 0);
@@ -881,13 +883,28 @@ export default function MapPage() {
     { id: 'basic', label: 'อากาศ', shortLabel: 'อากาศ', icon: '🌤️', color: '#0ea5e9', desc: 'PM2.5 ฝน ลม UV', useFor: 'เช็กค่าปัจจุบันและพยากรณ์' },
     { id: 'risk', label: 'ความเสี่ยง', shortLabel: 'เสี่ยง', icon: '⚠️', color: '#8b5cf6', desc: 'สุขภาพ กลางแจ้ง ไฟป่า', useFor: 'ดูพื้นที่ที่ควรระวัง' },
     { id: 'yesterday', label: 'ย้อนหลัง', shortLabel: 'ย้อนหลัง', icon: '🕘', color: '#f59e0b', desc: 'ค่าสูงสุด/ต่ำสุดเมื่อวาน', useFor: 'เทียบสถิติที่เกิดขึ้นจริง' },
-    { id: 'gistda', label: 'ภัยพิบัติ', shortLabel: 'ภัยพิบัติ', icon: '🛰️', color: '#ef4444', desc: 'จุดความร้อน พื้นที่ไหม้', useFor: 'ข้อมูลดาวเทียมล่าสุด' }
+    { id: 'gistda', label: 'ภัยพิบัติ', shortLabel: 'ภัยพิบัติ', icon: '🛰️', color: '#ef4444', desc: 'พื้นที่ไหม้ น้ำท่วม ความชื้น', useFor: 'ข้อมูลดาวเทียมล่าสุด' }
   ];
 
   const activeModeId = mapCategory === 'basic' ? activeBasicMode :
     mapCategory === 'risk' ? activeRiskMode :
     mapCategory === 'yesterday' ? activeYesterdayMode :
     activeGistdaMode;
+
+  const primaryLayerOptions = [
+    ...basicModes.map(mode => ({ ...mode, category: 'basic' })),
+  ].filter(Boolean);
+
+  const setPrimaryLayer = (layer) => {
+    setMapCategory(layer.category);
+    if (layer.category === 'basic') {
+      setActiveBasicMode(layer.id);
+    } else if (layer.category === 'gistda') {
+      setActiveGistdaMode(layer.id);
+    }
+  };
+
+  const secondaryToolOptions = mapCategoryOptions.filter(opt => opt.id !== 'basic');
 
   const setActiveModeByCategory = (id) => {
     if (mapCategory === 'basic') setActiveBasicMode(id);
@@ -898,27 +915,27 @@ export default function MapPage() {
 
   const activeCategoryOption = mapCategoryOptions.find(opt => opt.id === mapCategory);
   const activeDataSourceMeta = mapCategory === 'basic'
-    ? (timeMode === 'today'
-        ? { label: 'สด', icon: '🟢', color: '#22c55e', detail: 'AIR4Thai + TMD อัปเดตล่าสุด' }
-        : timeMode === 'tomorrow'
-          ? { label: 'พยากรณ์', icon: '🔮', color: '#a855f7', detail: 'TMD คาดการณ์รายวัน' }
-          : { label: 'ล่วงหน้า', icon: '📊', color: '#0ea5e9', detail: 'แนวโน้ม 7 วันข้างหน้า' })
+    ? (timeMode === 'now'
+        ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: 'AIR4Thai + TMD อัปเดตล่าสุด' }
+        : timeMode === 'today'
+          ? { label: 'วันนี้', icon: '📅', color: '#0ea5e9', detail: 'ภาพรวมรายวันของวันนี้' }
+          : { label: 'พยากรณ์', icon: '🔮', color: '#a855f7', detail: 'TMD คาดการณ์รายวัน' })
     : mapCategory === 'risk'
-      ? (timeMode === 'today'
+      ? (timeMode === 'now'
           ? { label: 'วิเคราะห์สด', icon: '⚠️', color: '#8b5cf6', detail: 'คำนวณจากข้อมูลล่าสุด' }
           : timeMode === 'tomorrow'
             ? { label: 'วิเคราะห์พรุ่งนี้', icon: '🔮', color: '#a855f7', detail: 'คำนวณจากค่าพยากรณ์' }
-            : { label: 'วิเคราะห์ล่วงหน้า', icon: '📊', color: '#0ea5e9', detail: 'แนวโน้มความเสี่ยง 7 วัน' })
+            : { label: 'วิเคราะห์วันนี้', icon: '📅', color: '#0ea5e9', detail: 'คำนวณจากภาพรวมวันนี้' })
       : mapCategory === 'yesterday'
         ? { label: 'ย้อนหลัง', icon: '🕘', color: '#f59e0b', detail: 'ค่าที่เกิดขึ้นจริงของเมื่อวาน' }
         : { label: 'ดาวเทียม', icon: '🛰️', color: '#ef4444', detail: 'ข้อมูล GISTDA ล่าสุด' };
 
-  const timeHelperText = mapCategory === 'basic' || mapCategory === 'risk'
-    ? (timeMode === 'today'
-        ? 'ตอนนี้ = ใช้ค่าล่าสุดที่ระบบมีอยู่ในขณะนี้'
-        : timeMode === 'tomorrow'
-          ? 'พรุ่งนี้ = ค่าพยากรณ์รายวันของวันถัดไป'
-          : '7 วันข้างหน้า = ฝนเป็นค่าสะสม ส่วนค่าอื่นเป็นค่าเฉลี่ยแนวโน้มล่วงหน้า')
+  const timeHelperText = mapCategory === 'basic'
+    ? (timeMode === 'now'
+        ? 'Now = ใช้ค่าล่าสุดที่ระบบมีอยู่ในขณะนี้'
+        : timeMode === 'today'
+          ? 'ภาพรวมวันนี้ = ใช้ค่าสรุปรายวันของวันนี้'
+          : 'พรุ่งนี้ = ค่าพยากรณ์รายวันของวันถัดไป')
     : '';
 
   const quickPresetOptions = [
@@ -927,7 +944,7 @@ export default function MapPage() {
       label: 'ดูฝุ่นตอนนี้',
       icon: '😷',
       color: '#f97316',
-      onClick: () => { setMapCategory('basic'); setActiveBasicMode('pm25'); setTimeMode('today'); }
+      onClick: () => { setMapCategory('basic'); setActiveBasicMode('pm25'); setTimeMode('now'); }
     },
     {
       id: 'rain-tomorrow',
@@ -941,48 +958,36 @@ export default function MapPage() {
       label: 'ดูเสี่ยงสุขภาพ',
       icon: '⚠️',
       color: '#8b5cf6',
-      onClick: () => { setMapCategory('risk'); setActiveRiskMode('respiratory'); setTimeMode('today'); }
+      onClick: () => { setMapCategory('risk'); setActiveRiskMode('respiratory'); setTimeMode('now'); }
     }
   ];
 
-  const canChooseTimeMode = mapCategory === 'basic' || mapCategory === 'risk';
+  const canChooseTimeMode = mapCategory === 'basic';
   const timeModeSections = [
     {
-      id: 'history',
-      title: 'สถิติย้อนหลัง',
-      helper: 'ค่าที่เกิดขึ้นจริง',
-      options: [
-        { id: 'yesterday', label: `🕘 เมื่อวาน ${getDateLabel(-1)}`, sub: 'สถิติสูงสุด/ต่ำสุด', color: '#f59e0b' },
-      ],
-    },
-    {
       id: 'now',
-      title: 'ขณะนี้',
-      helper: 'ข้อมูลล่าสุด',
+      title: 'Now',
+      helper: 'ข้อมูลล่าสุด ณ ตอนนี้',
       options: [
-        { id: 'today', label: `📍 ตอนนี้ ${getDateLabel(0)}`, sub: 'ข้อมูลล่าสุด', color: '#22c55e' },
+        { id: 'now', label: `🟢 Now ${getDateLabel(0)}`, sub: 'ค่าล่าสุด', color: '#22c55e' },
       ],
     },
     {
-      id: 'forecast',
-      title: 'พยากรณ์',
-      helper: 'มองล่วงหน้า',
+      id: 'today',
+      title: 'วันนี้',
+      helper: 'ภาพรวมรายวัน',
       options: [
+        { id: 'today', label: `📅 ภาพรวมวันนี้ ${getDateLabel(0)}`, sub: 'ค่าสรุปวันนี้', color: '#0ea5e9' },
         { id: 'tomorrow', label: `🔮 พรุ่งนี้ ${getDateLabel(1)}`, sub: 'พยากรณ์รายวัน', color: '#a855f7' },
-        { id: 'avg7', label: '📊 7 วันข้างหน้า', sub: 'แนวโน้มรวม', color: '#0ea5e9' },
       ],
     },
   ];
   const flatTimeOptions = timeModeSections.flatMap(section => section.options);
   const activeTimeKey = mapCategory === 'yesterday' ? 'yesterday' : (canChooseTimeMode ? timeMode : 'latest');
-  const activeTimeOption = flatTimeOptions.find(opt => opt.id === activeTimeKey) || { label: '🛰️ ล่าสุด', sub: 'ข้อมูลสะสมล่าสุด', color: activeCategoryOption?.color || '#64748b' };
+  const activeTimeOption = mapCategory === 'yesterday'
+    ? { label: `🕘 เมื่อวาน ${getDateLabel(-1)}`, sub: 'สถิติย้อนหลัง', color: '#f59e0b' }
+    : flatTimeOptions.find(opt => opt.id === activeTimeKey) || { label: '🛰️ ล่าสุด', sub: 'ข้อมูลเฉพาะเครื่องมือ', color: activeCategoryOption?.color || '#64748b' };
   const handleTimeOptionSelect = (id) => {
-    if (id === 'yesterday') {
-      setMapCategory('yesterday');
-      setTimeMode('today');
-      return;
-    }
-
     if (mapCategory === 'yesterday' || mapCategory === 'gistda') {
       setMapCategory('basic');
     }
@@ -1128,14 +1133,6 @@ export default function MapPage() {
   );
   const mobileDockButtons = [
     {
-      id: 'category',
-      icon: activeCategoryOption?.icon || '🗺️',
-      label: 'ประเภท',
-      value: activeCategoryOption?.shortLabel || activeCategoryOption?.label || '-',
-      color: activeCategoryOption?.color || '#0ea5e9',
-      disabled: false,
-    },
-    {
       id: 'layer',
       icon: '🧩',
       label: 'ชั้นข้อมูล',
@@ -1145,10 +1142,18 @@ export default function MapPage() {
     },
     {
       id: 'time',
-      icon: activeTimeKey === 'yesterday' ? '🕘' : activeTimeOption?.color === '#a855f7' ? '🔮' : activeTimeOption?.color === '#0ea5e9' ? '📊' : '📅',
+      icon: activeTimeKey === 'yesterday' ? '🕘' : activeTimeKey === 'tomorrow' ? '🔮' : activeTimeKey === 'today' ? '📅' : '🟢',
       label: 'วันที่',
       value: activeTimeOption?.sub || activeTimeOption?.label || '-',
       color: activeTimeOption?.color || '#22c55e',
+      disabled: false,
+    },
+    {
+      id: 'category',
+      icon: activeCategoryOption?.icon || '🗺️',
+      label: 'เครื่องมือ',
+      value: activeCategoryOption?.shortLabel || activeCategoryOption?.label || '-',
+      color: activeCategoryOption?.color || '#0ea5e9',
       disabled: false,
     },
     {
@@ -1197,46 +1202,44 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Row 2: Sub-nav — Category + Data layer + Time + Mode */}
-          <div className="hide-scrollbar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '6px', flexShrink: 0, background: cardBg, padding: '8px 12px', borderRadius: '14px', border: `1px solid ${borderColor}`, overflowX: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-              <span style={{ fontSize: '0.62rem', color: subTextColor, fontWeight: 900, whiteSpace: 'nowrap' }}>ช่วงเวลา</span>
+          {/* Row 2: Layer-first controls */}
+          <div className="hide-scrollbar" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', alignItems: 'center', gap: '10px', marginBottom: '6px', flexShrink: 0, background: cardBg, padding: '9px 12px', borderRadius: '14px', border: `1px solid ${borderColor}`, overflowX: 'auto' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>1. ชั้นข้อมูลหลัก</div>
+              <div className="hide-scrollbar" style={{ display: 'flex', gap: '5px', overflowX: 'auto', minWidth: 0 }}>
+                {primaryLayerOptions.map(layer => {
+                  const isAct = layer.category === mapCategory && activeModeId === layer.id;
+                  return (
+                    <button key={`${layer.category}-${layer.id}`} onClick={() => setPrimaryLayer(layer)} style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${isAct ? layer.color : borderColor}`, background: isAct ? (darkMode ? `${layer.color}28` : `${layer.color}16`) : 'transparent', color: isAct ? layer.color : subTextColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }}>
+                      {layer.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>2. วัน</div>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {(canChooseTimeMode ? flatTimeOptions : []).map(opt => {
                   const isAct = activeTimeKey === opt.id;
                   return (
-                    <button key={opt.id} onClick={() => handleTimeOptionSelect(opt.id)} style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${isAct ? opt.color : borderColor}`, background: isAct ? opt.color : 'transparent', color: isAct ? '#fff' : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+                    <button key={opt.id} onClick={() => handleTimeOptionSelect(opt.id)} style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${isAct ? opt.color : borderColor}`, background: isAct ? opt.color : 'transparent', color: isAct ? '#fff' : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
                       {opt.label}
                     </button>
                   );
                 })}
-                {!canChooseTimeMode && <span style={{ fontSize: '0.68rem', color: subTextColor, padding: '4px 6px' }}>{activeTimeOption?.sub}</span>}
-              </div>
-              <div style={{ width: '1px', height: '18px', background: borderColor }} />
-              <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-secondary)', padding: '3px', borderRadius: '20px' }}>
-                <button onClick={() => { if (canChooseTimeMode) setTimeMode('today'); }} style={{ padding: '3px 10px', borderRadius: '16px', border: 'none', background: (timeMode === 'today' && canChooseTimeMode) ? '#22c55e' : 'transparent', color: (timeMode === 'today' && canChooseTimeMode) ? '#fff' : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />Live
-                </button>
-                <button onClick={() => { setMapCategory('basic'); setTimeMode('tomorrow'); }} style={{ padding: '3px 10px', borderRadius: '16px', border: 'none', background: timeMode === 'tomorrow' ? '#a855f7' : 'transparent', color: timeMode === 'tomorrow' ? '#fff' : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>พยากรณ์</button>
+                {!canChooseTimeMode && <span style={{ fontSize: '0.68rem', color: activeCategoryOption?.color || subTextColor, padding: '5px 8px', border: `1px solid ${borderColor}`, borderRadius: '999px', whiteSpace: 'nowrap' }}>{activeTimeOption?.sub}</span>}
               </div>
             </div>
-            <div style={{ width: '1px', height: '18px', background: borderColor, flexShrink: 0 }} />
-            <span style={{ fontSize: '0.62rem', color: subTextColor, fontWeight: 900, whiteSpace: 'nowrap', flexShrink: 0 }}>มุมมอง</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', flexShrink: 0, minWidth: 0 }}>
-              {mapCategoryOptions.map(opt => (
-                <button key={opt.id} onClick={() => setMapCategory(opt.id)} style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${mapCategory === opt.id ? opt.color : borderColor}`, background: mapCategory === opt.id ? opt.color : 'transparent', color: mapCategory === opt.id ? '#fff' : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', whiteSpace: 'normal', transition: 'all 0.2s', lineHeight: 1.2 }}>
-                  {opt.icon} {opt.shortLabel}
-                </button>
-              ))}
-            </div>
-            <div style={{ width: '1px', height: '18px', background: borderColor, flexShrink: 0 }} />
-            <span style={{ fontSize: '0.62rem', color: subTextColor, fontWeight: 900, whiteSpace: 'nowrap', flexShrink: 0 }}>แสดงข้อมูล</span>
-            <div className="hide-scrollbar" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', overflowX: 'auto', flexShrink: 1, minWidth: 0 }}>
-              {activeModeList.map(m => (
-                <button key={m.id} onClick={() => setActiveModeByCategory(m.id)} style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${activeModeId === m.id ? m.color : borderColor}`, background: activeModeId === m.id ? (darkMode ? `${m.color}25` : `${m.color}18`) : 'transparent', color: activeModeId === m.id ? m.color : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', whiteSpace: 'normal', transition: 'all 0.2s', lineHeight: 1.2 }}>
-                  {m.name}
-                </button>
-              ))}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>เครื่องมือแยก</div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {secondaryToolOptions.map(opt => (
+                  <button key={opt.id} onClick={() => setMapCategory(opt.id)} style={{ padding: '5px 9px', borderRadius: '999px', border: `1px solid ${mapCategory === opt.id ? opt.color : borderColor}`, background: mapCategory === opt.id ? (darkMode ? `${opt.color}28` : `${opt.color}16`) : 'transparent', color: mapCategory === opt.id ? opt.color : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+                    {opt.icon} {opt.shortLabel}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1358,10 +1361,15 @@ export default function MapPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '0.68rem', fontWeight: 900, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
-                        <div style={{ height: '4px', borderRadius: '2px', background: r.color, width: `${Math.min(100, (r.avg / 150) * 100)}%`, minWidth: '4px', transition: 'width 0.5s' }} />
+                        <div style={{ height: '4px', borderRadius: '2px', background: r.color, width: `${Math.min(100, (r.avg / (activeBasicMode === 'humidity' ? 100 : 150)) * 100)}%`, minWidth: '4px', transition: 'width 0.5s' }} />
                         <span style={{ fontSize: '0.62rem', color: r.color, fontWeight: 900 }}>{r.avg}</span>
                         <span style={{ fontSize: '0.58rem', color: subTextColor }}>–</span>
                       </div>
+                      {activeBasicMode === 'wind' && r.windDirection && (
+                        <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 800, marginTop: '2px' }}>
+                          {r.windDirection.arrow} ทิศ{r.windDirection.name}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1633,15 +1641,15 @@ export default function MapPage() {
                         <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: mobilePanelBottom, background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003, maxHeight: '52vh', overflowY: 'auto' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
                             <div>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 900, color: textColor }}>🗺️ เลือกมุมมองแผนที่</div>
-                              <div style={{ fontSize: '0.62rem', color: subTextColor, marginTop: '2px', lineHeight: 1.35 }}>เลือกก่อนว่าอยากดูอะไร แล้วค่อยเลือกชั้นข้อมูล</div>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 900, color: textColor }}>🧰 เครื่องมือแยก</div>
+                              <div style={{ fontSize: '0.62rem', color: subTextColor, marginTop: '2px', lineHeight: 1.35 }}>สถิติย้อนหลัง วิเคราะห์ความเสี่ยง และภัยพิบัติ แยกจากชั้นข้อมูลหลัก</div>
                             </div>
                             <span style={{ flexShrink: 0, color: activeCategoryOption?.color, background: darkMode ? `${activeCategoryOption?.color}20` : `${activeCategoryOption?.color}12`, border: `1px solid ${activeCategoryOption?.color}35`, borderRadius: '999px', padding: '4px 9px', fontSize: '0.62rem', fontWeight: 900 }}>
                               {activeCategoryOption?.shortLabel}
                             </span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
-                            {mapCategoryOptions.map(opt => {
+                            {secondaryToolOptions.map(opt => {
                               const active = mapCategory === opt.id;
                               return (
                                 <button
@@ -1688,17 +1696,20 @@ export default function MapPage() {
                       {/* === LAYER PANEL dropdown === */}
                       {activePanel === 'layer' && (
                         <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: mobilePanelBottom, background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003, maxHeight: '52vh', overflowY: 'auto' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🧩 ชั้นข้อมูล</div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🧩 ชั้นข้อมูลหลัก</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '260px', overflowY: 'auto' }} className="custom-scrollbar">
-                            {activeModeList.map(m => (
+                            {primaryLayerOptions.map(m => {
+                              const active = m.category === mapCategory && activeModeId === m.id;
+                              return (
                               <button
-                                key={m.id}
-                                onClick={() => { setActiveModeByCategory(m.id); setActivePanel(null); }}
-                                style={{ padding: '8px 10px', borderRadius: '10px', border: `1px solid ${activeModeId === m.id ? m.color : borderColor}`, background: activeModeId === m.id ? (darkMode ? `${m.color}25` : `${m.color}18`) : 'var(--bg-secondary)', color: activeModeId === m.id ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.75rem', textAlign: 'left', opacity: m.noApi ? 0.5 : 1 }}
+                                key={`${m.category}-${m.id}`}
+                                onClick={() => { setPrimaryLayer(m); setActivePanel(null); }}
+                                style={{ padding: '8px 10px', borderRadius: '10px', border: `1px solid ${active ? m.color : borderColor}`, background: active ? (darkMode ? `${m.color}25` : `${m.color}18`) : 'var(--bg-secondary)', color: active ? m.color : textColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.75rem', textAlign: 'left', opacity: m.noApi ? 0.5 : 1 }}
                               >
                                 {m.name}
                               </button>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1798,7 +1809,7 @@ export default function MapPage() {
               </div>
 
               {/* === 7-DAY FORECAST BAR (desktop only) === */}
-              {!isMobile && forecast7d.length > 0 && (
+              {false && !isMobile && forecast7d.length > 0 && (
                 <div style={{ background: cardBg, borderRadius: '14px', border: `1px solid ${borderColor}`, padding: '8px 12px', flexShrink: 0 }}>
                   <div style={{ fontSize: '0.6rem', fontWeight: 900, color: subTextColor, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     พยากรณ์ 7 วัน — {forecastStName}
@@ -1844,7 +1855,7 @@ export default function MapPage() {
                           <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🛰️</div>
                           <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#f59e0b' }}>ยังไม่มีข้อมูลจาก API</div>
                           <div style={{ fontSize: '0.75rem', marginTop: '8px', lineHeight: 1.6 }}>ข้อมูล{activeModeObj.name.replace(/[^\u0E00-\u0E7F\s]/g, '').trim()} ยังไม่มี Public API จาก GISTDA<br/>ระบบกำลังหาช่องทางเชื่อมต่อข้อมูลดาวเทียม</div>
-                          <div style={{ fontSize: '0.65rem', marginTop: '12px', color: '#94a3b8', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: '8px', border: `1px solid ${borderColor}` }}>💡 ข้อมูลจุดความร้อนและพื้นที่เผาไหม้ใช้งานได้ปกติ</div>
+                          <div style={{ fontSize: '0.65rem', marginTop: '12px', color: '#94a3b8', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: '8px', border: `1px solid ${borderColor}` }}>💡 ข้อมูลพื้นที่เผาไหม้ยังใช้งานได้ปกติ</div>
                       </div>
                   )}
                   {mapCategory === 'gistda' && !activeModeObj?.noApi && rankedSidebarData.length === 0 && !searchQuery.trim() && (
@@ -1863,7 +1874,7 @@ export default function MapPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ fontSize: '1.05rem', fontWeight: '900', color: textColor }}>จ.{st.areaTH.replace('จังหวัด', '')}</div>
                             <div style={{ fontSize: '1.45rem', fontWeight: '900', color: st.color }}>
-                               {st.displayVal} <span style={{fontSize:'0.8rem', color: subTextColor, fontWeight:'bold'}}>{(mapCategory==='basic' || mapCategory==='yesterday') ? activeModeObj?.unit : ''}</span>
+                                {st.displayVal} <span style={{fontSize:'0.8rem', color: subTextColor, fontWeight:'bold'}}>{mapCategory==='basic' || mapCategory==='yesterday' || mapCategory==='gistda' ? activeModeObj?.unit : ''}</span>
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1955,8 +1966,7 @@ export default function MapPage() {
                         <div style={{ fontSize: '1rem', fontWeight: 'bold', color: selectedHotspot.color }}>{activeModeObj?.name}</div>
                         <div style={{ fontSize: '0.85rem', color: textColor, marginTop: '5px' }}>สถานะ: <span style={{fontWeight:'bold'}}>เฝ้าระวังพิเศษ (Top 5)</span></div>
                         <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '5px', lineHeight: 1.4 }}>
-                            {activeGistdaMode === 'hotspots' ? 'จุดความร้อนที่ตรวจพบจากดาวเทียม VIIRS สะสม 7 วัน บ่งชี้การเผาไหม้ในพื้นที่' :
-                             activeGistdaMode === 'burntArea' ? 'พื้นที่ที่พบร่องรอยการเผาไหม้จากภาพถ่ายดาวเทียม สะสมรอบ 10 วัน' :
+                            {activeGistdaMode === 'burntArea' ? 'พื้นที่ที่พบร่องรอยการเผาไหม้จากภาพถ่ายดาวเทียม สะสมรอบ 10 วัน' :
                              activeGistdaMode === 'lowSoilMoisture' ? 'ค่าความชื้นในดินต่ำกว่าเกณฑ์ปกติ เสี่ยงต่อภัยแล้งและพืชผลเสียหาย' :
                              activeGistdaMode === 'lowVegetationMoisture' ? 'ค่าดัชนีน้ำในพืช (NDWI) ต่ำ บ่งชี้ว่าพืชขาดน้ำและเสี่ยงเป็นเชื้อเพลิงไฟป่า' :
                              'พื้นที่น้ำท่วมสะสมที่ตรวจพบจากภาพถ่ายดาวเทียม Sentinel-1'}
@@ -1977,8 +1987,8 @@ export default function MapPage() {
               <button autoFocus aria-label="ปิด" onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold', zIndex: 1 }}>✕</button>
 
               <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: `1px solid ${borderColor}` }}>
-                  <div style={{ fontSize: '0.72rem', color: timeMode === 'today' ? '#22c55e' : timeMode === 'tomorrow' ? '#a855f7' : '#0ea5e9', fontWeight: 'bold', marginBottom: '3px' }}>
-                      {timeMode === 'today' ? `● ข้อมูลตอนนี้ • ${getLastUpdatedText()}` : timeMode === 'tomorrow' ? `🔮 พยากรณ์พรุ่งนี้ ${getDateLabel(1)}` : `📊 ภาพรวมพยากรณ์ 7 วันข้างหน้า`}
+                  <div style={{ fontSize: '0.72rem', color: timeMode === 'now' ? '#22c55e' : timeMode === 'tomorrow' ? '#a855f7' : '#0ea5e9', fontWeight: 'bold', marginBottom: '3px' }}>
+                      {timeMode === 'now' ? `● Now • ${getLastUpdatedText()}` : timeMode === 'today' ? `📅 ภาพรวมวันนี้ ${getDateLabel(0)}` : `🔮 พยากรณ์พรุ่งนี้ ${getDateLabel(1)}`}
                   </div>
                   <h2 style={{ margin: 0, color: textColor, fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 'bold' }}>📍 จ.{selectedHotspot.station.areaTH.replace('จังหวัด','')}</h2>
               </div>
@@ -1998,16 +2008,20 @@ export default function MapPage() {
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🥵 ความร้อน</span>
                       <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.feelsLike, 'heat') }}>{Math.round(selectedHotspot.data.feelsLike || 0)}°C</span>
                   </div>
+                  <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.humidity, 'humidity')}` }}>
+                      <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>💧 ความชื้นสัมพัทธ์</span>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.humidity, 'humidity') }}>{Math.round(selectedHotspot.data.humidity || 0)} <span style={{fontSize: '0.65rem', color: subTextColor, fontWeight:'normal'}}>%</span></span>
+                  </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.rainProb, 'rain')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>☔ โอกาสฝน</span>
                       <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.rainProb, 'rain') }}>{Math.round(selectedHotspot.data.rainProb || 0)} <span style={{fontSize: '0.65rem', color: subTextColor, fontWeight:'normal'}}>%</span></span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.windSpeed, 'wind')}` }}>
-                      <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🌬️ ลมกระโชก{timeMode === 'today' ? '/ทิศ' : ''}</span>
+                      <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🌬️ ลม{timeMode === 'now' ? '/ทิศ' : ''}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.windSpeed, 'wind') }}>{Math.round(selectedHotspot.data.windSpeed || 0)} <span style={{fontSize: '0.65rem', color: subTextColor, fontWeight:'normal'}}>km/h</span></span>
-                          {timeMode === 'today' && selectedHotspot.data.windDir !== undefined && (
-                              <span style={{ fontSize: '1rem' }}>{getWindDirection(selectedHotspot.data.windDir).arrow}</span>
+                          {timeMode === 'now' && (selectedHotspot.data.windDirection ?? selectedHotspot.data.windDir) !== undefined && (
+                              <span style={{ fontSize: '1rem' }}>{getWindDirection(selectedHotspot.data.windDirection ?? selectedHotspot.data.windDir).arrow}</span>
                           )}
                       </div>
                   </div>
@@ -2024,8 +2038,8 @@ export default function MapPage() {
                 const pressureArr = daily.pressure;
                 const yMax = stationMaxYesterday?.[selectedHotspot.station.stationID]?.pressure;
                 const yMin = stationYesterday?.[selectedHotspot.station.stationID]?.minPressure;
-                const avg7 = pressureArr ? Math.round([8,9,10,11,12,13,14].map(i=>pressureArr[i]||0).filter(v=>v>0).reduce((a,b,_,ar)=>a+b/ar.length,0)) : null;
-                if (!pCur && !yMax && !avg7) return null;
+                const todayOverview = pressureArr?.[7] ? Math.round(pressureArr[7]) : null;
+                if (!pCur && !yMax && !todayOverview) return null;
                 return (
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', marginBottom: '12px', borderLeft: '4px solid #64748b' }}>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: subTextColor, marginBottom: '8px' }}>🧭 ความกดอากาศ (hPa)</div>
@@ -2034,7 +2048,7 @@ export default function MapPage() {
                         { label: 'ตอนนี้', val: pCur ? Math.round(pCur) : null },
                         { label: 'เมื่อวาน ต่ำ', val: yMin ? Math.round(yMin) : null },
                         { label: 'เมื่อวาน สูง', val: yMax ? Math.round(yMax) : null },
-                        { label: '7 วันข้างหน้า', val: avg7 || null },
+                        { label: 'ภาพรวมวันนี้', val: todayOverview || null },
                       ].map((item, i) => (
                         <div key={i} style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: '0.6rem', color: subTextColor, marginBottom: '2px' }}>{item.label}</div>
@@ -2059,23 +2073,15 @@ export default function MapPage() {
                 </div>
               )}
 
-              {/* === พรุ่งนี้ + เฉลี่ย 7 วันข้างหน้า === */}
+              {/* === พรุ่งนี้ === */}
               {selectedHotspot.summary7 && (
                 <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', marginBottom: '12px', border: `1px solid #a855f740` }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#a855f7', marginBottom: '8px' }}>🔮 พยากรณ์ข้างหน้า</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.72rem' }}>
-                    <div style={{ background: cardBg, padding: '8px', borderRadius: '10px', border: `1px solid #a855f720` }}>
-                      <div style={{ color: '#a855f7', fontWeight: 'bold', marginBottom: '4px' }}>🌅 พรุ่งนี้ {getDateLabel(1)}</div>
-                      <div style={{ color: textColor }}>🌡️ {selectedHotspot.summary7.tomorrowTemp ?? '--'}° | 🥵 {selectedHotspot.summary7.tomorrowHeat ?? '--'}°</div>
-                      <div style={{ color: textColor }}>☔ {selectedHotspot.summary7.tomorrowRain ?? '--'}% | 🌬️ {selectedHotspot.summary7.tomorrowWind ?? '--'} km/h</div>
-                      <div style={{ color: textColor }}>☀️ UV {selectedHotspot.summary7.tomorrowUv ?? '--'}</div>
-                    </div>
-                    <div style={{ background: cardBg, padding: '8px', borderRadius: '10px', border: `1px solid #0ea5e920` }}>
-                      <div style={{ color: '#0ea5e9', fontWeight: 'bold', marginBottom: '4px' }}>📊 7 วันข้างหน้า</div>
-                      <div style={{ color: textColor }}>🌡️ {selectedHotspot.summary7.fcast7TempAvg ?? '--'}° | 🥵 {selectedHotspot.summary7.fcast7HeatAvg ?? '--'}°</div>
-                      <div style={{ color: textColor }}>☔ ฝนสะสม {selectedHotspot.summary7.fcast7RainSum ?? '--'}%</div>
-                      <div style={{ color: textColor }}>☀️ UV เฉลี่ย {selectedHotspot.summary7.fcast7UvAvg ?? '--'}</div>
-                    </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#a855f7', marginBottom: '8px' }}>🔮 พรุ่งนี้ {getDateLabel(1)}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', fontSize: '0.72rem' }}>
+                    <div style={{ background: cardBg, padding: '8px', borderRadius: '10px', color: textColor }}>🌡️ {selectedHotspot.summary7.tomorrowTemp ?? '--'}°</div>
+                    <div style={{ background: cardBg, padding: '8px', borderRadius: '10px', color: textColor }}>🥵 {selectedHotspot.summary7.tomorrowHeat ?? '--'}°</div>
+                    <div style={{ background: cardBg, padding: '8px', borderRadius: '10px', color: textColor }}>☔ {selectedHotspot.summary7.tomorrowRain ?? '--'}%</div>
+                    <div style={{ background: cardBg, padding: '8px', borderRadius: '10px', color: textColor }}>🌬️ {selectedHotspot.summary7.tomorrowWind ?? '--'} km/h</div>
                   </div>
                 </div>
               )}
