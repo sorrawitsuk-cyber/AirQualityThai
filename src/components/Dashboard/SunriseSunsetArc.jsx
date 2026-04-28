@@ -42,12 +42,12 @@ export default function SunriseSunsetArc({ current, cardBg, borderColor, textCol
         return () => clearInterval(interval);
     }, [current]);
 
-    const svgWidth = 200;
-    const svgHeight = 90;
-    const padding = 20;
-    const r = (svgWidth - padding * 2) / 2; // 80 radius
-    const cx = svgWidth / 2; // 100
-    const cy = svgHeight - 10; // 80
+    const svgWidth = 220;
+    const svgHeight = 118;
+    const padding = 34;
+    const r = 76;
+    const cx = svgWidth / 2;
+    const cy = svgHeight - 20;
 
     const x = cx - r * Math.cos(progress * Math.PI);
     const y = cy - r * Math.sin(progress * Math.PI);
@@ -61,8 +61,8 @@ export default function SunriseSunsetArc({ current, cardBg, borderColor, textCol
                 <span style={{ fontSize: '1.2rem' }}>🌅</span> พระอาทิตย์ขึ้น / ตก
             </div>
             
-            <div style={{ position: 'relative', width: '100%', maxWidth: '220px', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
-                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 'auto', overflow: 'hidden', display: 'block' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '260px', display: 'flex', justifyContent: 'center', overflow: 'visible' }}>
+                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 'auto', overflow: 'visible', display: 'block' }}>
                     
                     {/* Horizon line */}
                     <line x1={padding - 10} y1={cy} x2={svgWidth - padding + 10} y2={cy} stroke={borderColor} strokeWidth="2" strokeDasharray="3 3" opacity={0.6} />
@@ -92,7 +92,7 @@ export default function SunriseSunsetArc({ current, cardBg, borderColor, textCol
                         y={y} 
                         textAnchor="middle" 
                         dominantBaseline="central" 
-                        fontSize="22"
+                        fontSize="24"
                         style={{ filter: isDay ? 'drop-shadow(0px 0px 8px rgba(234, 179, 8, 0.8))' : 'drop-shadow(0px 0px 8px rgba(203, 213, 225, 0.6))' }}
                     >
                         {isDay ? '☀️' : '🌙'}
