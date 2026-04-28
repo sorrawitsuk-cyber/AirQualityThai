@@ -1,11 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Buffer } from 'node:buffer';
 
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 let _cache = null;
 let _cacheAt = 0;
 
 const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
-const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+const MODEL_CANDIDATES = ['gemini-1.5-flash', 'gemini-1.5-pro'];
 const AI_TIMEOUT_MS = 25000;
 
 // Upper air analysis standard times (UTC): 00, 06, 12, 18 + supplemental 03, 09, 15, 21
@@ -202,7 +203,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json(_cache);
   } catch (err) {
-    console.error('[tmd-wind]', err.message);
-    return res.status(500).json({ error: err.message });
+    console.error('[tmd-wind] CRITICAL ERROR:', err);
+    return res.status(500).json({ 
+      error: err.message,
+      stack: err.stack,
+      hint: 'Check if GEMINI_API_KEY is valid and network allows outgoing requests'
+    });
   }
 }
