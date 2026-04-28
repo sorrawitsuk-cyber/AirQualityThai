@@ -271,3 +271,19 @@ body {
 @keyframes gaugeGrow {
   from { width: 0; }
 }
+
+/* =========================================
+   🤖 AIPage: Sticky Nav & Expand Buttons
+   ========================================= */
+.ai-sticky-nav::-webkit-scrollbar { display: none; }
+.ai-sticky-nav { -ms-overflow-style: none; scrollbar-width: none; }
+
+.dark-theme .ai-expand-btn {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-sub) !important;
+}
+
+.dark-theme .ai-sticky-nav {
+  background: var(--bg-nav-blur) !important;
+}
