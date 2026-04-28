@@ -171,7 +171,7 @@ export default async function handler(req, res) {
       const lats = chunk.map(p => p.lat).join(',');
       const lons = chunk.map(p => p.lon).join(',');
 
-      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m,uv_index&daily=temperature_2m_max,apparent_temperature_max,precipitation_probability_max,uv_index_max,wind_speed_10m_max&timezone=Asia%2FBangkok&past_days=7&forecast_days=8&_t=${timestamp}`;
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max&timezone=Asia%2FBangkok&past_days=7&forecast_days=8&_t=${timestamp}`;
       const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm2_5&hourly=pm2_5&timezone=Asia%2FBangkok&past_days=7&forecast_days=7&_t=${timestamp}`;
 
       const [wRes, aRes] = await Promise.all([fetch(wUrl), fetch(aUrl)]);
@@ -238,6 +238,7 @@ export default async function handler(req, res) {
 
       newYesterday[sID] = {
         temp: Math.round(prevTemp !== undefined ? prevTemp : (w.daily?.temperature_2m_max?.[0] || 0)),
+        minTemp: Math.round(w.daily?.temperature_2m_min?.[0] || 0),
         pm25: Math.round(prevPm25 !== undefined ? prevPm25 : (a.current?.pm2_5 || 0)),
         uv: Math.round(prevUv !== undefined ? prevUv : (w.daily?.uv_index_max?.[0] || 0)),
         rain: Math.round(prevRain !== undefined ? prevRain : (w.daily?.precipitation_probability_max?.[0] || 0)),
@@ -254,7 +255,7 @@ export default async function handler(req, res) {
         temp: Math.round(w.daily?.temperature_2m_max?.[0] || 0),
         pm25: Math.round(maxPm25 || a.current?.pm2_5 || 0),
         uv: Math.round(w.daily?.uv_index_max?.[0] || 0),
-        rain: Math.round(w.daily?.precipitation_probability_max?.[0] || 0),
+        rain: Math.round((w.daily?.precipitation_sum?.[0] || 0) * 10) / 10,
         wind: Math.round(w.daily?.wind_speed_10m_max?.[0] || 0)
       };
 
