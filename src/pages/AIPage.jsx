@@ -735,8 +735,7 @@ export default function AIPage() {
               🌬️ วิเคราะห์กระแสลมชั้นบนรายภูมิภาค
             </div>
             <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', marginTop: '3px' }}>
-              ข้อมูล TMD Marine · Gemini {windAnalysis?.model || '2.5-flash'} · อัปเดตทุก 3 ชม.
-              {windLastFetch && ` · ล่าสุด ${windLastFetch.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`}
+              อัปเดตอัตโนมัติทุก 3 ชั่วโมง{windLastFetch && ` · ล่าสุด ${windLastFetch.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`}
             </div>
           </div>
           <button onClick={fetchWindAnalysis} disabled={windLoading} style={{ alignItems: 'center', background: windLoading ? 'var(--bg-secondary)' : 'linear-gradient(135deg,#0ea5e9,#2563eb)', border: 'none', borderRadius: '999px', color: windLoading ? 'var(--text-sub)' : '#fff', cursor: windLoading ? 'not-allowed' : 'pointer', display: 'flex', fontSize: '0.72rem', fontWeight: 900, gap: '5px', padding: '7px 13px' }}>
@@ -753,7 +752,7 @@ export default function AIPage() {
         {windLoading && !windAnalysis && (
           <div style={{ alignItems: 'center', color: 'var(--text-sub)', display: 'flex', fontSize: '0.82rem', gap: '10px', justifyContent: 'center', padding: '28px 0' }}>
             <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>🌀</span>
-            กำลังดึงข้อมูลลมชั้นบนและวิเคราะห์ด้วย AI...
+            กำลังวิเคราะห์สภาพอากาศ...
           </div>
         )}
 
@@ -840,9 +839,6 @@ export default function AIPage() {
                   <div style={{ color: '#3b82f6', fontSize: '0.78rem', fontWeight: 900 }}>
                     {peak.label} <span style={{ color: 'var(--text-sub)', fontWeight: 700 }}>({windAnalysis.peakRainTimeDesc || peak.range})</span>
                   </div>
-                  <div style={{ color: 'var(--text-sub)', fontSize: '0.66rem', marginTop: '4px' }}>
-                    {windAnalysis.mainDriver || ''}
-                  </div>
                 </div>
               </div>
 
@@ -888,14 +884,13 @@ export default function AIPage() {
                 onClick={() => setWindDetailsOpen(o => !o)}
                 style={{ alignItems: 'center', background: 'none', border: '1px solid var(--border-color)', borderRadius: '999px', color: 'var(--text-sub)', cursor: 'pointer', display: 'flex', fontSize: '0.72rem', fontWeight: 800, gap: '5px', padding: '6px 14px', width: '100%', justifyContent: 'center', marginBottom: windDetailsOpen ? '12px' : 0 }}
               >
-                {windDetailsOpen ? '▲ ซ่อนรายละเอียดทางเทคนิค' : '▼ ดูรายละเอียดลมรายชั้นและปัจจัยเพิ่มเติม'}
+                {windDetailsOpen ? '▲ ซ่อน' : '▼ ดูเพิ่มเติม'}
               </button>
 
               {windDetailsOpen && (
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                   {windAnalysis.summary && (
                     <div style={{ background: 'rgba(14,165,233,0.07)', border: '1px solid rgba(14,165,233,0.18)', borderRadius: '12px', color: 'var(--text-main)', fontSize: '0.78rem', lineHeight: 1.65, marginBottom: '12px', padding: '12px' }}>
-                      <div style={{ color: '#0ea5e9', fontSize: '0.68rem', fontWeight: 900, marginBottom: '5px' }}>🔬 การวิเคราะห์เชิงเทคนิค</div>
                       {windAnalysis.summary}
                     </div>
                   )}
@@ -903,34 +898,11 @@ export default function AIPage() {
                     <div style={{ display: 'grid', gap: '7px', gridTemplateColumns: isMobile ? '1fr' : `repeat(${Math.min(3, windAnalysis.levelInsights.length)}, 1fr)`, marginBottom: '12px' }}>
                       {windAnalysis.levelInsights.map((li) => (
                         <div key={li.level} style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)', borderRadius: '11px', padding: '9px' }}>
-                          <div style={{ color: '#0ea5e9', fontSize: '0.68rem', fontWeight: 950, marginBottom: '3px' }}>{li.level}</div>
                           <div style={{ color: 'var(--text-main)', fontSize: '0.7rem', lineHeight: 1.45 }}>{li.description}</div>
                         </div>
                       ))}
                     </div>
                   )}
-                  <div style={{ display: 'grid', gap: '8px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)' }}>
-                    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '11px', padding: '9px' }}>
-                      <div style={{ color: 'var(--text-sub)', fontSize: '0.62rem', fontWeight: 800 }}>เวลาอ้างอิง (UTC)</div>
-                      <div style={{ color: 'var(--text-main)', fontSize: '0.82rem', fontWeight: 900, marginTop: '4px' }}>
-                        {windAnalysis.synopticHourUTC != null ? `${String(windAnalysis.synopticHourUTC).padStart(2,'0')}:00 UTC` : '–'}
-                      </div>
-                      <div style={{ color: 'var(--text-sub)', fontSize: '0.65rem' }}>{windAnalysis.synopticHourUTC != null ? `${String((windAnalysis.synopticHourUTC + 7) % 24).padStart(2,'0')}:00 น. ไทย` : ''}</div>
-                    </div>
-                    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '11px', padding: '9px' }}>
-                      <div style={{ color: 'var(--text-sub)', fontSize: '0.62rem', fontWeight: 800 }}>ความน่าเชื่อถือ AI</div>
-                      <div style={{ color: 'var(--text-main)', fontSize: '0.82rem', fontWeight: 900, marginTop: '4px' }}>
-                        {windAnalysis.confidence === 'high' ? '🟢 สูง' : windAnalysis.confidence === 'medium' ? '🟡 ปานกลาง' : '🔴 ต่ำ'}
-                      </div>
-                    </div>
-                    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '11px', padding: '9px' }}>
-                      <div style={{ color: 'var(--text-sub)', fontSize: '0.62rem', fontWeight: 800 }}>แหล่งข้อมูล</div>
-                      <div style={{ color: windAnalysis.tmdAvailable ? '#22c55e' : '#f97316', fontSize: '0.78rem', fontWeight: 900, marginTop: '4px' }}>
-                        {windAnalysis.tmdAvailable ? '✅ TMD Marine' : '⚠️ ประมาณการ'}
-                      </div>
-                      <div style={{ color: 'var(--text-sub)', fontSize: '0.62rem' }}>{windAnalysis.imageCount > 0 ? `+ ${windAnalysis.imageCount} ภาพ` : 'ข้อความเท่านั้น'}</div>
-                    </div>
-                  </div>
                 </div>
               )}
             </>
