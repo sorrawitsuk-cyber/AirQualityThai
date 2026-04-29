@@ -1,15 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL = 3 * 60 * 60 * 1000; // 3 hours — conserve quota
 let _cache = null;
 let _cacheAt = 0;
 
 const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
-// gemini-2.x requires v1beta; gemini-1.5 uses v1
 const MODELS = [
-  { id: 'gemini-2.5-flash', api: 'v1beta' },
   { id: 'gemini-2.0-flash', api: 'v1beta' },
-  { id: 'gemini-1.5-flash-latest', api: 'v1' },
 ];
 const AI_TIMEOUT_MS = 25000;
 
@@ -247,7 +244,7 @@ export default async function handler(req, res) {
       const fallback = buildFallbackData(pageText, synopticHour);
       _cache = fallback;
       _cacheAt = Date.now();
-      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60');
+      res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=120');
       return res.status(200).json(fallback);
     }
 
@@ -269,7 +266,7 @@ export default async function handler(req, res) {
     };
     _cacheAt = Date.now();
 
-    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=600');
+    res.setHeader('Cache-Control', 'public, s-maxage=10800, stale-while-revalidate=1800');
     return res.status(200).json(_cache);
   } catch (err) {
     console.error('[tmd-wind] CRITICAL ERROR:', err);
