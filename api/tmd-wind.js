@@ -5,7 +5,7 @@ let _cache = null;
 let _cacheAt = 0;
 
 const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
-const MODEL = 'gemini-2.5-flash';
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 const AI_TIMEOUT_MS = 25000;
 
 // Upper air analysis standard times (UTC): 00, 06, 12, 18 + supplemental 03, 09, 15, 21
@@ -192,23 +192,32 @@ export default async function handler(req, res) {
     const prompt = buildPrompt(pageText, synopticHour);
 
     const client = new GoogleGenerativeAI(apiKey);
-    const model = client.getGenerativeModel(
-      { model: MODEL },
-      { apiVersion: 'v1beta' },
-    );
 
     let raw = null;
-    try {
-      const result = await withTimeout(
-        model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
-        }),
-        AI_TIMEOUT_MS,
-      );
-      raw = result.response.text().trim();
-    } catch (err) {
-      console.warn(`[tmd-wind] ${MODEL} failed: ${err.message}`);
+    let usedModel = null;
+    for (const modelId of MODELS) {
+      try {
+        const model = client.getGenerativeModel(
+          { model: modelId },
+          { apiVersion: 'v1beta' },
+        );
+        const result = await withTimeout(
+          model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: modelId.startsWith('gemini-2.5')
+              ? { thinkingConfig: { thinkingBudget: 0 } }
+              : {},
+          }),
+          AI_TIMEOUT_MS,
+        );
+        raw = result.response.text().trim();
+        usedModel = modelId;
+        break;
+      } catch (err) {
+        const is429 = err.message?.includes('429') || err.message?.includes('quota');
+        console.warn(`[tmd-wind] ${modelId} failed (${is429 ? 'quota' : 'error'}): ${err.message?.slice(0, 200)}`);
+        if (!is429) break; // non-quota errors won't be fixed by switching model
+      }
     }
 
     if (!raw) {
@@ -228,7 +237,7 @@ export default async function handler(req, res) {
 
     _cache = {
       ...data,
-      model: MODEL,
+      model: usedModel,
       tmdAvailable: htmlText !== null,
       cachedAt: new Date().toISOString(),
       nextUpdateAt: new Date(Date.now() + CACHE_TTL).toISOString(),
