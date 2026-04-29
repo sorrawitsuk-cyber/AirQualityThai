@@ -5,7 +5,12 @@ let _cache = null;
 let _cacheAt = 0;
 
 const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
-const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+// gemini-2.x requires v1beta; gemini-1.5 uses v1
+const MODELS = [
+  { id: 'gemini-2.5-flash', api: 'v1beta' },
+  { id: 'gemini-2.0-flash', api: 'v1beta' },
+  { id: 'gemini-1.5-flash-latest', api: 'v1' },
+];
 const AI_TIMEOUT_MS = 25000;
 
 // Upper air analysis standard times (UTC): 00, 06, 12, 18 + supplemental 03, 09, 15, 21
@@ -213,11 +218,11 @@ export default async function handler(req, res) {
 
     let raw = null;
     let usedModel = null;
-    for (const modelId of MODELS) {
+    for (const { id: modelId, api: apiVersion } of MODELS) {
       try {
         const model = client.getGenerativeModel(
           { model: modelId },
-          { apiVersion: 'v1beta' },
+          { apiVersion },
         );
         const result = await withTimeout(
           model.generateContent({
