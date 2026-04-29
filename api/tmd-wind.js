@@ -5,8 +5,8 @@ let _cache = null;
 let _cacheAt = 0;
 
 const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
-const MODEL_CANDIDATES = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
-const AI_TIMEOUT_MS = 7000;
+const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const AI_TIMEOUT_MS = 5500;
 
 // Upper air analysis standard times (UTC): 00, 06, 12, 18 + supplemental 03, 09, 15, 21
 const SYNOPTIC_HOURS = [0, 3, 6, 9, 12, 15, 18, 21];
@@ -27,7 +27,7 @@ async function withTimeout(promise, ms) {
 
 async function fetchHtml() {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 3000);
+  const timer = setTimeout(() => ctrl.abort(), 2000);
   try {
     const res = await fetch(TMD_URL, {
       signal: ctrl.signal,
