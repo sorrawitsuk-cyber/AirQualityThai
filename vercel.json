@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/tmd-wind.js": { "maxDuration": 30 }
+    "api/tmd-wind.js": { "maxDuration": 30 },
+    "api/cron-wind.js": { "maxDuration": 30 }
   },
   "headers": [
     {
@@ -24,6 +25,10 @@
     {
       "path": "/api/cron",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron-wind",
+      "schedule": "0 */3 * * *"
     }
   ],
   "rewrites": [
