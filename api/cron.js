@@ -214,49 +214,57 @@ export default async function handler(req, res) {
         tmdCond: hasTmd ? tmdData.cond : null
       });
 
+      // With past_days=7: daily[0]=7 days ago, daily[6]=yesterday, daily[7]=today, daily[8]=tomorrow
+      // Hourly: [7*24 + currentHour] = current hour today, [6*24 + currentHour] = same hour yesterday
+      const todayDailyIdx = 7;
+      const yesterdayDailyIdx = 6;
+      const todayHourlyIdx = 7 * 24 + currentHour;
+      const yesterdayHourlyIdx = 6 * 24 + currentHour;
+
       // Current values: TMD primary, OpenMeteo fallback
       newTemps[sID] = {
         temp: hasTmd ? Math.round(tmdData.tc) : Math.round(w.current?.temperature_2m || 0),
         feelsLike: Math.round(w.current?.apparent_temperature || 0),
         humidity: hasTmd ? (tmdData.rh || Math.round(w.current?.relative_humidity_2m || 0)) : Math.round(w.current?.relative_humidity_2m || 0),
-        rainProb: Math.round(w.daily?.precipitation_probability_max?.[1] || 0),
+        rainProb: Math.round(w.hourly?.precipitation_probability?.[todayHourlyIdx] ?? w.daily?.precipitation_probability_max?.[todayDailyIdx] ?? 0),
         rainMm: hasTmd ? (tmdData.rain || 0) : 0,
         windSpeed: Math.round(w.current?.wind_speed_10m || 0),
         windDir: Math.round(w.current?.wind_direction_10m || 0),
-        uv: Math.round(w.daily?.uv_index_max?.[1] || 0),
+        uv: Math.round(w.hourly?.uv_index?.[todayHourlyIdx] ?? w.daily?.uv_index_max?.[todayDailyIdx] ?? 0),
         pressure: hasTmd ? (tmdData.slp || null) : null,
         cond: hasTmd ? tmdData.cond : null,
         source: hasTmd ? 'tmd' : 'openmeteo'
       };
 
       // Yesterday comparison — still from Open-Meteo (has historical data)
-      const prevTemp = w.hourly?.temperature_2m?.[currentHour];
-      const prevPm25 = a.hourly?.pm2_5?.[currentHour];
-      const prevUv = w.hourly?.uv_index?.[currentHour];
-      const prevRain = w.hourly?.precipitation_probability?.[currentHour];
-      const prevWind = w.hourly?.wind_speed_10m?.[currentHour];
+      const prevTemp = w.hourly?.temperature_2m?.[yesterdayHourlyIdx];
+      const prevPm25 = a.hourly?.pm2_5?.[yesterdayHourlyIdx];
+      const prevUv = w.hourly?.uv_index?.[yesterdayHourlyIdx];
+      const prevRain = w.hourly?.precipitation_probability?.[yesterdayHourlyIdx];
+      const prevWind = w.hourly?.wind_speed_10m?.[yesterdayHourlyIdx];
 
       newYesterday[sID] = {
-        temp: Math.round(prevTemp !== undefined ? prevTemp : (w.daily?.temperature_2m_max?.[0] || 0)),
-        minTemp: Math.round(w.daily?.temperature_2m_min?.[0] || 0),
+        temp: Math.round(prevTemp !== undefined ? prevTemp : (w.daily?.temperature_2m_max?.[yesterdayDailyIdx] || 0)),
+        minTemp: Math.round(w.daily?.temperature_2m_min?.[yesterdayDailyIdx] || 0),
         pm25: Math.round(prevPm25 !== undefined ? prevPm25 : (a.current?.pm2_5 || 0)),
-        uv: Math.round(prevUv !== undefined ? prevUv : (w.daily?.uv_index_max?.[0] || 0)),
-        rain: Math.round(prevRain !== undefined ? prevRain : (w.daily?.precipitation_probability_max?.[0] || 0)),
-        wind: Math.round(prevWind !== undefined ? prevWind : (w.daily?.wind_speed_10m_max?.[0] || 0))
+        uv: Math.round(prevUv !== undefined ? prevUv : (w.daily?.uv_index_max?.[yesterdayDailyIdx] || 0)),
+        rain: Math.round(prevRain !== undefined ? prevRain : (w.daily?.precipitation_probability_max?.[yesterdayDailyIdx] || 0)),
+        wind: Math.round(prevWind !== undefined ? prevWind : (w.daily?.wind_speed_10m_max?.[yesterdayDailyIdx] || 0))
       };
 
       let maxPm25 = 0;
       if (a.hourly?.pm2_5) {
-          const yesterdayHourly = a.hourly.pm2_5.slice(0, 24).filter(v => v !== null);
+          const yStart = yesterdayDailyIdx * 24;
+          const yesterdayHourly = a.hourly.pm2_5.slice(yStart, yStart + 24).filter(v => v !== null);
           if (yesterdayHourly.length > 0) maxPm25 = Math.max(...yesterdayHourly);
       }
 
       newMaxYesterday[sID] = {
-        temp: Math.round(w.daily?.temperature_2m_max?.[0] || 0),
+        temp: Math.round(w.daily?.temperature_2m_max?.[yesterdayDailyIdx] || 0),
         pm25: Math.round(maxPm25 || a.current?.pm2_5 || 0),
-        uv: Math.round(w.daily?.uv_index_max?.[0] || 0),
-        rain: Math.round((w.daily?.precipitation_sum?.[0] || 0) * 10) / 10,
-        wind: Math.round(w.daily?.wind_speed_10m_max?.[0] || 0)
+        uv: Math.round(w.daily?.uv_index_max?.[yesterdayDailyIdx] || 0),
+        rain: Math.round((w.daily?.precipitation_sum?.[yesterdayDailyIdx] || 0) * 10) / 10,
+        wind: Math.round(w.daily?.wind_speed_10m_max?.[yesterdayDailyIdx] || 0)
       };
 
       // Daily arrays for Map Slider
