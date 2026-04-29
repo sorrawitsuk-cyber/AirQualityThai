@@ -35,11 +35,12 @@ function MapZoomListener({ setMapZoom }) {
 }
 
 const getWindDirection = (degree) => {
-    if (degree === undefined || degree === null) return { name: '-', arrow: '🌀' };
+    if (degree === undefined || degree === null) return { name: '-', arrow: '🌀', shortName: '-' };
     const val = Math.floor((degree / 45) + 0.5);
     const arr = ["เหนือ", "ตะวันออกเฉียงเหนือ", "ตะวันออก", "ตะวันออกเฉียงใต้", "ใต้", "ตะวันตกเฉียงใต้", "ตะวันตก", "ตะวันตกเฉียงเหนือ"];
-    const arrows = ["⬇️", "↙️", "⬅️", "↖️", "⬆️", "↗️", "➡️", "↘️"]; 
-    return { name: arr[(val % 8)], arrow: arrows[(val % 8)] };
+    const shortArr = ["น.", "ตอ.น.", "ตอ.", "ตอ.ต.", "ต.", "ตต.ต.", "ตต.", "ตต.น."];
+    const arrows = ["⬇️", "↙️", "⬅️", "↖️", "⬆️", "↗️", "➡️", "↘️"];
+    return { name: arr[(val % 8)], arrow: arrows[(val % 8)], shortName: shortArr[(val % 8)] };
 };
 
 const getAverageWindDirection = (degrees = []) => {
@@ -650,15 +651,21 @@ export default function MapPage() {
     stations,
   ]);
 
-  const createMapIcon = (stationName, val, color) => {
+  const createMapIcon = (stationName, val, color, windDir) => {
+    const textCol = color === '#eab308' || color === '#b8d9f5' ? '#0c1f3d' : '#fff';
+    const hasWind = windDir && windDir.arrow !== '🌀' && windDir.shortName !== '-';
+    const windRow = hasWind
+        ? `<span style="font-size: 0.78em; opacity: 0.92; margin-top: 1px;">${windDir.arrow} ${windDir.shortName}</span>`
+        : '';
     return L.divIcon({
         className: 'custom-risk-icon',
-        html: `<div style="background: ${color}; color: ${color === '#eab308' || color === '#b8d9f5' ? '#0c1f3d' : '#fff'}; font-weight: 900; font-size: ${isMobile ? '9px' : '11px'}; padding: ${isMobile ? '2px 4px' : '4px 8px'}; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; line-height: 1.1;">
+        html: `<div style="background: ${color}; color: ${textCol}; font-weight: 900; font-size: ${isMobile ? '9px' : '11px'}; padding: ${isMobile ? '2px 4px' : '4px 8px'}; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; line-height: 1.1;">
                  <span style="font-size: 0.7em; opacity: 0.9;">${stationName}</span>
                  <span>${val}</span>
+                 ${windRow}
                </div>`,
-        iconSize: isMobile ? [50, 30] : [60, 40],
-        iconAnchor: isMobile ? [25, 15] : [30, 20]
+        iconSize: hasWind ? (isMobile ? [50, 42] : [60, 55]) : (isMobile ? [50, 30] : [60, 40]),
+        iconAnchor: hasWind ? (isMobile ? [25, 21] : [30, 27]) : (isMobile ? [25, 15] : [30, 20])
     });
   };
 
@@ -1420,7 +1427,10 @@ export default function MapPage() {
                         }
 
                         if (!isVisible) return null;
-                        return <Marker key={st.stationID} position={[st.lat, st.long]} icon={createMapIcon(st.areaTH.replace('จังหวัด',''), st.displayVal, st.color)} interactive={false} />;
+                        const windDir = (mapCategory === 'basic' && activeBasicMode === 'wind' && isNowMode)
+                            ? getWindDirection(stationTemps[st.stationID]?.windDirection)
+                            : null;
+                        return <Marker key={st.stationID} position={[st.lat, st.long]} icon={createMapIcon(st.areaTH.replace('จังหวัด',''), st.displayVal, st.color, windDir)} interactive={false} />;
                     })}
                     
                     {/* 🆕 Amphoe markers — แสดงเมื่อซูมเข้าไประดับอำเภอ (zoom >= 9) */}
