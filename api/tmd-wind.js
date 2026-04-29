@@ -5,7 +5,7 @@ let _cache = null;
 let _cacheAt = 0;
 
 const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
-const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 const AI_TIMEOUT_MS = 25000;
 
 // Upper air analysis standard times (UTC): 00, 06, 12, 18 + supplemental 03, 09, 15, 21
@@ -242,6 +242,7 @@ export default async function handler(req, res) {
       const fallback = buildFallbackData(pageText, synopticHour);
       _cache = fallback;
       _cacheAt = Date.now();
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60');
       return res.status(200).json(fallback);
     }
 
@@ -263,6 +264,7 @@ export default async function handler(req, res) {
     };
     _cacheAt = Date.now();
 
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=600');
     return res.status(200).json(_cache);
   } catch (err) {
     console.error('[tmd-wind] CRITICAL ERROR:', err);
