@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/tmd-wind.js": { "maxDuration": 30 }
+  },
   "headers": [
     {
       "source": "/index.html",

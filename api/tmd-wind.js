@@ -5,8 +5,8 @@ let _cache = null;
 let _cacheAt = 0;
 
 const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
-const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.0-flash'];
-const AI_TIMEOUT_MS = 5500;
+const MODEL = 'gemini-2.5-flash';
+const AI_TIMEOUT_MS = 8000;
 
 // Upper air analysis standard times (UTC): 00, 06, 12, 18 + supplemental 03, 09, 15, 21
 const SYNOPTIC_HOURS = [0, 3, 6, 9, 12, 15, 18, 21];
@@ -40,6 +40,78 @@ async function fetchHtml() {
   }
 }
 
+
+function buildFallbackData(pageText, synopticHour) {
+  const month = new Date().getMonth() + 1; // 1-12
+  const hour = new Date().getHours(); // 0-23
+
+  // Thai seasonal patterns
+  const isHotSeason = month >= 3 && month <= 5;
+  const isRainySeason = month >= 5 && month <= 10;
+  const isCoolSeason = month >= 11 || month <= 2;
+
+  // Afternoon = 12-18, evening = 18-22
+  const isAfternoon = hour >= 12 && hour < 18;
+  const isEvening = hour >= 18 && hour < 22;
+
+  let rainForming = 'none';
+  let nationalRainChance = 0;
+  let peakRainTime = 'none';
+
+  if (isRainySeason) {
+    rainForming = 'possible';
+    nationalRainChance = 35;
+    peakRainTime = 'afternoon';
+    if (isAfternoon || isEvening) {
+      rainForming = 'forming';
+      nationalRainChance = 55;
+    }
+  } else if (isHotSeason && (isAfternoon || isEvening)) {
+    rainForming = 'possible';
+    nationalRainChance = 25;
+    peakRainTime = 'afternoon';
+  }
+
+  return {
+    limited: false,
+    isFallback: true,
+    quickSummary: isRainySeason
+      ? 'ฤดูฝนเริ่มต้น มีโอกาสเกิดฝนกระจายหลายพื้นที่'
+      : 'ท้องฟ้าส่วนใหญ่แจ่มใส แต่อาจมีฝนบางพื้นที่',
+    summary: `ข้อมูลฤดูกาล: ${isRainySeason ? 'ฤดูฝน' : isHotSeason ? 'ฤดูร้อน' : 'ฤดูหนาว'}`,
+    synopticHourUTC: synopticHour,
+    nationalRainChance,
+    rainForming,
+    rainFormingDesc: `ตอนนี้ฝน${rainForming === 'active' ? 'ตกอยู่' : rainForming === 'forming' ? 'กำลังก่อตัว' : rainForming === 'possible' ? 'อาจเกิดขึ้น' : 'ไม่น่าจะเกิด'}`,
+    peakRainTime,
+    peakRainTimeDesc: peakRainTime === 'afternoon' ? '12:00–18:00 น.' : peakRainTime === 'evening' ? '18:00–22:00 น.' : '–',
+    bangkok: {
+      rainChance: Math.max(0, Math.min(100, nationalRainChance - 15)),
+      status: nationalRainChance > 40 ? 'มีโอกาสฝน' : nationalRainChance > 20 ? 'ท้องฟ้าปกติ' : 'ท้องฟ้าแจ่มใส',
+      action: nationalRainChance > 40 ? '🌂 แนะนำพกร่ม' : '✅ ไม่ต้องพกร่ม',
+      detail: 'จากข้อมูลฤดูกาล (ระบบวิเคราะห์หลักขัดข้อง)',
+    },
+    mainDriver: isRainySeason ? 'ลมมรสุมตะวันออกเฉียงใต้' : 'ความร้อนจากแรงแสงอาทิตย์',
+    regions: [
+      { name: 'ภาคเหนือ', rainChance: Math.max(20, nationalRainChance - 20), windLevel: '850hPa', pattern: 'ลมจากตะวันออก', detail: '' },
+      { name: 'ภาคกลาง', rainChance: Math.max(15, nationalRainChance - 25), windLevel: '850hPa', pattern: 'ลมแปรปรวน', detail: '' },
+      { name: 'ภาคตะวันออกเฉียงเหนือ', rainChance: nationalRainChance - 10, windLevel: '850hPa', pattern: 'ลมจากตะวันออก', detail: '' },
+      { name: 'ภาคตะวันออก', rainChance: nationalRainChance, windLevel: '850hPa', pattern: 'ลมจากทะเล', detail: '' },
+      { name: 'ภาคตะวันตก', rainChance: Math.max(nationalRainChance - 5, 15), windLevel: '850hPa', pattern: 'ลมแปรปรวน', detail: '' },
+      { name: 'ภาคใต้ฝั่งตะวันออก', rainChance: nationalRainChance + 10, windLevel: '850hPa', pattern: 'ลมจากทะเล', detail: '' },
+      { name: 'ภาคใต้ฝั่งตะวันตก', rainChance: nationalRainChance + 5, windLevel: '850hPa', pattern: 'ลมจากทะเล', detail: '' },
+    ],
+    levelInsights: [
+      { level: '925hPa', description: 'ลมระดับต่ำ: ทิศทางแปรปรวน' },
+      { level: '850hPa', description: 'ลมระดับกลางล่าง: ส่วนใหญ่จากตะวันออก' },
+      { level: '500hPa', description: 'ลมระดับกลาง: อ่อนไป ปานกลาง' },
+    ],
+    alerts: ['ข้อมูลเป็นการประมาณจากรูปแบบฤดูกาล เนื่องจากระบบวิเคราะห์หลักไม่พร้อมใช้งาน'],
+    confidence: 'low',
+    tmdAvailable: false,
+    cachedAt: new Date().toISOString(),
+  };
+}
 
 function stripHtml(html) {
   return html
@@ -122,40 +194,21 @@ export default async function handler(req, res) {
     const client = new GoogleGenerativeAI(apiKey);
 
     let raw = null;
-    let usedModel = null;
-    for (const modelId of MODEL_CANDIDATES) {
-      try {
-        const result = await withTimeout(
-          client.getGenerativeModel({ model: modelId }).generateContent(prompt),
-          AI_TIMEOUT_MS,
-        );
-        raw = result.response.text().trim();
-        usedModel = modelId;
-        break;
-      } catch (err) {
-        console.warn(`[tmd-wind] ${modelId} failed:`, err.message?.slice(0, 120));
-      }
+    try {
+      const result = await withTimeout(
+        client.getGenerativeModel({ model: MODEL }).generateContent(prompt),
+        AI_TIMEOUT_MS,
+      );
+      raw = result.response.text().trim();
+    } catch (err) {
+      console.warn(`[tmd-wind] ${MODEL} failed:`, err.message?.slice(0, 120));
     }
 
     if (!raw) {
-      return res.status(200).json({
-        limited: true,
-        quickSummary: 'ไม่สามารถวิเคราะห์สภาพอากาศได้ในขณะนี้',
-        summary: 'ระบบวิเคราะห์ชั่วคราวขัดข้อง โปรดลองใหม่ในภายหลัง',
-        nationalRainChance: 0,
-        rainForming: 'none',
-        rainFormingDesc: '',
-        peakRainTime: 'none',
-        peakRainTimeDesc: '',
-        bangkok: { rainChance: 0, status: '–', action: 'ไม่สามารถวิเคราะห์ได้', detail: '' },
-        mainDriver: '',
-        regions: [],
-        levelInsights: [],
-        alerts: [],
-        confidence: 'low',
-        tmdAvailable: htmlText !== null,
-        cachedAt: new Date().toISOString(),
-      });
+      const fallback = buildFallbackData(pageText, synopticHour);
+      _cache = fallback;
+      _cacheAt = Date.now();
+      return res.status(200).json(fallback);
     }
 
     let data;
@@ -168,7 +221,7 @@ export default async function handler(req, res) {
 
     _cache = {
       ...data,
-      model: usedModel,
+      model: MODEL,
       tmdAvailable: htmlText !== null,
       cachedAt: new Date().toISOString(),
       nextUpdateAt: new Date(Date.now() + CACHE_TTL).toISOString(),
@@ -178,23 +231,7 @@ export default async function handler(req, res) {
     return res.status(200).json(_cache);
   } catch (err) {
     console.error('[tmd-wind] CRITICAL ERROR:', err);
-    return res.status(200).json({
-      limited: true,
-      quickSummary: 'ไม่สามารถวิเคราะห์สภาพอากาศได้ในขณะนี้',
-      summary: err.message,
-      nationalRainChance: 0,
-      rainForming: 'none',
-      rainFormingDesc: '',
-      peakRainTime: 'none',
-      peakRainTimeDesc: '',
-      bangkok: { rainChance: 0, status: '–', action: 'ไม่สามารถวิเคราะห์ได้', detail: '' },
-      mainDriver: '',
-      regions: [],
-      levelInsights: [],
-      alerts: [],
-      confidence: 'low',
-      tmdAvailable: false,
-      cachedAt: new Date().toISOString(),
-    });
+    const fallback = buildFallbackData('', nearestSynopticTime());
+    return res.status(200).json(fallback);
   }
 }
