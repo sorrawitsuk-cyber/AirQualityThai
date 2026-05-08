@@ -125,8 +125,7 @@ export default function MapPage() {
   const [flyToPos, setFlyToPos] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [activePanel, setActivePanel] = useState(null); // 'legend' | 'filter' | 'category' | 'layer' | 'time' | 'rank'
-  const [showStationMarkers, setShowStationMarkers] = useState(true);
-  const [showLayerPanel, setShowLayerPanel] = useState(false);
+
 
   const [flashProv, setFlashProv] = useState(null);
   const hasAutoLocated = useRef(false);
@@ -293,7 +292,6 @@ export default function MapPage() {
   }, [darkMode, gistdaModes]);
 
   // Derived from timeMode — day overview uses daily rollups; now uses the latest observed values.
-  const effectiveDayOffset = timeMode === 'tomorrow' ? 1 : 0;
   const isNowMode = timeMode === 'now';
 
   const getBasicVal = useCallback((station, mode) => {
@@ -591,8 +589,8 @@ export default function MapPage() {
               rainProb: daily.rain?.[idx], windSpeed: daily.wind?.[idx], uv: daily.uv?.[idx],
               humidity: daily.humidity?.[idx] || currentData.humidity,
               pressure: daily.pressure?.[idx] || currentData.pressure,
-              windDirection: currentData.windDirection,
-              windDir: currentData.windDirection,
+              windDirection: currentData.windDir,
+              windDir: currentData.windDir,
           };
           const pm25 = isNowMode ? (station.AQILast?.PM25?.value || 0) : (daily.pm25?.[idx] || 0);
           const summary7 = get7DaySummary(station);
@@ -702,6 +700,9 @@ export default function MapPage() {
     setActiveModeById(activeModeList[nextIndex].id);
   }, [activeModeIndex, activeModeList, setActiveModeById]);
 
+  const handleMobileLayerSwipeStart = useCallback(() => {}, []);
+  const handleMobileLayerSwipeEnd = useCallback(() => {}, []);
+
   const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const getDateLabel = (offset) => {
       const d = new Date();
@@ -806,7 +807,7 @@ export default function MapPage() {
       const vals = sts.map(st => st.displayVal).filter(v => v != null && !Number.isNaN(v));
       const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
       const windDirection = activeBasicMode === 'wind'
-        ? getAverageWindDirection(sts.map(st => stationTemps[st.stationID]?.windDirection))
+        ? getAverageWindDirection(sts.map(st => stationTemps[st.stationID]?.windDir))
         : null;
       const color = mapCategory === 'basic'
         ? getBasicColor(avg, activeBasicMode)
@@ -831,7 +832,7 @@ export default function MapPage() {
               if (activeBasicMode === 'wind') return live.windSpeed || 0;
               return live[activeBasicMode] || 0;
             }
-            return stationDaily[st.stationID]?.[activeBasicMode]?.[i] || 0;
+            return daily[activeBasicMode]?.[i] || 0;
           })
         : stations.map(st => stationDaily[st.stationID]?.pm25?.[i] || 0))
         .filter(v => v > 0);
@@ -913,13 +914,6 @@ export default function MapPage() {
 
   const secondaryToolOptions = mapCategoryOptions.filter(opt => opt.id !== 'basic');
 
-  const setActiveModeByCategory = (id) => {
-    if (mapCategory === 'basic') setActiveBasicMode(id);
-    else if (mapCategory === 'risk') setActiveRiskMode(id);
-    else if (mapCategory === 'yesterday') setActiveYesterdayMode(id);
-    else setActiveGistdaMode(id);
-  };
-
   const activeCategoryOption = mapCategoryOptions.find(opt => opt.id === mapCategory);
   const activeDataSourceMeta = mapCategory === 'basic'
     ? (timeMode === 'now'
@@ -944,30 +938,6 @@ export default function MapPage() {
           ? 'ภาพรวมวันนี้ = ใช้ค่าสรุปรายวันของวันนี้'
           : 'พรุ่งนี้ = ค่าพยากรณ์รายวันของวันถัดไป')
     : '';
-
-  const quickPresetOptions = [
-    {
-      id: 'pm-now',
-      label: 'ดูฝุ่นตอนนี้',
-      icon: '😷',
-      color: '#f97316',
-      onClick: () => { setMapCategory('basic'); setActiveBasicMode('pm25'); setTimeMode('now'); }
-    },
-    {
-      id: 'rain-tomorrow',
-      label: 'ดูฝนพรุ่งนี้',
-      icon: '🌧️',
-      color: '#3b82f6',
-      onClick: () => { setMapCategory('basic'); setActiveBasicMode('rain'); setTimeMode('tomorrow'); }
-    },
-    {
-      id: 'risk-health',
-      label: 'ดูเสี่ยงสุขภาพ',
-      icon: '⚠️',
-      color: '#8b5cf6',
-      onClick: () => { setMapCategory('risk'); setActiveRiskMode('respiratory'); setTimeMode('now'); }
-    }
-  ];
 
   const canChooseTimeMode = mapCategory === 'basic';
   const timeModeSections = [
@@ -1092,52 +1062,6 @@ export default function MapPage() {
     downloadTextFile(`thaiweather-map-${mapCategory}-${activeModeId}-${activeTimeKey}-${dateKey}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
   };
 
-  const timeControlCard = (
-    <div style={{ background: cardBg, padding: '7px 10px', borderRadius: '14px', border: `1px solid ${borderColor}`, marginBottom: '6px', flexShrink: 0, boxShadow: '0 4px 14px rgba(15,23,42,0.07)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: textColor, fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
-          <span>🗓️</span>
-          <span>3. เลือกช่วงเวลา</span>
-        </div>
-        <div className="hide-scrollbar" style={{ display: 'flex', gap: '6px', overflowX: 'auto', minWidth: 0 }}>
-          {timeModeSections.flatMap(section => section.options.map(opt => ({ ...opt, sectionTitle: section.title }))).map(opt => {
-            const active = activeTimeKey === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => handleTimeOptionSelect(opt.id)}
-                style={{
-                  padding: '6px 11px',
-                  borderRadius: '999px',
-                  border: `1px solid ${active ? opt.color : borderColor}`,
-                  background: active ? (darkMode ? `${opt.color}24` : `${opt.color}16`) : 'var(--bg-secondary)',
-                  color: active ? opt.color : textColor,
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  fontFamily: 'Kanit',
-                  fontSize: '0.72rem',
-                  transition: 'all 0.2s',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  minWidth: 0,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-                title={`${opt.sectionTitle}: ${opt.sub}`}
-              >
-                <span>{opt.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: darkMode ? `${activeDataSourceMeta.color}22` : `${activeDataSourceMeta.color}14`, color: activeDataSourceMeta.color, border: `1px solid ${darkMode ? `${activeDataSourceMeta.color}55` : `${activeDataSourceMeta.color}35`}`, borderRadius: '999px', padding: '4px 9px', fontSize: '0.64rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-          <span>{activeDataSourceMeta.icon}</span>
-          <span>{activeDataSourceMeta.label}</span>
-        </span>
-      </div>
-    </div>
-  );
   const mobileDockButtons = [
     {
       id: 'layer',
@@ -1428,7 +1352,7 @@ export default function MapPage() {
 
                         if (!isVisible) return null;
                         const windDir = (mapCategory === 'basic' && activeBasicMode === 'wind' && isNowMode)
-                            ? getWindDirection(stationTemps[st.stationID]?.windDirection)
+                            ? getWindDirection(stationTemps[st.stationID]?.windDir)
                             : null;
                         return <Marker key={st.stationID} position={[st.lat, st.long]} icon={createMapIcon(st.areaTH.replace('จังหวัด',''), st.displayVal, st.color, windDir)} interactive={false} />;
                     })}
@@ -1466,6 +1390,7 @@ export default function MapPage() {
                     })()}
                 </MapContainer>
 
+                {/* eslint-disable-next-line no-constant-binary-expression */}
                 {false && isMobile && (
                   <div
                     className="fade-in"
@@ -1819,6 +1744,7 @@ export default function MapPage() {
               </div>
 
               {/* === 7-DAY FORECAST BAR (desktop only) === */}
+              {/* eslint-disable-next-line no-constant-binary-expression */}
               {false && !isMobile && forecast7d.length > 0 && (
                 <div style={{ background: cardBg, borderRadius: '14px', border: `1px solid ${borderColor}`, padding: '8px 12px', flexShrink: 0 }}>
                   <div style={{ fontSize: '0.6rem', fontWeight: 900, color: subTextColor, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
