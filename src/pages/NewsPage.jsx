@@ -11,14 +11,13 @@ import {
   ShieldAlert,
   ThermometerSun,
 } from 'lucide-react';
-import LoadingScreen from '../components/LoadingScreen';
 
 const categoryOptions = [
   { id: 'all', label: 'ทั้งหมด', icon: Search, color: '#2563eb' },
   { id: 'warning', label: 'เตือนภัย', icon: ShieldAlert, color: '#ef4444' },
   { id: 'news', label: 'ข่าวสาร', icon: Newspaper, color: '#475569' },
   { id: 'weather', label: 'สภาพอากาศ', icon: CloudRain, color: '#0ea5e9' },
-  { id: 'climate', label: 'Climate', icon: ThermometerSun, color: '#16a34a' },
+  { id: 'climate', label: 'ENSO/ภูมิอากาศ', icon: ThermometerSun, color: '#16a34a' },
 ];
 
 const topicMeta = {
@@ -188,7 +187,7 @@ function extractThaiProvinces(text = '', limit = 18) {
   return found.slice(0, limit);
 }
 
-const ensoOutlook = {
+const fallbackEnsoOutlook = {
   updatedAt: '26 เม.ย. 2569',
   status: 'ENSO-neutral',
   alert: 'El Niño Watch',
@@ -558,8 +557,29 @@ export default function NewsPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [activeCategory, setActiveCategory] = useState('all');
   const [query, setQuery] = useState('');
-  const [feed, setFeed] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [feed, setFeed] = useState(() => {
+    try {
+      const cached = window.localStorage.getItem('air4thai-news-feed-cache');
+      return cached ? JSON.parse(cached).payload : null;
+    } catch {
+      return null;
+    }
+  });
+  const [ensoFeed, setEnsoFeed] = useState(() => {
+    try {
+      const cached = window.localStorage.getItem('air4thai-enso-cache');
+      return cached ? JSON.parse(cached).payload : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !window.localStorage.getItem('air4thai-news-feed-cache');
+    } catch {
+      return true;
+    }
+  });
   const [error, setError] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -576,6 +596,7 @@ export default function NewsPage() {
   const heroRef = useRef(null);
   const detailRef = useRef(null);
   const newsRef = useRef(null);
+  const ensoOutlook = ensoFeed || fallbackEnsoOutlook;
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -595,10 +616,10 @@ export default function NewsPage() {
       setLoading(true);
       setError('');
       try {
-        const endpoint = `/api/news?_fresh=${refreshToken || Date.now()}`;
+        const endpoint = refreshToken ? `/api/news?fresh=${refreshToken}` : '/api/news';
         const response = await fetch(endpoint, {
           signal: controller.signal,
-          cache: 'no-store',
+          cache: refreshToken ? 'no-store' : 'default',
           headers: { Accept: 'application/json' },
         });
         if (!response.ok) {
@@ -607,6 +628,7 @@ export default function NewsPage() {
         const payload = await response.json();
         if (!active) return;
         setFeed(payload);
+        window.localStorage.setItem('air4thai-news-feed-cache', JSON.stringify({ cachedAt: Date.now(), payload }));
       } catch (loadError) {
         if (loadError.name === 'AbortError') return;
         if (!active) return;
@@ -622,6 +644,34 @@ export default function NewsPage() {
       controller.abort();
     };
   }, [refreshToken]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    async function loadEnso() {
+      try {
+        const response = await fetch('/api/enso', {
+          signal: controller.signal,
+          cache: 'default',
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!active) return;
+        setEnsoFeed(payload);
+        window.localStorage.setItem('air4thai-enso-cache', JSON.stringify({ cachedAt: Date.now(), payload }));
+      } catch {
+        // ENSO has a robust local fallback; keep the page fast and quiet.
+      }
+    }
+
+    loadEnso();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
 
   const normalizedAlerts = useMemo(() => {
     if (!feed) return [];
@@ -705,6 +755,31 @@ export default function NewsPage() {
   }, [filteredAlerts, filteredStories, normalizedAlerts, normalizedStories]);
 
   const heroItem = heroItems[currentHero] || null;
+  const newsStats = useMemo(() => ([
+    {
+      label: 'ประกาศสำคัญ',
+      value: normalizedAlerts.filter((item) => item.severity === 'high' || item.severity === 'medium').length,
+      detail: normalizedAlerts[0]?.title || 'ยังไม่มีประกาศรุนแรงในตัวกรอง',
+      icon: '🚨',
+      color: '#ef4444',
+    },
+    {
+      label: 'ฝนฟ้าอากาศ',
+      value: feed?.weather?.summary || 'กำลังอัปเดต',
+      detail: feed?.weather?.days?.[0]
+        ? `วันนี้ ${feed.weather.days[0].label} ฝน ${feed.weather.days[0].rainChance}%`
+        : 'ดึงพยากรณ์จาก Open-Meteo และ TMD',
+      icon: '🌦️',
+      color: '#0ea5e9',
+    },
+    {
+      label: 'ENSO',
+      value: ensoOutlook.status || 'ENSO',
+      detail: `${ensoOutlook.alert || ''} · ${ensoOutlook.nino34 || '-'}`,
+      icon: '🌊',
+      color: '#16a34a',
+    },
+  ]), [feed, normalizedAlerts, ensoOutlook]);
 
   useEffect(() => {
     if (!heroItems.length) {
@@ -805,10 +880,6 @@ export default function NewsPage() {
     </div>
   );
 
-  if (loading && !feed) {
-    return <LoadingScreen title="กำลังโหลดข่าวสาร" subtitle="รวมข่าวอากาศและประกาศเตือนภัยล่าสุด" />;
-  }
-
   return (
     <main
       style={{
@@ -822,9 +893,9 @@ export default function NewsPage() {
     >
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto', gap: 14, alignItems: 'start', marginBottom: 18 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '1.95rem', fontWeight: 900 }}>ข่าวสาร & เตือนภัย</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '1.95rem', fontWeight: 900 }}>ศูนย์ข่าวอากาศ & ENSO</h1>
           <p style={{ margin: '6px 0 0', color: 'var(--text-sub)', fontSize: '0.92rem' }}>
-            อัปเดตสถานการณ์ล่าสุดเพื่อความปลอดภัยของคุณ และตรวจสอบแหล่งข้อมูลจริงได้จากหน้าเดียว
+            ข่าวฝนฟ้า ประกาศเตือนภัย คุณภาพอากาศ และเอลนีโญ/ลานีญ่า จากแหล่งข้อมูลจริงที่โหลดแบบเร็วขึ้น
           </p>
         </div>
 
@@ -910,6 +981,21 @@ export default function NewsPage() {
         })}
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12, maxWidth: 1180, margin: '0 auto 18px' }}>
+        {newsStats.map((stat) => (
+          <div key={stat.label} style={{ background: 'var(--bg-card)', border: `1px solid ${stat.color}24`, borderRadius: 18, padding: 14, boxShadow: '0 12px 26px rgba(15, 23, 42, 0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 14, display: 'grid', placeItems: 'center', background: `${stat.color}13`, color: stat.color, fontSize: '1.2rem' }}>{stat.icon}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: stat.color, fontSize: '0.72rem', fontWeight: 950 }}>{stat.label}</div>
+                <div style={{ color: 'var(--text-main)', fontWeight: 950, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stat.value}</div>
+              </div>
+            </div>
+            <div style={{ color: 'var(--text-sub)', fontSize: '0.76rem', lineHeight: 1.5, marginTop: 10, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{stat.detail}</div>
+          </div>
+        ))}
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18, alignItems: 'start', maxWidth: 1180, margin: '0 auto' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <Panel
@@ -923,8 +1009,8 @@ export default function NewsPage() {
               color: 'var(--text-main)',
             }}
           >
-            {loading ? (
-              <div style={{ padding: '18px 4px', color: 'rgba(255,255,255,0.92)' }}>กำลังดึงข่าวล่าสุดจากแหล่งข้อมูลจริง...</div>
+            {loading && !feed ? (
+              <div style={{ padding: '18px 4px', color: 'var(--text-sub)', fontWeight: 900 }}>กำลังดึงข่าวล่าสุดจากแหล่งข้อมูลจริง...</div>
             ) : error ? (
               <div style={{ padding: '18px 4px', color: '#fff' }}>
                 <div style={{ fontWeight: 900, fontSize: '1rem' }}>โหลดข่าวจาก `/api/news` ไม่สำเร็จ</div>
@@ -1280,7 +1366,7 @@ export default function NewsPage() {
               </button>
             </div>
 
-            {loading ? (
+            {loading && !feed ? (
               <div style={{ color: 'var(--text-sub)' }}>กำลังดึงข่าวสารล่าสุด...</div>
             ) : filteredStories.length ? (
               renderNewsList(filteredStories.slice(0, 16), 'ไม่พบข่าวสารในตัวกรองนี้')
