@@ -1399,6 +1399,7 @@ export default function Dashboard() {
 
   const desktopShowcaseLayout = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minWidth: 0 }}>
+      {rainNowcastCard}
       <div style={{ ...surfaceCardStyle, padding: '20px' }}>
         {heroCard}
         {quickActionBar}
@@ -1406,7 +1407,6 @@ export default function Dashboard() {
         {healthAdviceBar}
         {highlightMetricsGrid}
       </div>
-      {rainNowcastCard}
       {rainRadarCard}
       {tomorrowOverviewCard}
       {briefingCard}
@@ -1424,6 +1424,7 @@ export default function Dashboard() {
   const mobileOverviewLayout = (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', flexShrink: 0, width: '100%', alignItems: 'stretch', minWidth: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
+        {rainNowcastCard}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', flexShrink: 0, alignItems: 'stretch' }}>
           {heroCard}
           {quickActionBar}
@@ -1431,7 +1432,6 @@ export default function Dashboard() {
           {healthAdviceBar}
           {highlightMetricsGrid}
         </div>
-        {rainNowcastCard}
         {rainRadarCard}
         {tomorrowOverviewCard}
         {briefingCard}
