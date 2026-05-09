@@ -28,7 +28,7 @@
     },
     {
       "path": "/api/cron-wind",
-      "schedule": "0 */3 * * *"
+      "schedule": "30 0 * * *"
     }
   ],
   "rewrites": [
