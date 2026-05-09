@@ -102,7 +102,7 @@ const getActionableAdvice = (pm25, temp, rain, uv, wind) => {
 };
 
 export default function MapPage() {
-  const { stations, stationTemps, stationYesterday, stationMaxYesterday, stationDaily, darkMode, gistdaSummary, lastUpdated, amphoeData, tmdAvailable } = useContext(WeatherContext);
+  const { stations, stationTemps, stationYesterday, stationMaxYesterday, stationDaily, darkMode, gistdaSummary, lastUpdated, amphoeData, tmdAvailable, loading } = useContext(WeatherContext);
   
   const [geoData, setGeoData] = useState(null);
   const [geoError, setGeoError] = useState(false);
@@ -883,9 +883,12 @@ export default function MapPage() {
     </div>
   );
 
-  if (!geoData || Object.keys(stationTemps).length === 0) return (
+  if (!geoData) return (
     <LoadingScreen title="กำลังเตรียมแผนที่" subtitle="ประมวลผลข้อมูลเฝ้าระวังทั้ง 77 จังหวัด" />
   );
+
+  const hasRealtimeData = (stations?.length || 0) > 0 && Object.keys(stationTemps || {}).length > 0;
+  const showRealtimeDataWarning = !loading && !hasRealtimeData;
 
   const mapCategoryOptions = [
     { id: 'basic', label: 'อากาศ', shortLabel: 'อากาศ', icon: '🌤️', color: '#0ea5e9', desc: 'PM2.5 ฝน ลม UV', useFor: 'เช็กค่าปัจจุบันและพยากรณ์' },
@@ -1391,6 +1394,34 @@ export default function MapPage() {
                 </MapContainer>
 
                 {/* eslint-disable-next-line no-constant-binary-expression */}
+                {showRealtimeDataWarning && (
+                  <div
+                    className="fade-in"
+                    style={{
+                      position: 'absolute',
+                      top: isMobile ? '12px' : '14px',
+                      left: isMobile ? '12px' : '14px',
+                      right: isMobile ? '12px' : 'auto',
+                      maxWidth: isMobile ? 'none' : '420px',
+                      zIndex: 1002,
+                      background: darkMode ? 'rgba(15, 30, 54, 0.94)' : 'rgba(255, 255, 255, 0.94)',
+                      color: textColor,
+                      border: `1px solid ${borderColor}`,
+                      borderLeft: '4px solid #f59e0b',
+                      borderRadius: '12px',
+                      padding: '10px 12px',
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                      backdropFilter: 'blur(10px)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.82rem', fontWeight: 900, marginBottom: '3px' }}>แสดงแผนที่ฐานได้แล้ว</div>
+                    <div style={{ fontSize: '0.72rem', color: subTextColor, lineHeight: 1.45 }}>
+                      ข้อมูล realtime ยังโหลดไม่ได้จาก Firebase จึงซ่อนหมุดและค่าสถานีชั่วคราว
+                    </div>
+                  </div>
+                )}
+
                 {false && isMobile && (
                   <div
                     className="fade-in"
