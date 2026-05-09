@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 import { useWeatherData } from '../hooks/useWeatherData';
 import { useDraggableScroll } from '../hooks/useDraggableScroll';
-import { getAqiTheme, getAlertBanner, getBriefingText } from '../utils/weatherHelpers';
+import { getAqiTheme, getAlertBanner } from '../utils/weatherHelpers';
 
 import DailyForecast from '../components/Dashboard/DailyForecast';
 import SunriseSunsetArc from '../components/Dashboard/SunriseSunsetArc';
@@ -453,7 +453,6 @@ export default function Dashboard() {
   const tomorrowMaxTemp = daily?.temperature_2m_max?.[1] ? Math.round(daily.temperature_2m_max[1]) : null;
   const tomorrowRainProb = daily?.precipitation_probability_max?.[1] || 0;
 
-  const briefingText = getBriefingText(weatherText, current?.temp, current?.feelsLike, maxTemp, dailyRainProb, current?.pm25, currentHour, tomorrowMaxTemp, tomorrowRainProb);
   const minChartTemp = Math.min(...chartData.map((item) => item.temp), Math.round(current?.temp || 0));
   const maxChartTemp = Math.max(...chartData.map((item) => item.temp), Math.round(current?.temp || 0));
   const chartTempRange = Math.max(maxChartTemp - minChartTemp, 4);
@@ -521,20 +520,25 @@ export default function Dashboard() {
     })
     .filter((item) => item.minutesFromNow >= -15 && item.minutesFromNow <= 180)
     .slice(0, 13);
-  const incomingRainCell = minutelyRows.find((item) => item.minutesFromNow >= 0 && (item.rain >= 0.1 || item.probability >= 45));
+  const isRainSignal = (item) => item && (item.rain >= 0.1 || item.probability >= 45);
+  const radarRainNowCell = minutelyRows.find((item) => item.minutesFromNow <= 15 && isRainSignal(item));
+  const incomingRainCell = minutelyRows.find((item) => item.minutesFromNow > 15 && isRainSignal(item));
   const peakMinutelyRain = minutelyRows.reduce((best, item) => {
     const score = item.probability + item.rain * 28;
     const bestScore = (best?.probability || 0) + (best?.rain || 0) * 28;
     return score > bestScore ? item : best;
   }, minutelyRows[0]);
   const rainNow = Number(current?.rain || current?.precipitation || currentRainAmount || 0);
-  const nowcastRainAlert = rainNow >= 0.1
+  const nowRainAmount = Math.max(rainNow, radarRainNowCell?.rain || 0);
+  const nowcastRainAlert = rainNow >= 0.1 || radarRainNowCell
     ? {
-      key: `now-${Math.round(rainNow * 10)}`,
+      key: `now-${radarRainNowCell?.time || Math.round(nowRainAmount * 10)}`,
       level: 'danger',
       icon: '🌧️',
-      title: 'ฝนกำลังตกใกล้พื้นที่',
-      detail: `เรดาร์ควรจับตาใกล้บ้าน ปริมาณฝนล่าสุด ${rainNow.toFixed(1)} มม.`,
+      title: 'มีฝนในพื้นที่ตอนนี้',
+      detail: nowRainAmount >= 0.1
+        ? `เรดาร์พบฝนบริเวณพื้นที่ของคุณ ปริมาณล่าสุด ${nowRainAmount.toFixed(1)} มม.`
+        : `เรดาร์พบกลุ่มฝนบริเวณพื้นที่ของคุณ โอกาสฝน ${radarRainNowCell.probability}%`,
       time: 'ตอนนี้',
       tone: '#2563eb',
       bg: 'rgba(37,99,235,0.12)',
@@ -563,7 +567,6 @@ export default function Dashboard() {
         bg: 'rgba(22,163,74,0.1)',
         progress: Math.min(100, Math.max(8, peakMinutelyRain?.probability || 8)),
       };
-  const rainAlertStatusText = rainAlertEnabled ? 'แจ้งเตือนเปิดอยู่' : 'เปิดแจ้งเตือนฝน';
   const handleRainAlertToggle = async () => {
     if (!rainAlertEnabled && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
@@ -1204,16 +1207,6 @@ export default function Dashboard() {
     ];
   };
 
-  const todayOverviewSlots = [
-    { label: 'เช้า', range: '06:00-11:00', data: chartData.find((item) => Number(item.time.slice(0, 2)) >= 6 && Number(item.time.slice(0, 2)) <= 11) || chartData[0] },
-    { label: 'บ่าย', range: '12:00-16:00', data: chartData.find((item) => Number(item.time.slice(0, 2)) >= 12 && Number(item.time.slice(0, 2)) <= 16) || chartData[4] || chartData[0] },
-    { label: 'เย็น', range: '17:00-20:00', data: chartData.find((item) => Number(item.time.slice(0, 2)) >= 17 && Number(item.time.slice(0, 2)) <= 20) || chartData[8] || chartData[0] },
-    { label: 'กลางคืน', range: '21:00-05:00', data: chartData.find((item) => {
-      const hour = Number(item.time.slice(0, 2));
-      return hour >= 21 || hour <= 5;
-    }) || chartData[12] || chartData[0] },
-  ];
-
   const tomorrowOverviewSlots = buildOverviewSlotsForDate(1);
 
   const renderOverviewCard = (title, slots, accent = '#2563eb') => (
@@ -1242,7 +1235,6 @@ export default function Dashboard() {
     </div>
   );
 
-  const todayOverviewCard = renderOverviewCard('วันนี้ภาพรวม', todayOverviewSlots, '#2563eb');
   const tomorrowOverviewCard = renderOverviewCard('พรุ่งนี้ภาพรวม', tomorrowOverviewSlots, '#8b5cf6');
 
   const peakRainHour = [...chartData].sort((a, b) => (b.rain || 0) - (a.rain || 0))[0];
