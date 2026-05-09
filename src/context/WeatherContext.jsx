@@ -1,11 +1,18 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { ref, onValue } from 'firebase/database';
-import { db } from '../firebase'; 
+import { provinces77 } from '../provinces77';
 
 export const WeatherContext = createContext();
 
+const initialStations = provinces77.map((province, index) => ({
+  stationID: `PROV_${index}`,
+  areaTH: province.n,
+  lat: province.lat,
+  long: province.lon,
+  AQILast: { PM25: { value: 0 } },
+}));
+
 export const WeatherProvider = ({ children }) => {
-  const [stations, setStations] = useState([]);
+  const [stations, setStations] = useState(initialStations);
   const [stationTemps, setStationTemps] = useState({});
   const [stationYesterday, setStationYesterday] = useState({}); 
   const [stationMaxYesterday, setStationMaxYesterday] = useState({}); 
@@ -33,53 +40,45 @@ export const WeatherProvider = ({ children }) => {
   }, [darkMode]);
 
   useEffect(() => {
-    // ===== 1. Weather Data (Province level — เดิม) =====
-    const weatherRef = ref(db, 'weather_data');
-    const unsubscribe = onValue(weatherRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setStations(data.stations || []);
-        setStationTemps(data.stationTemps || {});
-        setStationYesterday(data.stationYesterday || {}); 
-        setStationMaxYesterday(data.stationMaxYesterday || {}); 
-        setStationDaily(data.stationDaily || {});
-        setLastUpdated(data.lastUpdated || null);
-        setTmdAvailable(data.tmdAvailable || false);
-      } else {
-        setStations([]);
-        setStationTemps({});
-        setStationYesterday({});
-        setStationMaxYesterday({});
-        setStationDaily({});
-      }
-      setLoading(false); 
-    }, (error) => {
-      console.error("Firebase Read Error:", error);
-      setLoading(false);
-    });
+    let cancelled = false;
 
-    // ===== 2. GISTDA Disaster Data (เดิม) =====
-    const gistdaRef = ref(db, 'gistda_disaster');
-    const unsubscribeGistda = onValue(gistdaRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setGistdaSummary(data);
-      }
-    });
+    const loadWeatherData = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/weather-data', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Weather API ${response.status}`);
+        const data = await response.json();
+        if (cancelled) return;
 
-    // ===== 3. Amphoe Data (ใหม่ — ข้อมูลระดับอำเภอจาก TMD) =====
-    const amphoeRef = ref(db, 'weather_data_amphoe');
-    const unsubscribeAmphoe = onValue(amphoeRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setAmphoeData(data);
+        if (data) {
+          setStations(data.stations?.length ? data.stations : initialStations);
+          setStationTemps(data.stationTemps || {});
+          setStationYesterday(data.stationYesterday || {});
+          setStationMaxYesterday(data.stationMaxYesterday || {});
+          setStationDaily(data.stationDaily || {});
+          setGistdaSummary(data.gistdaSummary || null);
+          setAmphoeData(data.amphoeData || null);
+          setLastUpdated(data.lastUpdated || null);
+          setTmdAvailable(data.tmdAvailable || false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Weather data load failed:', error.message);
+          setStations(initialStations);
+          setStationTemps({});
+          setStationYesterday({});
+          setStationMaxYesterday({});
+          setStationDaily({});
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    });
+    };
+
+    loadWeatherData();
 
     return () => {
-      unsubscribe();
-      unsubscribeGistda();
-      unsubscribeAmphoe();
+      cancelled = true;
     };
   }, []);
 

@@ -1104,6 +1104,7 @@ export default function MapPage() {
   const mobilePanelGap = 88;
   const mobileDockBottom = `calc(env(safe-area-inset-bottom, 0px) + ${mobileBottomNavHeight + mobileDockGap}px)`;
   const mobilePanelBottom = `calc(env(safe-area-inset-bottom, 0px) + ${mobileBottomNavHeight + mobilePanelGap}px)`;
+  const renderLegacyMobileLayerControl = false;
 
   return (
     <div style={{ height: isMobile ? '100%' : desktopViewportHeight, width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '0' : '8px', boxSizing: 'border-box', overflow: 'hidden' }}>
@@ -1393,7 +1394,6 @@ export default function MapPage() {
                     })()}
                 </MapContainer>
 
-                {/* eslint-disable-next-line no-constant-binary-expression */}
                 {showRealtimeDataWarning && (
                   <div
                     className="fade-in"
@@ -1422,7 +1422,7 @@ export default function MapPage() {
                   </div>
                 )}
 
-                {false && isMobile && (
+                {renderLegacyMobileLayerControl && isMobile && (
                   <div
                     className="fade-in"
                     onClick={() => setActivePanel(p => p === 'layer' ? null : 'layer')}

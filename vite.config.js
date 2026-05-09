@@ -97,6 +97,7 @@ export default defineConfig(({ mode }) => {
   plugins: [
     react(),
     apiNewsDevPlugin(),
+    makeApiDevPlugin('weather-data', 'weather-data.js'),
     makeApiDevPlugin('tmd-wind', 'tmd-wind.js'),
     VitePWA({
       strategies: 'injectManifest',
