@@ -1400,17 +1400,21 @@ export default function Dashboard() {
     </div>
   );
 
+  const heroTopSection = (
+    <div style={{ ...surfaceCardStyle, padding: isMobile ? '12px' : '20px' }}>
+      {heroCard}
+      {quickActionBar}
+    </div>
+  );
+
   const desktopShowcaseLayout = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minWidth: 0 }}>
+      {heroTopSection}
       {rainNowcastCard}
       {locationControlPanel}
       {rainRadarCard}
       {hourlyForecastCard}
       {tomorrowOverviewCard}
-      <div style={{ ...surfaceCardStyle, padding: '20px' }}>
-        {heroCard}
-        {quickActionBar}
-      </div>
       {briefingCard}
       {healthAdviceBar}
       {highlightMetricsGrid}
@@ -1427,14 +1431,13 @@ export default function Dashboard() {
   const mobileOverviewLayout = (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', flexShrink: 0, width: '100%', alignItems: 'stretch', minWidth: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
+        {heroTopSection}
         {rainNowcastCard}
         {locationControlPanel}
         {rainRadarCard}
         {hourlyForecastCard}
         {tomorrowOverviewCard}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', flexShrink: 0, alignItems: 'stretch' }}>
-          {heroCard}
-          {quickActionBar}
           {briefingCard}
           {healthAdviceBar}
           {highlightMetricsGrid}
