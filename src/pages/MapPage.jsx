@@ -110,12 +110,16 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState(window.innerWidth < 1024 ? 6 : 6);
   const [polyOpacity, setPolyOpacity] = useState(0.7);
   
-  const [mapCategory, setMapCategory] = useState('basic'); 
+  const [mapCategory, setMapCategory] = useState('rain');
   const [activeBasicMode, setActiveBasicMode] = useState('pm25'); 
+  const [activeRainMode, setActiveRainMode] = useState('rain24h');
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
   const [activeGistdaMode, setActiveGistdaMode] = useState('burntArea');
   const [timeMode, setTimeMode] = useState('now'); // 'now' | 'today' | 'tomorrow'
   const [activeYesterdayMode, setActiveYesterdayMode] = useState('maxTemp');
+  const [historyWeather, setHistoryWeather] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [selectedHotspot, setSelectedHotspot] = useState(null); 
@@ -232,6 +236,29 @@ export default function MapPage() {
     };
   }, [fetchGeoData]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError('');
+    fetch('/api/weather-history')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (!cancelled) setHistoryWeather(data);
+      })
+      .catch(error => {
+        console.warn('Historical weather unavailable', error);
+        if (!cancelled) setHistoryError('โหลดข้อมูลย้อนหลังไม่สำเร็จ');
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
   // 🌟 UX: ไม่ auto-zoom บนมือถือ — แสดงแผนที่ทั้งประเทศเมื่อเปิด
   useEffect(() => {
     if (stations && stations.length > 0 && !hasAutoLocated.current) {
@@ -242,7 +269,7 @@ export default function MapPage() {
 
   useEffect(() => {
       setSelectedHotspot(null);
-      if (mapCategory === 'gistda' || mapCategory === 'yesterday' || mapCategory === 'risk') setTimeMode('now');
+      if (mapCategory === 'rain' || mapCategory === 'gistda' || mapCategory === 'yesterday' || mapCategory === 'risk') setTimeMode('now');
   }, [mapCategory]);
 
   const basicModes = [
@@ -254,6 +281,16 @@ export default function MapPage() {
     { id: 'wind', name: '🌬️ ความเร็วลม', color: '#0ea5e9', unit: 'km/h', desc: 'ความเร็วลม/ลมกระโชกตามข้อมูลที่มี' },
     { id: 'uv', name: '☀️ รังสี UV', color: '#a855f7', unit: 'ดัชนี', desc: 'ดัชนีรังสีอัลตราไวโอเลต' },
     { id: 'pressure', name: '🧭 ความกดอากาศ', color: '#64748b', unit: 'hPa', desc: 'ความกดบรรยากาศ (ระดับน้ำทะเล)' }
+  ];
+
+  const rainModes = [
+    { id: 'rain24h', name: 'ฝนจริง 24 ชม.', color: '#2563eb', unit: 'mm', desc: 'ปริมาณฝนที่ตกจริงล่าสุดจากค่ารายวัน/สถานี' },
+    { id: 'rain7d', name: 'ฝนสะสม 7 วัน', color: '#0ea5e9', unit: 'mm', desc: 'ปริมาณฝนสะสมย้อนหลัง 7 วันจาก Open-Meteo Archive' },
+    { id: 'rain30d', name: 'ฝนสะสม 30 วัน', color: '#0369a1', unit: 'mm', desc: 'ปริมาณฝนสะสมย้อนหลัง 30 วัน ใช้ดูแนวโน้มชุ่มน้ำ/น้ำหลาก' },
+    { id: 'rain90d', name: 'ฝนสะสม 90 วัน', color: '#075985', unit: 'mm', desc: 'ปริมาณฝนสะสมระยะฤดูกาลสำหรับประเมินภาพรวมรายพื้นที่' },
+    { id: 'rainYtd', name: 'ฝนสะสมปีนี้', color: '#1d4ed8', unit: 'mm', desc: 'ปริมาณฝนสะสมตั้งแต่ต้นปีถึงเมื่อวาน' },
+    { id: 'wetDays30d', name: 'วันที่มีฝน 30 วัน', color: '#14b8a6', unit: 'วัน', desc: 'จำนวนวันที่มีฝนอย่างน้อย 1 มม. ในรอบ 30 วัน' },
+    { id: 'maxDailyRain30d', name: 'ฝนหนักสุด/วัน', color: '#1e3a8a', unit: 'mm', desc: 'ปริมาณฝนรายวันที่สูงที่สุดในรอบ 30 วัน' },
   ];
 
   const yesterdayModes = [
@@ -338,6 +375,51 @@ export default function MapPage() {
     if (mode === 'pressure') return val > 1015 ? '#3b82f6' : val >= 1010 ? '#22c55e' : val >= 1005 ? '#eab308' : '#ef4444';
     return darkMode ? '#1a3050' : '#b8d9f5';
   }, [darkMode]);
+
+  const getRainVal = useCallback((station, mode = activeRainMode) => {
+    if (!station) return null;
+    const observedYesterday = stationMaxYesterday?.[station.stationID]?.rain;
+    const history = historyWeather?.byStation?.[station.stationID] || {};
+    if (mode === 'rain24h') {
+      const value = observedYesterday ?? history.rain24h;
+      return value != null ? Math.round(value * 10) / 10 : null;
+    }
+    const value = history[mode];
+    return value != null ? Math.round(value * 10) / 10 : null;
+  }, [activeRainMode, historyWeather, stationMaxYesterday]);
+
+  const getRainColor = useCallback((val, mode = activeRainMode) => {
+    if (val === null || val === undefined || Number.isNaN(val)) return darkMode ? '#1a3050' : '#b8d9f5';
+    if (mode === 'wetDays30d') {
+      if (val >= 22) return '#0f766e';
+      if (val >= 15) return '#14b8a6';
+      if (val >= 8) return '#38bdf8';
+      if (val >= 1) return '#93c5fd';
+      return darkMode ? '#1a3050' : '#b8d9f5';
+    }
+    if (mode === 'rain90d' || mode === 'rainYtd') {
+      if (val >= 700) return '#0f172a';
+      if (val >= 450) return '#1e3a8a';
+      if (val >= 250) return '#2563eb';
+      if (val >= 80) return '#60a5fa';
+      if (val > 0) return '#bfdbfe';
+      return darkMode ? '#1a3050' : '#b8d9f5';
+    }
+    if (mode === 'rain30d') {
+      if (val >= 300) return '#0f172a';
+      if (val >= 180) return '#1e3a8a';
+      if (val >= 80) return '#2563eb';
+      if (val >= 20) return '#60a5fa';
+      if (val > 0) return '#bfdbfe';
+      return darkMode ? '#1a3050' : '#b8d9f5';
+    }
+    if (val >= 100) return '#0f172a';
+    if (val >= 50) return '#1e3a8a';
+    if (val >= 20) return '#2563eb';
+    if (val >= 5) return '#60a5fa';
+    if (val > 0) return '#bfdbfe';
+    return darkMode ? '#1a3050' : '#b8d9f5';
+  }, [activeRainMode, darkMode]);
 
   const calculateRisk = useCallback((station) => {
       let pm25 = 0, temp = 0, feelsLike = 0, wind = 0, rain = 0, uv = 0, hum = 50;
@@ -448,22 +530,22 @@ export default function MapPage() {
       if (!station) return null;
       const daily = stationDaily[station.stationID] || {};
       if (!daily.temp) return null;
+      const history = historyWeather?.byStation?.[station.stationID] || {};
       const histIdx = [1, 2, 3, 4, 5, 6, 7]; // past 7 days (idx 0 = 7 days ago, idx 7 = today)
       const fcastIdx = [8, 9, 10, 11, 12, 13, 14]; // next 7 days
       const nonZero = (arr, idxs) => idxs.map(i => arr?.[i]).filter(v => v != null && v > 0);
       const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : null;
       const max = arr => arr.length ? Math.max(...arr) : null;
       const min = arr => arr.length ? Math.min(...arr) : null;
-      const sum = (arr, idxs) => Math.round(idxs.reduce((s,i) => s + (arr?.[i] || 0), 0) * 10) / 10;
 
       return {
           // History (7 days back)
-          hist7RainSum: sum(daily.rain, histIdx),
+          hist7RainSum: history.rain7d ?? null,
           hist7TempMax: max(nonZero(daily.temp, histIdx)),
           hist7TempMin: min(nonZero(daily.temp, histIdx)),
           hist7UvMax: max(nonZero(daily.uv, histIdx)),
           // Forecast (7 days ahead)
-          fcast7RainSum: sum(daily.rain, fcastIdx),
+          fcast7RainChanceAvg: avg(nonZero(daily.rain, fcastIdx)),
           fcast7TempAvg: avg(nonZero(daily.temp, fcastIdx)),
           fcast7HeatAvg: avg(nonZero(daily.heat, fcastIdx)),
           fcast7UvAvg: avg(nonZero(daily.uv, fcastIdx)),
@@ -474,7 +556,7 @@ export default function MapPage() {
           tomorrowUv: daily.uv?.[8] ? Math.round(daily.uv[8] * 10) / 10 : null,
           tomorrowWind: daily.wind?.[8] ? Math.round(daily.wind[8]) : null,
       };
-  }, [stationDaily]);
+  }, [stationDaily, historyWeather]);
 
   const allMapData = useMemo(() => {
     return (stations || []).map(st => {
@@ -482,6 +564,9 @@ export default function MapPage() {
         if (mapCategory === 'basic') {
             val = getBasicVal(st, activeBasicMode);
             color = getBasicColor(val, activeBasicMode);
+        } else if (mapCategory === 'rain') {
+            val = getRainVal(st, activeRainMode);
+            color = getRainColor(val, activeRainMode);
         } else if (mapCategory === 'risk') {
             const risk = calculateRisk(st);
             val = risk.score;
@@ -507,7 +592,7 @@ export default function MapPage() {
         }
         return { ...st, displayVal: val, color };
     }).filter(st => st.displayVal !== null && st.displayVal !== undefined);
-  }, [stations, mapCategory, activeBasicMode, activeGistdaMode, activeYesterdayMode, calculateRisk, getBasicVal, getBasicColor, getRiskColor, getGistdaColor, getYesterdayVal, getYesterdayColor, gistdaSummary, darkMode]);
+  }, [stations, mapCategory, activeBasicMode, activeRainMode, activeGistdaMode, activeYesterdayMode, calculateRisk, getBasicVal, getBasicColor, getRainVal, getRainColor, getRiskColor, getGistdaColor, getYesterdayVal, getYesterdayColor, gistdaSummary, darkMode]);
 
   const rankedSidebarData = useMemo(() => {
     if (mapCategory === 'gistda' && gistdaSummary && gistdaSummary[activeGistdaMode]) {
@@ -545,6 +630,7 @@ export default function MapPage() {
             color = mapDataNode.color;
         } else {
             if (mapCategory === 'basic') color = getBasicColor(getBasicVal(station, activeBasicMode), activeBasicMode);
+            else if (mapCategory === 'rain') color = getRainColor(getRainVal(station, activeRainMode), activeRainMode);
             else if (mapCategory === 'risk') color = getRiskColor(calculateRisk(station).score);
         }
     }
@@ -580,6 +666,17 @@ export default function MapPage() {
           const maxObj = stationMaxYesterday?.[station.stationID] || {};
           const minObj = stationYesterday?.[station.stationID] || {};
           setSelectedHotspot({ type: 'yesterday', station, maxObj, minObj });
+      } else if (mapCategory === 'rain') {
+          const history = historyWeather?.byStation?.[station.stationID] || {};
+          const val = getRainVal(station, activeRainMode);
+          setSelectedHotspot({
+              type: 'rain',
+              station,
+              history,
+              val,
+              color: getRainColor(val, activeRainMode),
+              observedRain24h: getRainVal(station, 'rain24h'),
+          });
       } else {
           const daily = stationDaily[station.stationID] || {};
           const currentData = stationTemps[station.stationID] || {};
@@ -639,6 +736,7 @@ export default function MapPage() {
     allMapData,
     mapCategory,
     activeBasicMode,
+    activeRainMode,
     activeRiskMode,
     activeGistdaMode,
     activeYesterdayMode,
@@ -673,22 +771,26 @@ export default function MapPage() {
   const borderColor = 'var(--border-color)';
   const subTextColor = 'var(--text-sub)'; 
 
-  const activeModeObj = mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) :
+  const activeModeObj = mapCategory === 'rain' ? rainModes.find(m => m.id === activeRainMode) :
+                        mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) :
                         mapCategory === 'risk' ? riskModes.find(m => m.id === activeRiskMode) :
                         mapCategory === 'yesterday' ? yesterdayModes.find(m => m.id === activeYesterdayMode) :
                         gistdaModes.find(m => m.id === activeGistdaMode);
-  const activeModeList = mapCategory === 'basic' ? basicModes :
+  const activeModeList = mapCategory === 'rain' ? rainModes :
+                         mapCategory === 'basic' ? basicModes :
                          mapCategory === 'risk' ? riskModes :
                          mapCategory === 'yesterday' ? yesterdayModes :
                          gistdaModes;
   const activeModeIndex = Math.max(0, activeModeList.findIndex(m => m.id === activeModeObj?.id));
-  const activeCategoryLabel = mapCategory === 'basic' ? 'ข้อมูลทั่วไป' :
+  const activeCategoryLabel = mapCategory === 'rain' ? 'ฝนจริงและฝนสะสม' :
+                              mapCategory === 'basic' ? 'ข้อมูลทั่วไป' :
                               mapCategory === 'risk' ? 'วิเคราะห์ความเสี่ยง' :
                               mapCategory === 'yesterday' ? 'สถิติย้อนหลัง' :
                               'พิบัติภัย GISTDA';
 
   const setActiveModeById = useCallback((modeId) => {
-    if (mapCategory === 'basic') setActiveBasicMode(modeId);
+    if (mapCategory === 'rain') setActiveRainMode(modeId);
+    else if (mapCategory === 'basic') setActiveBasicMode(modeId);
     else if (mapCategory === 'risk') setActiveRiskMode(modeId);
     else if (mapCategory === 'yesterday') setActiveYesterdayMode(modeId);
     else setActiveGistdaMode(modeId);
@@ -736,6 +838,42 @@ export default function MapPage() {
   };
 
   const getDynamicLegendContent = () => {
+    if (mapCategory === 'rain') {
+        if (activeRainMode === 'wetDays30d') {
+            return [
+                { c: '#0f766e', l: 'ฝนบ่อยมาก', r: '≥ 22 วัน' },
+                { c: '#14b8a6', l: 'ฝนบ่อย', r: '15-21 วัน' },
+                { c: '#38bdf8', l: 'มีฝนเป็นช่วง', r: '8-14 วัน' },
+                { c: '#93c5fd', l: 'ฝนน้อย', r: '1-7 วัน' },
+                { c: darkMode ? '#1a3050' : '#b8d9f5', l: 'ไม่มีฝน', r: '0 วัน' },
+            ];
+        }
+        if (activeRainMode === 'rain90d' || activeRainMode === 'rainYtd') {
+            return [
+                { c: '#0f172a', l: 'สะสมสูงมาก', r: '≥ 700mm' },
+                { c: '#1e3a8a', l: 'สะสมสูง', r: '450-699mm' },
+                { c: '#2563eb', l: 'สะสมปานกลาง', r: '250-449mm' },
+                { c: '#60a5fa', l: 'สะสมน้อย', r: '80-249mm' },
+                { c: darkMode ? '#1a3050' : '#b8d9f5', l: 'แทบไม่มีฝน', r: '< 80mm' },
+            ];
+        }
+        if (activeRainMode === 'rain30d') {
+            return [
+                { c: '#0f172a', l: 'เสี่ยงน้ำมาก', r: '≥ 300mm' },
+                { c: '#1e3a8a', l: 'ฝนสะสมสูง', r: '180-299mm' },
+                { c: '#2563eb', l: 'ฝนสะสมกลาง', r: '80-179mm' },
+                { c: '#60a5fa', l: 'ฝนสะสมน้อย', r: '20-79mm' },
+                { c: darkMode ? '#1a3050' : '#b8d9f5', l: 'แห้ง/ฝนน้อยมาก', r: '< 20mm' },
+            ];
+        }
+        return [
+            { c: '#0f172a', l: 'ฝนหนักมาก', r: '≥ 100mm' },
+            { c: '#1e3a8a', l: 'ฝนหนัก', r: '50-99mm' },
+            { c: '#2563eb', l: 'ฝนปานกลาง', r: '20-49mm' },
+            { c: '#60a5fa', l: 'ฝนเล็กน้อย', r: '5-19mm' },
+            { c: darkMode ? '#1a3050' : '#b8d9f5', l: 'ไม่มี/น้อยมาก', r: '< 5mm' },
+        ];
+    }
     if (mapCategory === 'risk') {
         return [
             { c: '#ef4444', l: 'วิกฤต/อันตราย', r: '8-10' },
@@ -783,7 +921,9 @@ export default function MapPage() {
   const nationalMetric = useMemo(() => {
     const vals = allMapData.map(st => st.displayVal).filter(v => v != null && !Number.isNaN(v));
     const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
-    const color = mapCategory === 'basic'
+    const color = mapCategory === 'rain'
+      ? getRainColor(avg, activeRainMode)
+      : mapCategory === 'basic'
       ? getBasicColor(avg, activeBasicMode)
       : mapCategory === 'risk'
         ? getRiskColor(avg)
@@ -792,7 +932,9 @@ export default function MapPage() {
           : getGistdaColor(avg, activeGistdaMode);
     const label = mapCategory === 'basic' && activeBasicMode === 'pm25'
       ? getPm25QualityText(avg).text
-      : mapCategory === 'basic'
+      : mapCategory === 'rain'
+        ? `ค่าจริงเฉลี่ย ${activeModeObj?.name || 'ฝน'}`
+        : mapCategory === 'basic'
         ? activeModeObj?.name || 'ข้อมูลทั่วไป'
         : mapCategory === 'risk'
           ? 'คะแนนความเสี่ยงเฉลี่ย'
@@ -800,7 +942,7 @@ export default function MapPage() {
             ? `ย้อนหลัง ${activeModeObj?.name}`
             : 'ข้อมูล GISTDA';
     return { avg, count: vals.length, color, label };
-  }, [allMapData, mapCategory, activeBasicMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, activeModeObj, getBasicColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
+  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, activeModeObj, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
   const regionalMetric = useMemo(() => {
     return Object.entries(REGION_GROUPS).map(([name, provs]) => {
       const sts = allMapData.filter(st => provs.includes(st.areaTH.replace('จังหวัด', '').trim()));
@@ -809,7 +951,9 @@ export default function MapPage() {
       const windDirection = activeBasicMode === 'wind'
         ? getAverageWindDirection(sts.map(st => stationTemps[st.stationID]?.windDir))
         : null;
-      const color = mapCategory === 'basic'
+      const color = mapCategory === 'rain'
+        ? getRainColor(avg, activeRainMode)
+        : mapCategory === 'basic'
         ? getBasicColor(avg, activeBasicMode)
         : mapCategory === 'risk'
           ? getRiskColor(avg)
@@ -818,10 +962,16 @@ export default function MapPage() {
             : getGistdaColor(avg, activeGistdaMode);
       return { name, avg, color, trend: 0, windDirection };
     });
-  }, [allMapData, mapCategory, activeBasicMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRiskColor, getYesterdayColor, getGistdaColor]);
+  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor]);
   const sparkline7d = useMemo(() => {
     return Array.from({ length: 8 }, (_, i) => {
-      const vals = (mapCategory === 'basic'
+      const vals = (mapCategory === 'rain'
+        ? stations.map(st => {
+            const series = historyWeather?.byStation?.[st.stationID]?.rainDaily || [];
+            const value = series.slice(-8)[i] || 0;
+            return activeRainMode === 'wetDays30d' ? (value >= 1 ? 1 : 0) : value;
+          })
+        : mapCategory === 'basic'
         ? stations.map(st => {
             const daily = stationDaily[st.stationID] || {};
             if (i === 7) {
@@ -838,7 +988,7 @@ export default function MapPage() {
         .filter(v => v > 0);
       return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
     });
-  }, [stations, stationDaily, stationTemps, mapCategory, activeBasicMode]);
+  }, [stations, stationDaily, stationTemps, historyWeather, mapCategory, activeBasicMode, activeRainMode]);
   const forecastStId = selectedHotspot?.station?.stationID || stations.find(st => st.areaTH.includes('กรุงเทพ'))?.stationID;
   const forecastStName = selectedHotspot?.station?.areaTH?.replace('จังหวัด', '') || 'กรุงเทพมหานคร';
   const forecast7d = useMemo(() => {
@@ -891,34 +1041,42 @@ export default function MapPage() {
   const showRealtimeDataWarning = !loading && !hasRealtimeData;
 
   const mapCategoryOptions = [
+    { id: 'rain', label: 'ฝนจริง/สะสม', shortLabel: 'ฝนจริง', icon: '🌧️', color: '#2563eb', desc: '24 ชม. 7/30/90 วัน ปีนี้', useFor: 'ดูฝนที่เกิดขึ้นจริงและฝนสะสมย้อนหลัง' },
     { id: 'basic', label: 'อากาศ', shortLabel: 'อากาศ', icon: '🌤️', color: '#0ea5e9', desc: 'PM2.5 ฝน ลม UV', useFor: 'เช็กค่าปัจจุบันและพยากรณ์' },
     { id: 'risk', label: 'ความเสี่ยง', shortLabel: 'เสี่ยง', icon: '⚠️', color: '#8b5cf6', desc: 'สุขภาพ กลางแจ้ง ไฟป่า', useFor: 'ดูพื้นที่ที่ควรระวัง' },
     { id: 'yesterday', label: 'ย้อนหลัง', shortLabel: 'ย้อนหลัง', icon: '🕘', color: '#f59e0b', desc: 'ค่าสูงสุด/ต่ำสุดเมื่อวาน', useFor: 'เทียบสถิติที่เกิดขึ้นจริง' },
     { id: 'gistda', label: 'ภัยพิบัติ', shortLabel: 'ภัยพิบัติ', icon: '🛰️', color: '#ef4444', desc: 'พื้นที่ไหม้ น้ำท่วม ความชื้น', useFor: 'ข้อมูลดาวเทียมล่าสุด' }
   ];
 
-  const activeModeId = mapCategory === 'basic' ? activeBasicMode :
+  const activeModeId = mapCategory === 'rain' ? activeRainMode :
+    mapCategory === 'basic' ? activeBasicMode :
     mapCategory === 'risk' ? activeRiskMode :
     mapCategory === 'yesterday' ? activeYesterdayMode :
     activeGistdaMode;
 
-  const primaryLayerOptions = [
-    ...basicModes.map(mode => ({ ...mode, category: 'basic' })),
-  ].filter(Boolean);
+  const primaryLayerOptions = activeModeList.map(mode => ({ ...mode, category: mapCategory }));
 
   const setPrimaryLayer = (layer) => {
     setMapCategory(layer.category);
-    if (layer.category === 'basic') {
+    if (layer.category === 'rain') {
+      setActiveRainMode(layer.id);
+    } else if (layer.category === 'basic') {
       setActiveBasicMode(layer.id);
+    } else if (layer.category === 'risk') {
+      setActiveRiskMode(layer.id);
+    } else if (layer.category === 'yesterday') {
+      setActiveYesterdayMode(layer.id);
     } else if (layer.category === 'gistda') {
       setActiveGistdaMode(layer.id);
     }
   };
 
-  const secondaryToolOptions = mapCategoryOptions.filter(opt => opt.id !== 'basic');
+  const secondaryToolOptions = mapCategoryOptions;
 
   const activeCategoryOption = mapCategoryOptions.find(opt => opt.id === mapCategory);
-  const activeDataSourceMeta = mapCategory === 'basic'
+  const activeDataSourceMeta = mapCategory === 'rain'
+    ? { label: 'Historical', icon: '🌧️', color: '#2563eb', detail: historyLoading ? 'กำลังโหลดข้อมูลฝนย้อนหลังจริง' : historyError ? 'ใช้ค่าฝน 24 ชม. เท่าที่มี และรอข้อมูลย้อนหลัง' : `Open-Meteo Archive ถึง ${historyWeather?.period?.endDate || getDateLabel(-1)}` }
+    : mapCategory === 'basic'
     ? (timeMode === 'now'
         ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: 'AIR4Thai + TMD อัปเดตล่าสุด' }
         : timeMode === 'today'
@@ -963,17 +1121,21 @@ export default function MapPage() {
     },
   ];
   const flatTimeOptions = timeModeSections.flatMap(section => section.options);
-  const activeTimeKey = mapCategory === 'yesterday' ? 'yesterday' : (canChooseTimeMode ? timeMode : 'latest');
-  const activeTimeOption = mapCategory === 'yesterday'
+  const activeTimeKey = mapCategory === 'rain' ? 'history' : mapCategory === 'yesterday' ? 'yesterday' : (canChooseTimeMode ? timeMode : 'latest');
+  const activeTimeOption = mapCategory === 'rain'
+    ? { label: `🌧️ ย้อนหลังถึง ${historyWeather?.period?.endDate || getDateLabel(-1)}`, sub: activeRainMode === 'rain24h' ? 'ฝนจริง 24 ชม.' : 'ค่าจริงย้อนหลัง', color: '#2563eb' }
+    : mapCategory === 'yesterday'
     ? { label: `🕘 เมื่อวาน ${getDateLabel(-1)}`, sub: 'สถิติย้อนหลัง', color: '#f59e0b' }
     : flatTimeOptions.find(opt => opt.id === activeTimeKey) || { label: '🛰️ ล่าสุด', sub: 'ข้อมูลเฉพาะเครื่องมือ', color: activeCategoryOption?.color || '#64748b' };
   const handleTimeOptionSelect = (id) => {
-    if (mapCategory === 'yesterday' || mapCategory === 'gistda') {
+    if (mapCategory === 'rain' || mapCategory === 'yesterday' || mapCategory === 'gistda') {
       setMapCategory('basic');
     }
     setTimeMode(id);
   };
-  const timeContextNote = mapCategory === 'gistda'
+  const timeContextNote = mapCategory === 'rain'
+    ? 'โหมดฝนจริงใช้ปริมาณฝนย้อนหลังจาก Open-Meteo Archive และค่าฝน 24 ชม. ที่ระบบมี ไม่ใช่โอกาสฝนแบบพยากรณ์'
+    : mapCategory === 'gistda'
     ? 'โหมดดาวเทียมเป็นข้อมูลสะสมล่าสุดจาก GISTDA หากเลือกช่วงเวลาอื่นจะสลับไปแผนที่อากาศ'
     : mapCategory === 'yesterday'
       ? `กำลังดูสถิติย้อนหลังของเมื่อวาน ${getDateLabel(-1)}`
@@ -989,6 +1151,10 @@ export default function MapPage() {
       const province = st.areaTH?.replace('จังหวัด', '').trim() || st.nameTH || st.stationID;
       const status = mapCategory === 'risk'
         ? getRiskLabel(value)
+        : mapCategory === 'rain'
+          ? activeRainMode === 'wetDays30d'
+            ? `${value} วันที่มีฝน`
+            : value >= 100 ? 'ฝนสะสมสูงมาก' : value >= 50 ? 'ฝนสะสมสูง' : value > 0 ? 'มีฝน' : 'ไม่มีฝน'
         : mapCategory === 'basic' && activeBasicMode === 'pm25'
           ? getPm25QualityText(value).text
           : mapCategory === 'basic' && activeBasicMode === 'uv'
@@ -1004,7 +1170,7 @@ export default function MapPage() {
         period: activeTimeOption?.label || activeTimeKey,
         source: activeDataSourceMeta?.label || '',
         value,
-        unit: (mapCategory === 'basic' || mapCategory === 'yesterday' || mapCategory === 'gistda') ? (activeModeObj?.unit || '') : 'score',
+        unit: (mapCategory === 'basic' || mapCategory === 'rain' || mapCategory === 'yesterday' || mapCategory === 'gistda') ? (activeModeObj?.unit || '') : 'score',
         status,
         latitude: st.lat ?? '',
         longitude: st.long ?? '',
@@ -1137,15 +1303,25 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Row 2: Layer-first controls */}
-          <div className="hide-scrollbar" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', alignItems: 'center', gap: '10px', marginBottom: '6px', flexShrink: 0, background: cardBg, padding: '9px 12px', borderRadius: '14px', border: `1px solid ${borderColor}`, overflowX: 'auto' }}>
+          {/* Row 2: Data explorer controls */}
+          <div className="hide-scrollbar" style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', alignItems: 'center', gap: '10px', marginBottom: '6px', flexShrink: 0, background: cardBg, padding: '9px 12px', borderRadius: '14px', border: `1px solid ${borderColor}`, overflowX: 'auto' }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>1. ชั้นข้อมูลหลัก</div>
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>1. กลุ่มข้อมูล</div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {secondaryToolOptions.map(opt => (
+                  <button key={opt.id} onClick={() => setMapCategory(opt.id)} style={{ padding: '5px 9px', borderRadius: '999px', border: `1px solid ${mapCategory === opt.id ? opt.color : borderColor}`, background: mapCategory === opt.id ? (darkMode ? `${opt.color}28` : `${opt.color}16`) : 'transparent', color: mapCategory === opt.id ? opt.color : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s' }} title={opt.useFor}>
+                    {opt.icon} {opt.shortLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>2. ตัวชี้วัดในกลุ่ม {activeCategoryOption?.shortLabel}</div>
               <div className="hide-scrollbar" style={{ display: 'flex', gap: '5px', overflowX: 'auto', minWidth: 0 }}>
                 {primaryLayerOptions.map(layer => {
                   const isAct = layer.category === mapCategory && activeModeId === layer.id;
                   return (
-                    <button key={`${layer.category}-${layer.id}`} onClick={() => setPrimaryLayer(layer)} style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${isAct ? layer.color : borderColor}`, background: isAct ? (darkMode ? `${layer.color}28` : `${layer.color}16`) : 'transparent', color: isAct ? layer.color : subTextColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }}>
+                    <button key={`${layer.category}-${layer.id}`} onClick={() => setPrimaryLayer(layer)} style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${isAct ? layer.color : borderColor}`, background: isAct ? (darkMode ? `${layer.color}28` : `${layer.color}16`) : 'transparent', color: isAct ? layer.color : subTextColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }} title={layer.desc}>
                       {layer.name}
                     </button>
                   );
@@ -1153,7 +1329,7 @@ export default function MapPage() {
               </div>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>2. วัน</div>
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>3. ช่วงเวลา/แหล่งข้อมูล</div>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {(canChooseTimeMode ? flatTimeOptions : []).map(opt => {
                   const isAct = activeTimeKey === opt.id;
@@ -1164,16 +1340,6 @@ export default function MapPage() {
                   );
                 })}
                 {!canChooseTimeMode && <span style={{ fontSize: '0.68rem', color: activeCategoryOption?.color || subTextColor, padding: '5px 8px', border: `1px solid ${borderColor}`, borderRadius: '999px', whiteSpace: 'nowrap' }}>{activeTimeOption?.sub}</span>}
-              </div>
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>เครื่องมือแยก</div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {secondaryToolOptions.map(opt => (
-                  <button key={opt.id} onClick={() => setMapCategory(opt.id)} style={{ padding: '5px 9px', borderRadius: '999px', border: `1px solid ${mapCategory === opt.id ? opt.color : borderColor}`, background: mapCategory === opt.id ? (darkMode ? `${opt.color}28` : `${opt.color}16`) : 'transparent', color: mapCategory === opt.id ? opt.color : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
-                    {opt.icon} {opt.shortLabel}
-                  </button>
-                ))}
               </div>
             </div>
           </div>
@@ -1720,7 +1886,7 @@ export default function MapPage() {
                       {activePanel === 'rank' && (
                         <div className="fade-in" style={{ position: 'fixed', bottom: mobilePanelBottom, left: '12px', right: '12px', zIndex: 2000, background: cardBg, borderRadius: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.3)', maxHeight: '62vh', display: 'flex', flexDirection: 'column', padding: '16px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <h3 style={{ margin: 0, fontSize: '1rem', color: textColor }}>📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด' : mapCategory === 'gistda' ? 'พื้นที่วิกฤต' : mapCategory === 'yesterday' ? 'สถิติเมื่อวาน' : 'อันดับสูงสุด'}</h3>
+                            <h3 style={{ margin: 0, fontSize: '1rem', color: textColor }}>📍 {mapCategory === 'rain' ? 'พื้นที่ฝนสะสมสูง' : mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด' : mapCategory === 'gistda' ? 'พื้นที่วิกฤต' : mapCategory === 'yesterday' ? 'สถิติเมื่อวาน' : 'อันดับสูงสุด'}</h3>
                             <button onClick={() => setActivePanel(null)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: textColor, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>✕</button>
                           </div>
                           <p style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: activeModeObj?.color, fontWeight: 'bold' }}>{activeModeObj?.desc}</p>
@@ -1748,7 +1914,7 @@ export default function MapPage() {
                                   {mapCategory === 'risk' && <div style={{ fontSize: '0.65rem', color: subTextColor, marginTop: '2px' }}>สถานะ: {getRiskLabel(st.displayVal)}</div>}
                                 </div>
                                 <div style={{ background: cardBg, padding: '4px 10px', borderRadius: '10px', textAlign: 'center', border: `1px solid ${borderColor}` }}>
-                                  <div style={{ fontSize: '1rem', fontWeight: '900', color: st.color }}>{st.displayVal} <span style={{ fontSize: '0.6rem', color: subTextColor, fontWeight: 'normal' }}>{mapCategory === 'basic' ? activeModeObj?.unit : ''}</span></div>
+                                  <div style={{ fontSize: '1rem', fontWeight: '900', color: st.color }}>{st.displayVal} <span style={{ fontSize: '0.6rem', color: subTextColor, fontWeight: 'normal' }}>{mapCategory === 'basic' || mapCategory === 'rain' ? activeModeObj?.unit : ''}</span></div>
                                 </div>
                               </div>
                             ))}
@@ -1804,7 +1970,7 @@ export default function MapPage() {
           {!isMobile && (
             <div style={{ width: '280px', background: cardBg, borderRadius: '18px', padding: '12px', border: `1px solid ${borderColor}`, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0, minHeight: 0 }}>
                <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center' }}>
-                  📍 {mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 5)' : mapCategory === 'gistda' ? 'พื้นที่วิกฤต (Top 5)' : mapCategory === 'yesterday' ? `สถิติเมื่อวาน ${getDateLabel(-1)}` : 'จังหวัดที่น่าสนใจ (Top 5)'}
+                  📍 {mapCategory === 'rain' ? 'พื้นที่ฝนสะสมสูง (Top 5)' : mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 5)' : mapCategory === 'gistda' ? 'พื้นที่วิกฤต (Top 5)' : mapCategory === 'yesterday' ? `สถิติเมื่อวาน ${getDateLabel(-1)}` : 'จังหวัดที่น่าสนใจ (Top 5)'}
                </h3>
                <p style={{ margin: '0 0 8px 0', fontSize: '0.68rem', color: activeModeObj?.color, fontWeight: 'bold', lineHeight: 1.35 }}>{activeModeObj?.desc}</p>
                {mapCategory === 'yesterday' && (
@@ -1841,7 +2007,7 @@ export default function MapPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ fontSize: '1.05rem', fontWeight: '900', color: textColor }}>จ.{st.areaTH.replace('จังหวัด', '')}</div>
                             <div style={{ fontSize: '1.45rem', fontWeight: '900', color: st.color }}>
-                                {st.displayVal} <span style={{fontSize:'0.8rem', color: subTextColor, fontWeight:'bold'}}>{mapCategory==='basic' || mapCategory==='yesterday' || mapCategory==='gistda' ? activeModeObj?.unit : ''}</span>
+                                {st.displayVal} <span style={{fontSize:'0.8rem', color: subTextColor, fontWeight:'bold'}}>{mapCategory==='basic' || mapCategory==='rain' || mapCategory==='yesterday' || mapCategory==='gistda' ? activeModeObj?.unit : ''}</span>
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1947,6 +2113,39 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* POPUP 1.8: RAIN HISTORY MODAL */}
+      {selectedHotspot && selectedHotspot.type === 'rain' && (
+        <div role="dialog" aria-modal="true" aria-label="ข้อมูลฝนจริงย้อนหลังรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
+          <div className="fade-in custom-scrollbar" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: '20px', borderRadius: '20px', width: '100%', maxWidth: '430px', maxHeight: '90vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
+            <button autoFocus aria-label="ปิด" onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold', zIndex: 1 }}>✕</button>
+            <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: `1px solid ${borderColor}` }}>
+              <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '3px' }}>🌧️ ฝนจริงย้อนหลัง • {historyWeather?.period?.startDate || '-'} ถึง {historyWeather?.period?.endDate || '-'}</div>
+              <h2 style={{ margin: 0, color: textColor, fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 'bold' }}>📍 จ.{selectedHotspot.station.areaTH.replace('จังหวัด','')}</h2>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {[
+                { label: 'ฝนจริง 24 ชม.', val: selectedHotspot.observedRain24h, unit: 'mm', color: getRainColor(selectedHotspot.observedRain24h, 'rain24h') },
+                { label: 'ฝนสะสม 7 วัน', val: selectedHotspot.history.rain7d, unit: 'mm', color: getRainColor(selectedHotspot.history.rain7d, 'rain7d') },
+                { label: 'ฝนสะสม 30 วัน', val: selectedHotspot.history.rain30d, unit: 'mm', color: getRainColor(selectedHotspot.history.rain30d, 'rain30d') },
+                { label: 'ฝนสะสม 90 วัน', val: selectedHotspot.history.rain90d, unit: 'mm', color: getRainColor(selectedHotspot.history.rain90d, 'rain90d') },
+                { label: 'ฝนสะสมปีนี้', val: selectedHotspot.history.rainYtd, unit: 'mm', color: getRainColor(selectedHotspot.history.rainYtd, 'rainYtd') },
+                { label: 'วันที่มีฝน 30 วัน', val: selectedHotspot.history.wetDays30d, unit: 'วัน', color: getRainColor(selectedHotspot.history.wetDays30d, 'wetDays30d') },
+                { label: 'ฝนหนักสุด/วัน', val: selectedHotspot.history.maxDailyRain30d, unit: 'mm', color: getRainColor(selectedHotspot.history.maxDailyRain30d, 'maxDailyRain30d') },
+                { label: 'ลมแรงสุด 30 วัน', val: selectedHotspot.history.windMax30d, unit: 'km/h', color: '#0ea5e9' },
+              ].map((item) => (
+                <div key={item.label} style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', borderLeft: `4px solid ${item.color || '#64748b'}` }}>
+                  <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 'bold', marginBottom: '5px' }}>{item.label}</div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 900, color: item.color || textColor }}>{item.val ?? '--'} <span style={{ fontSize: '0.68rem', color: subTextColor }}>{item.unit}</span></div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: '12px', background: 'var(--bg-secondary)', padding: '10px 12px', borderRadius: '10px', fontSize: '0.7rem', color: subTextColor, lineHeight: 1.55 }}>
+              ข้อมูลฝนย้อนหลังเป็นค่าปริมาณฝนจริงแบบรายวันจาก Open-Meteo Historical Weather API (ERA5) ส่วน “โอกาสฝน %” อยู่ในกลุ่มอากาศและเป็นค่าพยากรณ์ คนละความหมายกัน
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* POPUP 2: WEATHER DASHBOARD MODAL */}
       {selectedHotspot && selectedHotspot.type === 'basic' && (
         <div role="dialog" aria-modal="true" aria-label="ข้อมูลสภาพอากาศรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
@@ -2032,7 +2231,7 @@ export default function MapPage() {
                 <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', marginBottom: '12px', border: `1px solid ${borderColor}` }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: subTextColor, marginBottom: '8px' }}>📊 สรุปย้อนหลัง 7 วัน</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', fontSize: '0.72rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', background: cardBg, padding: '5px 8px', borderRadius: '8px' }}><span style={{ color: subTextColor }}>🌧️ ฝนสะสม 7 วัน</span><span style={{ fontWeight: 'bold', color: '#3b82f6' }}>{selectedHotspot.summary7.hist7RainSum}%</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', background: cardBg, padding: '5px 8px', borderRadius: '8px' }}><span style={{ color: subTextColor }}>🌧️ ฝนจริงสะสม 7 วัน</span><span style={{ fontWeight: 'bold', color: '#3b82f6' }}>{selectedHotspot.summary7.hist7RainSum ?? '--'} mm</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', background: cardBg, padding: '5px 8px', borderRadius: '8px' }}><span style={{ color: subTextColor }}>🌡️ สูงสุด 7 วัน</span><span style={{ fontWeight: 'bold', color: '#ef4444' }}>{selectedHotspot.summary7.hist7TempMax ?? '--'}°</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', background: cardBg, padding: '5px 8px', borderRadius: '8px' }}><span style={{ color: subTextColor }}>❄️ ต่ำสุด 7 วัน</span><span style={{ fontWeight: 'bold', color: '#3b82f6' }}>{selectedHotspot.summary7.hist7TempMin ?? '--'}°</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', background: cardBg, padding: '5px 8px', borderRadius: '8px' }}><span style={{ color: subTextColor }}>☀️ UV สูงสุด 7 วัน</span><span style={{ fontWeight: 'bold', color: '#a855f7' }}>{selectedHotspot.summary7.hist7UvMax ?? '--'}</span></div>
