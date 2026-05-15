@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 export default function WeatherRadar({ coords, isMobile, cardBg, borderColor, textColor, frameHeightOverride, title = 'เรดาร์สภาพอากาศ' }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const defaultOverlay = 'radar';
   const defaultProduct = 'radar';
   const frameHeight = frameHeightOverride || (isMobile ? '340px' : '540px');
+  const lat = coords?.lat || 13.75;
+  const lon = coords?.lon || 100.5;
+  const radarSrc = useMemo(() => (
+    `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&zoom=8&level=surface&overlay=${defaultOverlay}&product=${defaultProduct}&menu=&message=true&marker=true`
+  ), [lat, lon]);
+
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [radarSrc]);
   
   return (
     <div style={{ background: cardBg, borderRadius: isMobile ? '20px' : '25px', padding: isMobile ? '15px' : '20px', border: `1px solid ${borderColor}`, overflow: 'hidden', flexShrink: 0, width: '100%', position: 'relative', isolation: 'isolate' }}>
@@ -30,7 +39,8 @@ export default function WeatherRadar({ coords, isMobile, cardBg, borderColor, te
             )}
             <iframe 
                 width="100%" height="100%" 
-                src={`https://embed.windy.com/embed2.html?lat=${coords?.lat || 13.75}&lon=${coords?.lon || 100.5}&detailLat=${coords?.lat || 13.75}&detailLon=${coords?.lon || 100.5}&zoom=8&level=surface&overlay=${defaultOverlay}&product=${defaultProduct}&menu=&message=true&marker=true`} 
+                key={radarSrc}
+                src={radarSrc}
                 style={{ border: 'none', opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.5s ease', display: 'block', position: 'relative', zIndex: 0 }}
                 title="Radar Map"
                 loading="lazy"

@@ -151,9 +151,10 @@ export default function Dashboard() {
   const [geoError, setGeoError] = useState(false);
   const [selectedProv, setSelectedProv] = useState('');
   const [selectedDist, setSelectedDist] = useState('');
-  const [showFilter, setShowFilter] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('airQualityThai.viewMode') || 'general');
+  const [radarScan, setRadarScan] = useState(null);
+  const [radarScanLoading, setRadarScanLoading] = useState(false);
+  const [radarScanError, setRadarScanError] = useState('');
   const [favoriteLocation, setFavoriteLocation] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(FAVORITE_LOCATION_KEY) || 'null');
@@ -166,13 +167,17 @@ export default function Dashboard() {
 
   const hourlyScrollRef = useRef(null);
   const mainScrollRef = useRef(null);
+  const locationPanelRef = useRef(null);
   const { isDragging: isHourlyDragging, events: hourlyScrollEvents } = useDraggableScroll(hourlyScrollRef);
+  const radarLat = weatherData?.coords?.lat;
+  const radarLon = weatherData?.coords?.lon;
+  const radarWindDir = weatherData?.current?.windDirection;
+  const radarWindSpeed = weatherData?.current?.windSpeed;
 
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      if (!mobile) setShowFilter(true);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -307,6 +312,47 @@ export default function Dashboard() {
       );
     }
   }, [favoriteApplied, favoriteLocation, fetchWeatherByCoords]);
+
+  useEffect(() => {
+    const lat = radarLat;
+    const lon = radarLon;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    const controller = new AbortController();
+    setRadarScan(null);
+    setRadarScanError('');
+    setRadarScanLoading(true);
+
+    fetch('/api/radar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lat,
+        lon,
+        windDir: radarWindDir,
+        windSpeed: radarWindSpeed,
+      }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Radar API ${res.status}`);
+        return res.json();
+      })
+      .then((data) => setRadarScan(data))
+      .catch((err) => {
+        if (err.name !== 'AbortError') setRadarScanError(err.message || 'โหลดเรดาร์ไม่สำเร็จ');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRadarScanLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [
+    radarLat,
+    radarLon,
+    radarWindDir,
+    radarWindSpeed,
+  ]);
 
   const fetchLocationName = async (lat, lon) => {
     try {
@@ -530,7 +576,22 @@ export default function Dashboard() {
   }, minutelyRows[0]);
   const rainNow = Number(current?.rain || current?.precipitation || currentRainAmount || 0);
   const nowRainAmount = Math.max(rainNow, radarRainNowCell?.rain || 0);
-  const nowcastRainAlert = rainNow >= 0.1 || radarRainNowCell
+  const radarAlertTone = radarScan?.alertLevel >= 3 ? '#ef4444' : radarScan?.alertLevel === 2 ? '#f59e0b' : radarScan?.alertLevel === 1 ? '#16a34a' : '#0ea5e9';
+  const radarScanAlert = radarScan
+    ? {
+      key: `radar-${radarScan.radarTime || 'latest'}-${radarScan.alertLevel}`,
+      level: radarScan.alertLevel >= 2 ? 'danger' : radarScan.alertLevel === 1 ? 'watch' : 'clear',
+      icon: radarScan.cardIcon || (radarScan.alertLevel > 0 ? '🌧️' : '🌤️'),
+      title: radarScan.cardTitle || (radarScan.alertLevel > 0 ? 'พบกลุ่มฝนใกล้พื้นที่' : 'ยังไม่พบฝนใกล้ตัว'),
+      detail: radarScan.cardDesc || 'สแกนเรดาร์รอบพิกัดที่เลือกแล้ว',
+      time: radarScan.radarTime ? `เรดาร์ ${radarScan.radarTime}` : 'เรดาร์ล่าสุด',
+      tone: radarAlertTone,
+      bg: radarScan.alertLevel >= 3 ? 'rgba(239,68,68,0.1)' : radarScan.alertLevel === 2 ? 'rgba(245,158,11,0.13)' : radarScan.alertLevel === 1 ? 'rgba(22,163,74,0.1)' : 'rgba(14,165,233,0.1)',
+      progress: radarScan.alertLevel >= 3 ? 100 : radarScan.alertLevel === 2 ? 76 : radarScan.alertLevel === 1 ? 45 : 12,
+      source: 'RainViewer radar',
+    }
+    : null;
+  const fallbackRainAlert = rainNow >= 0.1 || radarRainNowCell
     ? {
       key: `now-${radarRainNowCell?.time || Math.round(nowRainAmount * 10)}`,
       level: 'danger',
@@ -567,6 +628,7 @@ export default function Dashboard() {
         bg: 'rgba(22,163,74,0.1)',
         progress: Math.min(100, Math.max(8, peakMinutelyRain?.probability || 8)),
       };
+  const nowcastRainAlert = radarScanAlert || fallbackRainAlert;
   const handleRainAlertToggle = async () => {
     if (!rainAlertEnabled && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
@@ -610,42 +672,6 @@ export default function Dashboard() {
   };
   const districtLoading = Boolean(selectedProv && !amphoeData?.provinces && geoData.length === 0 && !geoError);
   const districtDisabled = !selectedProv || currentAmphoes.length === 0;
-  const viewModes = [
-    { id: 'general', label: 'ทั่วไป', icon: '🏠', hint: 'สรุปครบ' },
-    { id: 'travel', label: 'เดินทาง', icon: '🚘', hint: 'ฝน + ทัศนวิสัย' },
-    { id: 'health', label: 'สุขภาพ', icon: '😷', hint: 'ฝุ่น + UV' },
-    { id: 'farm', label: 'เกษตร', icon: '🌾', hint: 'ฝน + ลม' },
-  ];
-  const handleViewModeChange = (modeId) => {
-    setViewMode(modeId);
-    localStorage.setItem('airQualityThai.viewMode', modeId);
-  };
-  const modeSpecificAction = {
-    travel: {
-      icon: currentRainProb >= 40 ? '🚗' : '🛣️',
-      title: currentRainProb >= 40 ? 'เผื่อเวลาเดินทาง' : 'เดินทางได้ดี',
-      detail: currentRainProb >= 40 ? `ฝน ${currentRainProb}% ถนนอาจลื่น` : 'ฝนต่ำ ทัศนวิสัยดี',
-      tone: currentRainProb >= 40 ? '#f59e0b' : '#16a34a',
-      bg: currentRainProb >= 40 ? 'rgba(245,158,11,0.13)' : 'rgba(22,163,74,0.1)',
-      priority: 0,
-    },
-    health: {
-      icon: current?.pm25 >= 37.5 ? '😷' : '💪',
-      title: current?.pm25 >= 37.5 ? 'ลดเวลานอกอาคาร' : 'อากาศพอไหว',
-      detail: `PM2.5 ${Math.round(current?.pm25 || 0)} · UV ${current?.uv || 0}`,
-      tone: current?.pm25 >= 37.5 || current?.uv >= 8 ? '#f97316' : '#16a34a',
-      bg: current?.pm25 >= 37.5 || current?.uv >= 8 ? 'rgba(249,115,22,0.13)' : 'rgba(22,163,74,0.1)',
-      priority: 0,
-    },
-    farm: {
-      icon: currentRainProb >= 40 || current?.windSpeed >= 14 ? '🌧️' : '🌾',
-      title: currentRainProb >= 40 || current?.windSpeed >= 14 ? 'เลี่ยงพ่นยา' : 'ทำงานกลางแจ้งได้',
-      detail: `ฝน ${currentRainProb}% · ลม ${Math.round(current?.windSpeed || 0)} กม./ชม.`,
-      tone: currentRainProb >= 40 || current?.windSpeed >= 14 ? '#f59e0b' : '#16a34a',
-      bg: currentRainProb >= 40 || current?.windSpeed >= 14 ? 'rgba(245,158,11,0.13)' : 'rgba(22,163,74,0.1)',
-      priority: 0,
-    },
-  }[viewMode];
   const heroAdvisories = [
     {
       icon: '⚠️',
@@ -671,8 +697,16 @@ export default function Dashboard() {
     { label: 'ความชื้น', value: `${Math.round(current?.humidity || 0)}%`, note: current?.humidity > 75 ? 'ค่อนข้างชื้น' : 'กำลังดี', icon: '💧', tone: '#0ea5e9' },
     { label: 'ทัศนวิสัย', value: `${Math.round((current?.visibility || 10000) / 1000)}`, unit: 'กม.', note: (current?.visibility || 10000) < 5000 ? 'มองเห็นลดลง' : 'มองเห็นชัด', icon: '👁️', tone: '#6366f1' },
   ];
+  const rainActionItem = {
+    icon: nowcastRainAlert.level === 'danger' ? '⛈️' : nowcastRainAlert.level === 'watch' ? '☔' : '🌤️',
+    title: nowcastRainAlert.level === 'danger' ? 'เช็กเรดาร์ก่อนออก' : nowcastRainAlert.level === 'watch' ? 'พกร่มไว้ก่อน' : 'ฝนยังไม่เด่น',
+    detail: nowcastRainAlert.time ? `${nowcastRainAlert.time} · ${nowcastRainAlert.title}` : nowcastRainAlert.title,
+    tone: nowcastRainAlert.tone,
+    bg: nowcastRainAlert.bg,
+    priority: 0,
+  };
   const quickActionItems = [
-    modeSpecificAction,
+    rainActionItem,
     current?.feelsLike >= 38 && {
       icon: '🥤',
       title: 'ดื่มน้ำบ่อย',
@@ -759,12 +793,13 @@ export default function Dashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', width: '100%', marginBottom: isMobile ? '20px' : '26px' }}>
           <div style={{ position: 'relative', zIndex: 1, minWidth: 0 }}>
             <button
-              onClick={() => setShowFilter(!showFilter)}
+              type="button"
+              onClick={() => locationPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: heroCardSurface, color: '#475569', border: '1px solid rgba(148, 163, 184, 0.32)', borderRadius: '999px', padding: '7px 10px', fontSize: '0.72rem', fontWeight: '800', cursor: 'pointer', marginBottom: '9px' }}
             >
               <span>📍</span>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: isMobile ? '230px' : '360px' }}>{locationName}</span>
-              <span style={{ fontSize: '0.64rem' }}>{showFilter ? '▲' : '▼'}</span>
+              <span style={{ fontSize: '0.64rem' }}>เปลี่ยนพื้นที่</span>
             </button>
             <div style={{ fontSize: '0.78rem', color: heroSubTextColor, lineHeight: 1.5 }}>{locationDetailText}</div>
             <div style={{ fontSize: '0.68rem', color: heroSubTextColor, opacity: 0.74, lineHeight: 1.5, marginTop: '3px' }}>{thaiDate} • {thaiTime} น.</div>
@@ -835,100 +870,61 @@ export default function Dashboard() {
     </div>
   );
 
-  const activeViewMode = viewModes.find((mode) => mode.id === viewMode) || viewModes[0];
-
-  const preferencePanel = (
+  const locationControlPanel = (
     <div
+      ref={locationPanelRef}
       style={{
+        ...surfaceCardStyle,
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'minmax(180px, 0.8fr) minmax(320px, 1.55fr) minmax(220px, 0.9fr)',
-        gap: '10px',
+        gridTemplateColumns: isMobile ? '1fr' : 'minmax(190px, 0.65fr) minmax(0, 1.6fr) minmax(180px, 0.55fr)',
+        gap: isMobile ? '12px' : '14px',
         alignItems: 'stretch',
-        marginTop: isMobile ? '0' : '14px',
-        padding: '10px',
-        border: `1px solid ${borderColor}`,
-        borderRadius: '16px',
-        background: 'color-mix(in srgb, var(--bg-card) 94%, white)',
-        minWidth: 0,
+        padding: isMobile ? '14px' : '16px',
+        scrollMarginTop: '16px',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          gap: '3px',
-          minWidth: 0,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: textColor, fontSize: '0.78rem', fontWeight: 900 }}>
-          <span style={{ color: '#2563eb' }}>●</span>
-          ปรับมุมมอง
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '5px', minWidth: 0 }}>
+        <div style={{ color: '#2563eb', fontSize: '0.76rem', fontWeight: 950 }}>📍 พื้นที่เรดาร์</div>
+        <div style={{ color: textColor, fontSize: isMobile ? '1rem' : '1.06rem', fontWeight: 950, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {locationName}
         </div>
-        <div style={{ color: subTextColor, fontSize: '0.65rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {activeViewMode.icon} {activeViewMode.hint}
+        <div style={{ color: subTextColor, fontSize: '0.72rem', fontWeight: 800 }}>
+          {radarScanLoading ? 'กำลังสแกนเรดาร์ล่าสุด...' : radarScan?.radarTime ? `เรดาร์ล่าสุด ${radarScan.radarTime}` : 'เลือกจังหวัด/อำเภอแล้วข้อมูลจะตามพื้นที่นี้'}
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
-          gap: '8px',
-          minWidth: 0,
-        }}
-      >
-        {viewModes.map((mode) => {
-          const active = viewMode === mode.id;
-          return (
-            <button
-              key={mode.id}
-              type="button"
-              onClick={() => handleViewModeChange(mode.id)}
-              style={{
-                border: `1px solid ${active ? '#2563eb55' : borderColor}`,
-                background: active ? 'rgba(37,99,235,0.1)' : 'var(--bg-secondary)',
-                color: active ? '#2563eb' : textColor,
-                borderRadius: '999px',
-                padding: '8px 10px',
-                fontSize: '0.72rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                minWidth: 0,
-                whiteSpace: 'nowrap',
-              }}
-              title={mode.hint}
-            >
-              <span>{mode.icon}</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{mode.label}</span>
-            </button>
-          );
-        })}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)', gap: '10px', minWidth: 0 }}>
+        <select value={selectedProv} onChange={handleProvChange} style={{ width: '100%', background: 'var(--bg-secondary)', color: '#0f766e', border: `1px solid ${borderColor}`, fontWeight: 900, fontSize: '0.92rem', padding: '12px', borderRadius: '14px', outline: 'none', cursor: 'pointer', minWidth: 0 }}>
+          <option value="">เลือกจังหวัด</option>
+          {sortedStations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
+        </select>
+        <select value={selectedDist} onChange={handleDistChange} disabled={districtDisabled} style={{ width: '100%', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, fontWeight: 900, fontSize: '0.92rem', padding: '12px', borderRadius: '14px', outline: 'none', cursor: districtDisabled ? 'not-allowed' : 'pointer', opacity: districtDisabled ? 0.58 : 1, minWidth: 0 }}>
+          <option value="">
+            {!selectedProv ? 'เลือกอำเภอ' : districtLoading ? 'กำลังดึงข้อมูล...' : geoError ? 'โหลดรายชื่ออำเภอไม่ได้' : currentAmphoes.length === 0 ? 'ไม่มีข้อมูลอำเภอ' : 'เลือกอำเภอ'}
+          </option>
+          {currentAmphoes.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+        </select>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: favoriteLocation?.lat && favoriteLocation?.lon && !isMobile ? '1fr 1fr' : '1fr', gap: '8px', alignContent: 'center', minWidth: 0 }}>
         <button
           type="button"
           onClick={handleSaveFavorite}
+          disabled={!selectedProv && !coords}
           style={{
             border: '1px solid rgba(245,158,11,0.32)',
             background: 'rgba(245,158,11,0.12)',
             color: '#d97706',
-            borderRadius: '999px',
-            padding: '8px 10px',
-            fontSize: '0.72rem',
-            fontWeight: 900,
-            cursor: 'pointer',
+            borderRadius: '14px',
+            padding: '11px 12px',
+            fontSize: '0.76rem',
+            fontWeight: 950,
+            cursor: (!selectedProv && !coords) ? 'not-allowed' : 'pointer',
+            opacity: (!selectedProv && !coords) ? 0.5 : 1,
             whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
           }}
         >
-          ⭐ ปักหมุดพื้นที่นี้
+          ⭐ ปักหมุด
         </button>
         {favoriteLocation?.lat && favoriteLocation?.lon && (
           <button
@@ -938,23 +934,21 @@ export default function Dashboard() {
               border: '1px solid rgba(37,99,235,0.3)',
               background: 'rgba(37,99,235,0.1)',
               color: '#2563eb',
-              borderRadius: '999px',
-              padding: '8px 10px',
-              fontSize: '0.72rem',
-              fontWeight: 900,
+              borderRadius: '14px',
+              padding: '11px 12px',
+              fontSize: '0.76rem',
+              fontWeight: 950,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
             }}
             title={favoriteLocation.label}
           >
-            📍 ไปพื้นที่โปรด
+            📍 พื้นที่โปรด
           </button>
         )}
-        {favoriteLocation?.label && (
-          <div style={{ color: subTextColor, fontSize: '0.64rem', fontWeight: 800, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', gridColumn: '1 / -1', padding: '0 4px' }}>
-            พื้นที่โปรด: {favoriteLocation.label}
+        {(radarScanError || favoriteLocation?.label) && (
+          <div style={{ color: radarScanError ? '#f97316' : subTextColor, fontSize: '0.66rem', fontWeight: 850, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', gridColumn: '1 / -1', padding: '0 4px' }}>
+            {radarScanError ? 'ใช้ข้อมูลพยากรณ์ 15 นาทีสำรอง' : `พื้นที่โปรด: ${favoriteLocation.label}`}
           </div>
         )}
       </div>
@@ -1302,19 +1296,28 @@ export default function Dashboard() {
   );
 
   const rainNowcastCard = (
-    <div style={{ background: `linear-gradient(180deg, ${nowcastRainAlert.bg}, ${cardBg})`, borderRadius: '22px', padding: isMobile ? '16px' : '18px', border: `1px solid ${nowcastRainAlert.tone}33`, boxShadow: '0 12px 26px rgba(15,23,42,0.06)' }}>
+    <div style={{ background: `linear-gradient(180deg, ${nowcastRainAlert.bg}, ${cardBg})`, borderRadius: '24px', padding: isMobile ? '18px' : '22px', border: `1px solid ${nowcastRainAlert.tone}33`, boxShadow: '0 18px 42px rgba(15,23,42,0.08)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', minWidth: 0 }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${nowcastRainAlert.tone}18`, color: nowcastRainAlert.tone, fontSize: '1.35rem', flexShrink: 0 }}>
+          <div style={{ width: isMobile ? '46px' : '54px', height: isMobile ? '46px' : '54px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${nowcastRainAlert.tone}18`, color: nowcastRainAlert.tone, fontSize: isMobile ? '1.45rem' : '1.75rem', flexShrink: 0 }}>
             {nowcastRainAlert.icon}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ color: subTextColor, fontSize: '0.68rem', fontWeight: 900 }}>แจ้งเตือนฝนระยะสั้น · อัปเดตทุก 15 นาที</div>
-            <h3 style={{ margin: '4px 0 0', color: textColor, fontSize: isMobile ? '1rem' : '1.08rem', fontWeight: 900, lineHeight: 1.25 }}>
+            <div style={{ color: nowcastRainAlert.tone, fontSize: '0.72rem', fontWeight: 950 }}>
+              แจ้งเตือนฝนจากเรดาร์ · {radarScanLoading ? 'กำลังสแกนล่าสุด' : (nowcastRainAlert.source || 'Nowcast 15 นาที')}
+            </div>
+            <h2 style={{ margin: '5px 0 0', color: textColor, fontSize: isMobile ? '1.24rem' : '1.55rem', fontWeight: 950, lineHeight: 1.18, letterSpacing: 0 }}>
               {nowcastRainAlert.title}
-            </h3>
-            <div style={{ color: subTextColor, fontSize: '0.76rem', fontWeight: 800, lineHeight: 1.5, marginTop: '5px' }}>
+            </h2>
+            <div style={{ color: subTextColor, fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 800, lineHeight: 1.55, marginTop: '7px', maxWidth: 920 }}>
               {nowcastRainAlert.detail}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '11px' }}>
+              {[locationName, nowcastRainAlert.time, radarScanError ? 'ใช้พยากรณ์สำรอง' : null].filter(Boolean).map((item) => (
+                <span key={item} style={{ color: nowcastRainAlert.tone, background: `${nowcastRainAlert.tone}12`, border: `1px solid ${nowcastRainAlert.tone}24`, borderRadius: '999px', fontSize: '0.68rem', fontWeight: 900, padding: '5px 9px', maxWidth: isMobile ? '100%' : '360px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item}
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -1353,8 +1356,8 @@ export default function Dashboard() {
           );
         })}
       </div>
-      <div style={{ marginTop: '10px', color: subTextColor, fontSize: '0.64rem', lineHeight: 1.45, fontWeight: 800 }}>
-        ใช้ข้อมูล nowcast 15 นาทีเพื่อแจ้งเตือน ส่วนภาพเรดาร์ด้านล่างใช้ดูทิศทางกลุ่มฝนประกอบ
+      <div style={{ marginTop: '10px', color: subTextColor, fontSize: '0.68rem', lineHeight: 1.45, fontWeight: 800 }}>
+        แผงนี้สแกนภาพเรดาร์รอบพิกัดที่เลือกก่อน แล้วใช้พยากรณ์ 15 นาทีเป็นข้อมูลสำรองเมื่อเรดาร์โหลดไม่ได้
       </div>
     </div>
   );
@@ -1400,17 +1403,17 @@ export default function Dashboard() {
   const desktopShowcaseLayout = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minWidth: 0 }}>
       {rainNowcastCard}
+      {locationControlPanel}
+      {rainRadarCard}
+      {hourlyForecastCard}
+      {tomorrowOverviewCard}
       <div style={{ ...surfaceCardStyle, padding: '20px' }}>
         {heroCard}
         {quickActionBar}
-        {preferencePanel}
-        {healthAdviceBar}
-        {highlightMetricsGrid}
       </div>
-      {rainRadarCard}
-      {tomorrowOverviewCard}
       {briefingCard}
-      {hourlyForecastCard}
+      {healthAdviceBar}
+      {highlightMetricsGrid}
       {supportGrid}
     </div>
   );
@@ -1425,16 +1428,17 @@ export default function Dashboard() {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', flexShrink: 0, width: '100%', alignItems: 'stretch', minWidth: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
         {rainNowcastCard}
+        {locationControlPanel}
+        {rainRadarCard}
+        {hourlyForecastCard}
+        {tomorrowOverviewCard}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', flexShrink: 0, alignItems: 'stretch' }}>
           {heroCard}
           {quickActionBar}
-          {preferencePanel}
+          {briefingCard}
           {healthAdviceBar}
           {highlightMetricsGrid}
         </div>
-        {rainRadarCard}
-        {tomorrowOverviewCard}
-        {briefingCard}
         {supportGrid}
       </div>
     </div>
@@ -1453,60 +1457,6 @@ export default function Dashboard() {
             </div>
         )}
 
-        {/* === SECTION 2: Location Filter === */}
-        {showFilter && (
-            <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '15px', background: cardBg, padding: '15px', borderRadius: '20px', border: `1px solid ${borderColor}`, flexWrap: 'wrap', flexShrink: 0 }}>
-              <select value={selectedProv} onChange={handleProvChange} style={{ flex: 1, minWidth: '130px', background: 'var(--bg-secondary)', color: '#0ea5e9', border: 'none', fontWeight: 'bold', fontSize: '0.95rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: 'pointer' }}>
-                <option value="">-- เลือกจังหวัด --</option>
-                {sortedStations.map(p => <option key={p.stationID} value={p.areaTH}>{p.areaTH}</option>)}
-              </select>
-              <select value={selectedDist} onChange={handleDistChange} disabled={districtDisabled} style={{ flex: 1, minWidth: '130px', background: 'var(--bg-secondary)', color: textColor, border: 'none', fontWeight: 'bold', fontSize: '0.95rem', padding: '10px', borderRadius: '12px', outline: 'none', cursor: districtDisabled ? 'not-allowed' : 'pointer', opacity: districtDisabled ? 0.5 : 1 }}>
-                <option value="">
-                  {!selectedProv ? '-- เลือกอำเภอ --' : districtLoading ? 'กำลังดึงข้อมูล...' : geoError ? '⚠️ โหลดไฟล์ล้มเหลว' : currentAmphoes.length === 0 ? '⚠️ ไม่พบข้อมูลอำเภอ' : '-- เลือกอำเภอ --'}
-                </option>
-                {currentAmphoes.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-              </select>
-              <button
-                type="button"
-                onClick={handleSaveFavorite}
-                disabled={!selectedProv && !coords}
-                style={{
-                  border: `1px solid ${borderColor}`,
-                  background: 'rgba(245,158,11,0.12)',
-                  color: '#d97706',
-                  fontWeight: 900,
-                  fontSize: '0.78rem',
-                  padding: '10px 13px',
-                  borderRadius: '12px',
-                  cursor: (!selectedProv && !coords) ? 'not-allowed' : 'pointer',
-                  opacity: (!selectedProv && !coords) ? 0.5 : 1,
-                }}
-              >
-                ⭐ ปักหมุด
-              </button>
-              {favoriteLocation?.lat && favoriteLocation?.lon && (
-                <button
-                  type="button"
-                  onClick={handleUseFavorite}
-                  style={{
-                    border: `1px solid ${borderColor}`,
-                    background: 'rgba(37,99,235,0.1)',
-                    color: '#2563eb',
-                    fontWeight: 900,
-                    fontSize: '0.78rem',
-                    padding: '10px 13px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                  }}
-                  title={favoriteLocation.label}
-                >
-                  📍 พื้นที่โปรด
-                </button>
-              )}
-            </div>
-        )}
-
-        
         {isMobile ? mobileOverviewLayout : desktopOverviewLayout}
 
         {/* === SECTION 9: Daily Forecast 7 days (full width) === */}
