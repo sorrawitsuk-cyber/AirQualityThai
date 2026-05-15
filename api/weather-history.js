@@ -2,6 +2,7 @@ import { provinces77 } from '../src/provinces77.js';
 
 const CACHE_TTL_SECONDS = 6 * 60 * 60;
 const CHUNK_SIZE = 20;
+const ARCHIVE_LAG_DAYS = 5;
 
 const fetchJson = async (url, timeoutMs = 15000) => {
   const ctrl = new AbortController();
@@ -38,9 +39,10 @@ const avg = (values = []) => {
 };
 
 const sliceLast = (values = [], count) => values.slice(Math.max(values.length - count, 0));
+const getProvinceKey = (name = '') => String(name).replace(/^จังหวัด/, '').trim();
 
 const buildHistoryPayload = async () => {
-  const end = bangkokDate(-1);
+  const end = bangkokDate(-ARCHIVE_LAG_DAYS);
   const endDate = toDateKey(end);
   const yearStart = new Date(end);
   yearStart.setMonth(0, 1);
@@ -70,9 +72,12 @@ const buildHistoryPayload = async () => {
   }));
 
   const byStation = {};
+  const byProvince = {};
   responses.forEach(({ offset, data }) => {
     data.forEach((item, index) => {
       const stationID = `PROV_${offset + index}`;
+      const province = provinces77[offset + index];
+      const provinceKey = getProvinceKey(province?.n);
       const daily = item.daily || {};
       const dates = daily.time || [];
       const rain = daily.precipitation_sum || [];
@@ -84,7 +89,9 @@ const buildHistoryPayload = async () => {
       const last30Rain = sliceLast(rain, 30);
       const last90Rain = sliceLast(rain, 90);
 
-      byStation[stationID] = {
+      const metrics = {
+        province: province?.n || '',
+        provinceKey,
         dates,
         rainDaily: rain.map((value) => Math.round((Number(value) || 0) * 10) / 10),
         source: 'openmeteo-archive',
@@ -102,14 +109,18 @@ const buildHistoryPayload = async () => {
         windMax30d: max(sliceLast(windMax, 30)),
         tempAvg30d: avg(sliceLast(tempMax, 30)),
       };
+
+      byStation[stationID] = metrics;
+      if (provinceKey) byProvince[provinceKey] = metrics;
     });
   });
 
   return {
     updatedAt: new Date(timestamp).toISOString(),
-    period: { startDate, endDate, timezone: 'Asia/Bangkok' },
+    period: { startDate, endDate, timezone: 'Asia/Bangkok', archiveLagDays: ARCHIVE_LAG_DAYS },
     source: 'Open-Meteo Historical Weather API (ERA5)',
     byStation,
+    byProvince,
   };
 };
 

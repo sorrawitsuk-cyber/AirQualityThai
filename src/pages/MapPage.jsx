@@ -87,6 +87,13 @@ const findClosestStation = (lat, lng, stationList) => {
     return closest;
 };
 
+const getProvinceKey = (stationOrName = '') => {
+    const raw = typeof stationOrName === 'string'
+        ? stationOrName
+        : stationOrName?.areaTH || stationOrName?.nameTH || stationOrName?.stationID || '';
+    return String(raw).replace(/^จังหวัด/, '').trim();
+};
+
 // 🩺 คำแนะนำเชิงปฏิบัติตามสถานการณ์
 const getActionableAdvice = (pm25, temp, rain, uv, wind) => {
     const tips = [];
@@ -379,7 +386,8 @@ export default function MapPage() {
   const getRainVal = useCallback((station, mode = activeRainMode) => {
     if (!station) return null;
     const observedYesterday = stationMaxYesterday?.[station.stationID]?.rain;
-    const history = historyWeather?.byStation?.[station.stationID] || {};
+    const provinceKey = getProvinceKey(station);
+    const history = historyWeather?.byStation?.[station.stationID] || historyWeather?.byProvince?.[provinceKey] || {};
     if (mode === 'rain24h') {
       const value = observedYesterday ?? history.rain24h;
       return value != null ? Math.round(value * 10) / 10 : null;
@@ -530,7 +538,8 @@ export default function MapPage() {
       if (!station) return null;
       const daily = stationDaily[station.stationID] || {};
       if (!daily.temp) return null;
-      const history = historyWeather?.byStation?.[station.stationID] || {};
+      const provinceKey = getProvinceKey(station);
+      const history = historyWeather?.byStation?.[station.stationID] || historyWeather?.byProvince?.[provinceKey] || {};
       const histIdx = [1, 2, 3, 4, 5, 6, 7]; // past 7 days (idx 0 = 7 days ago, idx 7 = today)
       const fcastIdx = [8, 9, 10, 11, 12, 13, 14]; // next 7 days
       const nonZero = (arr, idxs) => idxs.map(i => arr?.[i]).filter(v => v != null && v > 0);
@@ -667,7 +676,8 @@ export default function MapPage() {
           const minObj = stationYesterday?.[station.stationID] || {};
           setSelectedHotspot({ type: 'yesterday', station, maxObj, minObj });
       } else if (mapCategory === 'rain') {
-          const history = historyWeather?.byStation?.[station.stationID] || {};
+          const provinceKey = getProvinceKey(station);
+          const history = historyWeather?.byStation?.[station.stationID] || historyWeather?.byProvince?.[provinceKey] || {};
           const val = getRainVal(station, activeRainMode);
           setSelectedHotspot({
               type: 'rain',
@@ -967,7 +977,8 @@ export default function MapPage() {
     return Array.from({ length: 8 }, (_, i) => {
       const vals = (mapCategory === 'rain'
         ? stations.map(st => {
-            const series = historyWeather?.byStation?.[st.stationID]?.rainDaily || [];
+            const provinceKey = getProvinceKey(st);
+            const series = historyWeather?.byStation?.[st.stationID]?.rainDaily || historyWeather?.byProvince?.[provinceKey]?.rainDaily || [];
             const value = series.slice(-8)[i] || 0;
             return activeRainMode === 'wetDays30d' ? (value >= 1 ? 1 : 0) : value;
           })
@@ -1075,7 +1086,7 @@ export default function MapPage() {
 
   const activeCategoryOption = mapCategoryOptions.find(opt => opt.id === mapCategory);
   const activeDataSourceMeta = mapCategory === 'rain'
-    ? { label: 'Historical', icon: '🌧️', color: '#2563eb', detail: historyLoading ? 'กำลังโหลดข้อมูลฝนย้อนหลังจริง' : historyError ? 'ใช้ค่าฝน 24 ชม. เท่าที่มี และรอข้อมูลย้อนหลัง' : `Open-Meteo Archive ถึง ${historyWeather?.period?.endDate || getDateLabel(-1)}` }
+    ? { label: 'Historical', icon: '🌧️', color: '#2563eb', detail: historyLoading ? 'กำลังโหลดข้อมูลฝนย้อนหลังจริง' : historyError ? 'ใช้ค่าฝน 24 ชม. เท่าที่มี และรอข้อมูลย้อนหลัง' : `Open-Meteo Archive ถึง ${historyWeather?.period?.endDate || getDateLabel(-(historyWeather?.period?.archiveLagDays || 5))}` }
     : mapCategory === 'basic'
     ? (timeMode === 'now'
         ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: 'AIR4Thai + TMD อัปเดตล่าสุด' }
@@ -1123,7 +1134,7 @@ export default function MapPage() {
   const flatTimeOptions = timeModeSections.flatMap(section => section.options);
   const activeTimeKey = mapCategory === 'rain' ? 'history' : mapCategory === 'yesterday' ? 'yesterday' : (canChooseTimeMode ? timeMode : 'latest');
   const activeTimeOption = mapCategory === 'rain'
-    ? { label: `🌧️ ย้อนหลังถึง ${historyWeather?.period?.endDate || getDateLabel(-1)}`, sub: activeRainMode === 'rain24h' ? 'ฝนจริง 24 ชม.' : 'ค่าจริงย้อนหลัง', color: '#2563eb' }
+    ? { label: `🌧️ ย้อนหลังถึง ${historyWeather?.period?.endDate || getDateLabel(-(historyWeather?.period?.archiveLagDays || 5))}`, sub: activeRainMode === 'rain24h' ? 'ฝนจริง 24 ชม.' : 'ค่าจริงย้อนหลัง', color: '#2563eb' }
     : mapCategory === 'yesterday'
     ? { label: `🕘 เมื่อวาน ${getDateLabel(-1)}`, sub: 'สถิติย้อนหลัง', color: '#f59e0b' }
     : flatTimeOptions.find(opt => opt.id === activeTimeKey) || { label: '🛰️ ล่าสุด', sub: 'ข้อมูลเฉพาะเครื่องมือ', color: activeCategoryOption?.color || '#64748b' };
