@@ -130,6 +130,7 @@ export default function MapPage() {
   const [activeRainMode, setActiveRainMode] = useState('rain24h');
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
   const [activeGistdaMode, setActiveGistdaMode] = useState('burntArea');
+  const [activeHistoryFilter, setActiveHistoryFilter] = useState('all');
   const [timeMode, setTimeMode] = useState('now'); // 'now' | 'today' | 'tomorrow'
   const [activeYesterdayMode, setActiveYesterdayMode] = useState('maxTemp');
   const [historyWeather, setHistoryWeather] = useState(null);
@@ -317,6 +318,12 @@ export default function MapPage() {
     { id: 'heatRiskDays30d', name: 'วันเสี่ยงร้อน', color: '#ef4444', unit: 'วัน', desc: 'จำนวนวันที่ดัชนีความร้อนตั้งแต่ 41°C ขึ้นไปในรอบ 30 วัน', section: 'อุณหภูมิ' },
     { id: 'windMax30d', name: 'ลมแรงสุด 30 วัน', color: '#0ea5e9', unit: 'km/h', desc: 'ความเร็วลมสูงสุดที่เกิดขึ้นจริงในรอบ 30 วัน', section: 'ลม' },
     { id: 'windyDays30d', name: 'วันลมแรง', color: '#0284c7', unit: 'วัน', desc: 'จำนวนวันที่ลมสูงสุดตั้งแต่ 30 km/h ขึ้นไปในรอบ 30 วัน', section: 'ลม' },
+  ];
+  const historyFilterOptions = [
+    { id: 'all', label: 'ทั้งหมด', icon: '▦', color: '#2563eb' },
+    { id: 'ฝน', label: 'ฝน', icon: 'ฝ', color: '#0ea5e9' },
+    { id: 'อุณหภูมิ', label: 'อุณหภูมิ', icon: 'อ', color: '#ef4444' },
+    { id: 'ลม', label: 'ลม', icon: 'ล', color: '#0284c7' },
   ];
 
   const yesterdayModes = [
@@ -838,12 +845,15 @@ export default function MapPage() {
   const borderColor = 'var(--border-color)';
   const subTextColor = 'var(--text-sub)'; 
 
-  const activeModeObj = mapCategory === 'rain' ? rainModes.find(m => m.id === activeRainMode) :
+  const visibleRainModes = activeHistoryFilter === 'all'
+    ? rainModes
+    : rainModes.filter(mode => mode.section === activeHistoryFilter);
+  const activeModeObj = mapCategory === 'rain' ? (visibleRainModes.find(m => m.id === activeRainMode) || visibleRainModes[0] || rainModes.find(m => m.id === activeRainMode)) :
                         mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) :
                         mapCategory === 'risk' ? riskModes.find(m => m.id === activeRiskMode) :
                         mapCategory === 'yesterday' ? yesterdayModes.find(m => m.id === activeYesterdayMode) :
                         gistdaModes.find(m => m.id === activeGistdaMode);
-  const activeModeList = mapCategory === 'rain' ? rainModes :
+  const activeModeList = mapCategory === 'rain' ? visibleRainModes :
                          mapCategory === 'basic' ? basicModes :
                          mapCategory === 'risk' ? riskModes :
                          mapCategory === 'yesterday' ? yesterdayModes :
@@ -862,6 +872,14 @@ export default function MapPage() {
     else if (mapCategory === 'yesterday') setActiveYesterdayMode(modeId);
     else setActiveGistdaMode(modeId);
   }, [mapCategory]);
+
+  const setHistoryFilter = (filterId) => {
+    setActiveHistoryFilter(filterId);
+    const nextModes = filterId === 'all' ? rainModes : rainModes.filter(mode => mode.section === filterId);
+    if (nextModes.length && !nextModes.some(mode => mode.id === activeRainMode)) {
+      setActiveRainMode(nextModes[0].id);
+    }
+  };
 
   const cycleActiveMode = useCallback((direction) => {
     if (!activeModeList.length) return;
@@ -1174,8 +1192,6 @@ export default function MapPage() {
     { id: 'rain', label: 'ย้อนหลังจริง', shortLabel: 'ย้อนหลังจริง', icon: '📈', color: '#2563eb', desc: 'ฝน อุณหภูมิ ลม 30/90 วัน', useFor: 'ดูค่าที่เกิดขึ้นจริงย้อนหลังจาก archive' },
     { id: 'basic', label: 'ตอนนี้/พยากรณ์', shortLabel: 'ตอนนี้', icon: '🌤️', color: '#0ea5e9', desc: 'PM2.5 อากาศ ฝน ลม UV', useFor: 'เช็กค่าล่าสุด วันนี้ และพรุ่งนี้' },
     { id: 'risk', label: 'ความเสี่ยง', shortLabel: 'เสี่ยง', icon: '⚠️', color: '#8b5cf6', desc: 'สุขภาพ ไฟป่า ความร้อน', useFor: 'ดูพื้นที่ที่ควรระวังเชิงปฏิบัติ' },
-    { id: 'yesterday', label: 'เมื่อวาน', shortLabel: 'เมื่อวาน', icon: '🕘', color: '#f59e0b', desc: 'ค่าสูงสุด/ต่ำสุดของเมื่อวาน', useFor: 'เทียบค่าจากสถานีวันล่าสุด' },
-    { id: 'gistda', label: 'ดาวเทียม', shortLabel: 'ดาวเทียม', icon: '🛰️', color: '#ef4444', desc: 'พื้นที่เผาไหม้จาก GISTDA', useFor: 'ข้อมูลดาวเทียมที่มี API จริง' }
   ];
 
   const activeModeId = mapCategory === 'rain' ? activeRainMode :
@@ -1521,7 +1537,27 @@ export default function MapPage() {
               </div>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>2. ตัวชี้วัดในกลุ่ม {activeCategoryOption?.shortLabel}</div>
+              {mapCategory === 'rain' && (
+                <>
+                  <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>2. กรองประเภทข้อมูลย้อนหลัง</div>
+                  <div className="hide-scrollbar" style={{ display: 'flex', gap: '5px', overflowX: 'auto', minWidth: 0, marginBottom: '6px' }}>
+                    {historyFilterOptions.map(filter => {
+                      const active = activeHistoryFilter === filter.id;
+                      return (
+                        <button
+                          key={filter.id}
+                          onClick={() => setHistoryFilter(filter.id)}
+                          style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${active ? filter.color : borderColor}`, background: active ? (darkMode ? `${filter.color}28` : `${filter.color}16`) : 'transparent', color: active ? filter.color : subTextColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }}
+                          title={`กรองข้อมูลย้อนหลัง: ${filter.label}`}
+                        >
+                          {filter.icon} {filter.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>{mapCategory === 'rain' ? '3.' : '2.'} ตัวชี้วัดในกลุ่ม {activeCategoryOption?.shortLabel}</div>
               <div className="hide-scrollbar" style={{ display: 'flex', gap: '5px', overflowX: 'auto', minWidth: 0 }}>
                 {primaryLayerSections.map(section => (
                   <React.Fragment key={section.title}>
@@ -1541,7 +1577,7 @@ export default function MapPage() {
               </div>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>3. ช่วงเวลา/แหล่งข้อมูล</div>
+              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>{mapCategory === 'rain' ? '4.' : '3.'} ช่วงเวลา/แหล่งข้อมูล</div>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {(canChooseTimeMode ? flatTimeOptions : []).map(opt => {
                   const isAct = activeTimeKey === opt.id;
@@ -1993,7 +2029,7 @@ export default function MapPage() {
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
                             <div>
                               <div style={{ fontSize: '0.78rem', fontWeight: 900, color: textColor }}>🧰 เครื่องมือแยก</div>
-                              <div style={{ fontSize: '0.62rem', color: subTextColor, marginTop: '2px', lineHeight: 1.35 }}>สถิติย้อนหลัง วิเคราะห์ความเสี่ยง และภัยพิบัติ แยกจากชั้นข้อมูลหลัก</div>
+                              <div style={{ fontSize: '0.62rem', color: subTextColor, marginTop: '2px', lineHeight: 1.35 }}>สถิติย้อนหลัง อากาศล่าสุด และวิเคราะห์ความเสี่ยง</div>
                             </div>
                             <span style={{ flexShrink: 0, color: activeCategoryOption?.color, background: darkMode ? `${activeCategoryOption?.color}20` : `${activeCategoryOption?.color}12`, border: `1px solid ${activeCategoryOption?.color}35`, borderRadius: '999px', padding: '4px 9px', fontSize: '0.62rem', fontWeight: 900 }}>
                               {activeCategoryOption?.shortLabel}
@@ -2048,6 +2084,25 @@ export default function MapPage() {
                       {activePanel === 'layer' && (
                         <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: mobilePanelBottom, background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003, maxHeight: '52vh', overflowY: 'auto' }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>🧩 ชั้นข้อมูลหลัก</div>
+                          {mapCategory === 'rain' && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <div style={{ color: subTextColor, fontSize: '0.64rem', fontWeight: 900, marginBottom: '6px' }}>กรองประเภทข้อมูลย้อนหลัง</div>
+                              <div className="hide-scrollbar" style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+                                {historyFilterOptions.map(filter => {
+                                  const active = activeHistoryFilter === filter.id;
+                                  return (
+                                    <button
+                                      key={filter.id}
+                                      onClick={() => setHistoryFilter(filter.id)}
+                                      style={{ padding: '8px 10px', borderRadius: '999px', border: `1px solid ${active ? filter.color : borderColor}`, background: active ? (darkMode ? `${filter.color}25` : `${filter.color}18`) : 'var(--bg-secondary)', color: active ? filter.color : textColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.72rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                    >
+                                      {filter.icon} {filter.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px', overflowY: 'auto' }} className="custom-scrollbar">
                             {primaryLayerSections.map(section => (
                               <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
