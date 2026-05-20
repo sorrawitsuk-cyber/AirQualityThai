@@ -87,6 +87,14 @@ const findClosestStation = (lat, lng, stationList) => {
     return closest;
 };
 
+const REGION_GROUPS = {
+  'เหนือ': ['เชียงใหม่','เชียงราย','แม่ฮ่องสอน','ลำปาง','ลำพูน','แพร่','น่าน','พะเยา','อุตรดิตถ์','สุโขทัย','พิษณุโลก','เพชรบูรณ์','ตาก','กำแพงเพชร','นครสวรรค์','อุทัยธานี','พิจิตร'],
+  'ตะวันออกเฉียงเหนือ': ['ขอนแก่น','อุดรธานี','หนองคาย','เลย','หนองบัวลำภู','สกลนคร','นครพนม','มุกดาหาร','บึงกาฬ','กาฬสินธุ์','มหาสารคาม','ร้อยเอ็ด','ยโสธร','อำนาจเจริญ','อุบลราชธานี','ศรีสะเกษ','สุรินทร์','บุรีรัมย์','ชัยภูมิ','นครราชสีมา'],
+  'กลาง': ['กรุงเทพมหานคร','นนทบุรี','ปทุมธานี','สมุทรปราการ','สมุทรสาคร','สมุทรสงคราม','นครปฐม','พระนครศรีอยุธยา','อ่างทอง','สิงห์บุรี','ชัยนาท','ลพบุรี','สระบุรี','นครนายก','ปราจีนบุรี','ฉะเชิงเทรา','สุพรรณบุรี','กาญจนบุรี','ราชบุรี','เพชรบุรี','ประจวบคีรีขันธ์'],
+  'ตะวันออก': ['ชลบุรี','ระยอง','จันทบุรี','ตราด','สระแก้ว'],
+  'ใต้': ['นครศรีธรรมราช','สุราษฎร์ธานี','กระบี่','พังงา','ภูเก็ต','ตรัง','พัทลุง','สตูล','สงขลา','ปัตตานี','ยะลา','นราธิวาส','ระนอง','ชุมพร'],
+};
+
 const getProvinceKey = (stationOrName = '') => {
     const raw = typeof stationOrName === 'string'
         ? stationOrName
@@ -622,7 +630,7 @@ export default function MapPage() {
 
 
 
-  const styleGeoJSON = (feature) => {
+  const styleGeoJSON = useCallback((feature) => {
     const props = Object.values(feature.properties || {}).map(v => String(v).trim());
     let thaiNameFromMap = "";
     for (let p of props) if (provMap[p]) { thaiNameFromMap = provMap[p]; break; }
@@ -655,7 +663,7 @@ export default function MapPage() {
         fillOpacity: polyOpacity,
         className: isFlashed ? 'arcgis-flash-polygon' : '' 
     };
-  };
+  }, [activeBasicMode, activeRainMode, allMapData, calculateRisk, darkMode, flashProv, getBasicColor, getBasicVal, getRainColor, getRainVal, getRiskColor, mapCategory, polyOpacity, stations]);
 
   const handleRegionClick = (station) => {
       if (mapCategory === 'risk') {
@@ -741,21 +749,7 @@ export default function MapPage() {
     geoJsonRef.current.eachLayer(layer => {
       layer.setStyle(styleGeoJSON(layer.feature));
     });
-  }, [
-    geoData,
-    allMapData,
-    mapCategory,
-    activeBasicMode,
-    activeRainMode,
-    activeRiskMode,
-    activeGistdaMode,
-    activeYesterdayMode,
-    timeMode,
-    polyOpacity,
-    darkMode,
-    flashProv,
-    stations,
-  ]);
+  }, [geoData, styleGeoJSON]);
 
   const createMapIcon = (stationName, val, color, windDir) => {
     const textCol = color === '#eab308' || color === '#b8d9f5' ? '#0c1f3d' : '#fff';
@@ -839,13 +833,13 @@ export default function MapPage() {
       return `${day} ${month} ${year}, ${hh}:${mm} น.`;
   };
 
-  const getPm25QualityText = (val) => {
+  const getPm25QualityText = useCallback((val) => {
       if (val > 75) return { text: 'มีผลกระทบต่อสุขภาพ', color: '#ef4444' };
       if (val >= 37.6) return { text: 'เริ่มมีผลกระทบเล็กน้อย', color: '#f97316' };
       if (val >= 25.1) return { text: 'ปานกลาง', color: '#eab308' };
       if (val >= 15.1) return { text: 'คุณภาพดี', color: '#22c55e' };
       return { text: 'คุณภาพดีมาก', color: '#0ea5e9' };
-  };
+  }, []);
 
   const getDynamicLegendContent = () => {
     if (mapCategory === 'rain') {
@@ -921,13 +915,6 @@ export default function MapPage() {
   };
 
   // ===== National & regional PM2.5 (must be before early returns) =====
-  const REGION_GROUPS = {
-    'เหนือ': ['เชียงใหม่','เชียงราย','แม่ฮ่องสอน','ลำปาง','ลำพูน','แพร่','น่าน','พะเยา','อุตรดิตถ์','สุโขทัย','พิษณุโลก','เพชรบูรณ์','ตาก','กำแพงเพชร','นครสวรรค์','อุทัยธานี','พิจิตร'],
-    'ตะวันออกเฉียงเหนือ': ['ขอนแก่น','อุดรธานี','หนองคาย','เลย','หนองบัวลำภู','สกลนคร','นครพนม','มุกดาหาร','บึงกาฬ','กาฬสินธุ์','มหาสารคาม','ร้อยเอ็ด','ยโสธร','อำนาจเจริญ','อุบลราชธานี','ศรีสะเกษ','สุรินทร์','บุรีรัมย์','ชัยภูมิ','นครราชสีมา'],
-    'กลาง': ['กรุงเทพมหานคร','นนทบุรี','ปทุมธานี','สมุทรปราการ','สมุทรสาคร','สมุทรสงคราม','นครปฐม','พระนครศรีอยุธยา','อ่างทอง','สิงห์บุรี','ชัยนาท','ลพบุรี','สระบุรี','นครนายก','ปราจีนบุรี','ฉะเชิงเทรา','สุพรรณบุรี','กาญจนบุรี','ราชบุรี','เพชรบุรี','ประจวบคีรีขันธ์'],
-    'ตะวันออก': ['ชลบุรี','ระยอง','จันทบุรี','ตราด','สระแก้ว'],
-    'ใต้': ['นครศรีธรรมราช','สุราษฎร์ธานี','กระบี่','พังงา','ภูเก็ต','ตรัง','พัทลุง','สตูล','สงขลา','ปัตตานี','ยะลา','นราธิวาส','ระนอง','ชุมพร'],
-  };
   const nationalMetric = useMemo(() => {
     const vals = allMapData.map(st => st.displayVal).filter(v => v != null && !Number.isNaN(v));
     const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
@@ -952,7 +939,7 @@ export default function MapPage() {
             ? `ย้อนหลัง ${activeModeObj?.name}`
             : 'ข้อมูล GISTDA';
     return { avg, count: vals.length, color, label };
-  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, activeModeObj, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
+  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, activeModeObj, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
   const regionalMetric = useMemo(() => {
     return Object.entries(REGION_GROUPS).map(([name, provs]) => {
       const sts = allMapData.filter(st => provs.includes(st.areaTH.replace('จังหวัด', '').trim()));
@@ -972,7 +959,7 @@ export default function MapPage() {
             : getGistdaColor(avg, activeGistdaMode);
       return { name, avg, color, trend: 0, windDirection };
     });
-  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeRiskMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor]);
+  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor]);
   const sparkline7d = useMemo(() => {
     return Array.from({ length: 8 }, (_, i) => {
       const vals = (mapCategory === 'rain'

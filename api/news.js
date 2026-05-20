@@ -783,7 +783,7 @@ async function maybeTranslateItems(items) {
   }));
 }
 
-function buildDigest({ weather, thaiWarnings, thaiStorms, gdacs, usgs, thaiDisasters, globalDisasters, sourceStatus }) {
+function buildDigest({ weather, thaiWarnings, thaiStorms, gdacs, usgs, thaiDisasters, globalDisasters }) {
   const warningTitles = (thaiWarnings || []).slice(0, 2).map((item) => item.title).filter(Boolean);
   const stormTitles = (thaiStorms || []).slice(0, 1).map((item) => item.title).filter(Boolean);
   const topGdacs = (gdacs || []).find((item) => item.severity === 'high') || gdacs?.[0];
@@ -1054,7 +1054,7 @@ function parseTmdHtml(html, url, type) {
     .trim();
 
   // Extract Thai text blocks (30-400 chars)
-  const blocks = plain.match(/[\u0E00-\u0E7F][\u0E00-\u0E7F\s\d.,!?:;()\-]{29,399}/g) || [];
+  const blocks = plain.match(/[\u0E00-\u0E7F][\u0E00-\u0E7F\s\d.,!?:;()-]{29,399}/g) || [];
   const unique = [...new Set(blocks)].filter((t) => t.trim().length > 30);
 
   if (type === 'storm') {
@@ -1568,12 +1568,17 @@ export default async function handler(req, res) {
     maybeGenerateAiSummary(aiSummaryInput),
   ]);
 
-  const gdacsTranslated = allGlobalTranslated.filter((item) => item._batch === 'gdacs').map(({ _batch, ...item }) => item);
-  const usgsTranslated = allGlobalTranslated.filter((item) => item._batch === 'usgs').map(({ _batch, ...item }) => item);
-  const globalDisastersTranslated = allGlobalTranslated.filter((item) => item._batch === 'globalDisasters').map(({ _batch, ...item }) => item);
-  const climateTranslated = allGlobalTranslated.filter((item) => item._batch === 'climate').map(({ _batch, ...item }) => item);
-  const eonetTranslated = allGlobalTranslated.filter((item) => item._batch === 'eonet').map(({ _batch, ...item }) => item);
-  const usgsRegionalTranslated = allGlobalTranslated.filter((item) => item._batch === 'usgsRegional').map(({ _batch, ...item }) => item);
+  const withoutBatch = (item) => {
+    const clean = { ...item };
+    delete clean._batch;
+    return clean;
+  };
+  const gdacsTranslated = allGlobalTranslated.filter((item) => item._batch === 'gdacs').map(withoutBatch);
+  const usgsTranslated = allGlobalTranslated.filter((item) => item._batch === 'usgs').map(withoutBatch);
+  const globalDisastersTranslated = allGlobalTranslated.filter((item) => item._batch === 'globalDisasters').map(withoutBatch);
+  const climateTranslated = allGlobalTranslated.filter((item) => item._batch === 'climate').map(withoutBatch);
+  const eonetTranslated = allGlobalTranslated.filter((item) => item._batch === 'eonet').map(withoutBatch);
+  const usgsRegionalTranslated = allGlobalTranslated.filter((item) => item._batch === 'usgsRegional').map(withoutBatch);
 
   const globalAlerts = prioritizeItems(gdacsTranslated.map(enrichItem), 10);
   const globalEarthquakes = prioritizeItems([...usgsTranslated.map(enrichItem), ...usgsRegionalTranslated.map(enrichItem)], 10);

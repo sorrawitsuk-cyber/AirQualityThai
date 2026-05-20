@@ -1,7 +1,9 @@
 {
   "functions": {
     "api/tmd-wind.js": { "maxDuration": 30 },
-    "api/cron-wind.js": { "maxDuration": 30 }
+    "api/cron-wind.js": { "maxDuration": 30 },
+    "api/weather-history.js": { "maxDuration": 30 },
+    "api/cron-history.js": { "maxDuration": 30 }
   },
   "headers": [
     {
@@ -29,6 +31,10 @@
     {
       "path": "/api/cron-wind",
       "schedule": "30 0 * * *"
+    },
+    {
+      "path": "/api/cron-history",
+      "schedule": "20 0 * * *"
     }
   ],
   "rewrites": [

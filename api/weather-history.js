@@ -1,8 +1,34 @@
 import { provinces77 } from '../src/provinces77.js';
+import { initializeApp, getApps } from 'firebase/app';
+import { getDatabase, ref, set } from 'firebase/database';
 
 const CACHE_TTL_SECONDS = 6 * 60 * 60;
+const FIREBASE_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const CHUNK_SIZE = 20;
 const ARCHIVE_LAG_DAYS = 5;
+const FIREBASE_CACHE_PATH = 'weather_history';
+
+const getFirebaseUrl = (path) => {
+  const dbUrl = process.env.FIREBASE_DATABASE_URL || process.env.VITE_FIREBASE_DATABASE_URL;
+  if (!dbUrl) return null;
+  return `${dbUrl.replace(/\/$/, '')}/${path}.json`;
+};
+
+const getFirebaseDb = () => {
+  const dbUrl = process.env.FIREBASE_DATABASE_URL || process.env.VITE_FIREBASE_DATABASE_URL;
+  if (!dbUrl) return null;
+  const firebaseConfig = {
+    apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
+    databaseURL: dbUrl,
+    projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID,
+  };
+  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  return getDatabase(app, dbUrl);
+};
 
 const fetchJson = async (url, timeoutMs = 15000) => {
   const ctrl = new AbortController();
@@ -14,6 +40,29 @@ const fetchJson = async (url, timeoutMs = 15000) => {
   } finally {
     clearTimeout(timer);
   }
+};
+
+const readCachedHistory = async () => {
+  const url = getFirebaseUrl(FIREBASE_CACHE_PATH);
+  if (!url) return null;
+  try {
+    return await fetchJson(url, 5000);
+  } catch {
+    return null;
+  }
+};
+
+export const writeCachedHistory = async (payload) => {
+  const db = getFirebaseDb();
+  if (!db) return false;
+  await set(ref(db, FIREBASE_CACHE_PATH), payload);
+  return true;
+};
+
+const isFreshCache = (payload) => {
+  if (!payload?.updatedAt) return false;
+  const age = Date.now() - new Date(payload.updatedAt).getTime();
+  return Number.isFinite(age) && age >= 0 && age < FIREBASE_CACHE_TTL_MS;
 };
 
 const bangkokDate = (offsetDays = 0) => {
@@ -41,7 +90,7 @@ const avg = (values = []) => {
 const sliceLast = (values = [], count) => values.slice(Math.max(values.length - count, 0));
 const getProvinceKey = (name = '') => String(name).replace(/^จังหวัด/, '').trim();
 
-const buildHistoryPayload = async () => {
+export const buildHistoryPayload = async () => {
   const end = bangkokDate(-ARCHIVE_LAG_DAYS);
   const endDate = toDateKey(end);
   const yearStart = new Date(end);
@@ -119,9 +168,16 @@ const buildHistoryPayload = async () => {
     updatedAt: new Date(timestamp).toISOString(),
     period: { startDate, endDate, timezone: 'Asia/Bangkok', archiveLagDays: ARCHIVE_LAG_DAYS },
     source: 'Open-Meteo Historical Weather API (ERA5)',
+    cachedFrom: 'openmeteo-archive',
     byStation,
     byProvince,
   };
+};
+
+export const refreshHistoryCache = async () => {
+  const payload = await buildHistoryPayload();
+  await writeCachedHistory(payload).catch(() => false);
+  return payload;
 };
 
 export default async function handler(req, res) {
@@ -132,7 +188,24 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}, stale-while-revalidate=86400`);
 
   try {
-    return res.status(200).json(await buildHistoryPayload());
+    const cached = await readCachedHistory();
+    if (!req.query?.fresh && isFreshCache(cached)) {
+      return res.status(200).json({ ...cached, cacheStatus: 'fresh' });
+    }
+
+    try {
+      const payload = await refreshHistoryCache();
+      return res.status(200).json({ ...payload, cacheStatus: 'refreshed' });
+    } catch (buildError) {
+      if (cached?.byStation || cached?.byProvince) {
+        return res.status(200).json({
+          ...cached,
+          cacheStatus: 'stale',
+          warning: buildError.message || 'Using stale rainfall history cache',
+        });
+      }
+      throw buildError;
+    }
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Unable to load historical weather data' });
   }

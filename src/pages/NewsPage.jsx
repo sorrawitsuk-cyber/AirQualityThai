@@ -1673,16 +1673,16 @@ export default function NewsPage() {
 
           <Panel style={{ padding: 20, borderRadius: 24, border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950 }}>รับการแจ้งเตือนด่วน</h2>
+              <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950 }}>ช่องทางแจ้งเตือนที่สนใจ</h2>
               <Bell size={18} color="#2563eb" />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {[
-                ['push', 'แอปเตือนบนเว็บไซต์', 'เปิดแจ้งเตือนแล้ว', '🔔'],
-                ['email', 'อีเมลแจ้งเตือน', 'example@email.com', '✉️'],
-                ['line', 'LINE Notify', 'เชื่อมต่อระบบแล้ว', '💬'],
-                ['sms', 'SMS ด่วน', '09x-xxx-xxxx', '📱'],
+                ['push', 'แจ้งเตือนบนเว็บไซต์', 'บันทึกความต้องการบนเครื่องนี้', '🔔'],
+                ['email', 'อีเมลแจ้งเตือน', 'เตรียมรองรับเมื่อระบบเชื่อมต่อบัญชี', '✉️'],
+                ['line', 'LINE / LINE OA', 'เตรียมรองรับการแจ้งเตือนรายจังหวัด', '💬'],
+                ['sms', 'SMS เหตุฉุกเฉิน', 'เตรียมรองรับเฉพาะประกาศระดับรุนแรง', '📱'],
               ].map(([key, title, subtitle, icon]) => (
                 <button
                   key={key}

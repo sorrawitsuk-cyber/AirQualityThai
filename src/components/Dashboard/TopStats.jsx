@@ -12,7 +12,7 @@ function formatValue(value, suffix = '') {
   return `${value}${suffix}`;
 }
 
-function CompactChip({ icon, label, item, suffix, accentColor, borderColor }) {
+function CompactChip({ icon, label, item, suffix, accentColor }) {
   return (
     <div
       style={{

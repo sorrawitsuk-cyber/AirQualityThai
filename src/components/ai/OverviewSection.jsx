@@ -5,8 +5,8 @@ import { riskMeta, pmMeta, heatMeta } from './useAIPageData';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 export default function OverviewSection({
-  current, hourly, daily, startIdx, isMobile, weatherInfo,
-  maxTemp, minTemp, rainProb, pm25, pm25Status, uvStatus,
+  current, isMobile,
+  rainProb, pm25, uvStatus,
   windDirection, updateText, trendData, gistdaSummary
 }) {
   const [trendTab, setTrendTab] = React.useState('temp');

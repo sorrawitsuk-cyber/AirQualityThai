@@ -7,7 +7,7 @@ const TMD_URL = 'http://www.marine.tmd.go.th/html/weather0.html';
 
 export default function RainSection({
   windAnalysis, windLoading, windError, windLastFetch, fetchWindAnalysis,
-  hourlyRows, isMobile, rainProb, sixHourForecast
+  hourlyRows, isMobile
 }) {
   const [windDetailsOpen, setWindDetailsOpen] = useState(false);
   const [imgErrors, setImgErrors] = useState({});
