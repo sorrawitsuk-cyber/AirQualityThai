@@ -139,6 +139,7 @@ export default function MapPage() {
   
   const [selectedHotspot, setSelectedHotspot] = useState(null); 
   const [showReferenceModal, setShowReferenceModal] = useState(false); 
+  const [showReportModal, setShowReportModal] = useState(false);
   
   const [basemapStyle, setBasemapStyle] = useState('dark'); 
   const [flyToPos, setFlyToPos] = useState(null);
@@ -211,13 +212,14 @@ export default function MapPage() {
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') {
-        if (showReferenceModal) setShowReferenceModal(false);
+        if (showReportModal) setShowReportModal(false);
+        else if (showReferenceModal) setShowReferenceModal(false);
         else if (selectedHotspot) setSelectedHotspot(null);
       }
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [selectedHotspot, showReferenceModal]);
+  }, [selectedHotspot, showReferenceModal, showReportModal]);
 
   const fetchGeoData = useCallback(() => {
     setGeoError(false);
@@ -1276,6 +1278,51 @@ export default function MapPage() {
       ? `กำลังดูสถิติย้อนหลังของเมื่อวาน ${getDateLabel(-1)}`
       : timeHelperText;
 
+  const formatReportValue = (value, unit = activeModeObj?.unit || '') => {
+    if (value === null || value === undefined || value === '' || Number.isNaN(value)) return '--';
+    const numeric = Number(value);
+    const display = Number.isFinite(numeric)
+      ? (Math.abs(numeric) >= 1000 ? numeric.toLocaleString('th-TH') : numeric)
+      : value;
+    return `${display}${unit ? ` ${unit}` : ''}`;
+  };
+
+  const reportRows = [...allMapData].filter(st => st.displayVal !== null && st.displayVal !== undefined && !Number.isNaN(st.displayVal));
+  const reportSortAscending = (mapCategory === 'yesterday' && activeYesterdayMode === 'minTemp') || (mapCategory === 'rain' && activeRainMode === 'tempMin30d');
+  const reportRankedRows = [...reportRows].sort((a, b) => reportSortAscending ? a.displayVal - b.displayVal : b.displayVal - a.displayVal);
+  const reportTopRows = reportRankedRows.slice(0, 6);
+  const reportBottomRows = [...reportRankedRows].slice(-4).reverse();
+  const reportRegionFocus = regionalMetric
+    .filter(region => region.avg !== null && region.avg !== undefined && !Number.isNaN(region.avg))
+    .sort((a, b) => reportSortAscending ? a.avg - b.avg : b.avg - a.avg)[0];
+  const reportLegendRows = getDynamicLegendContent().map(item => ({
+    ...item,
+    count: reportRows.filter(st => st.color === item.c).length,
+  }));
+  const reportPrimaryStatus = mapCategory === 'risk'
+    ? getRiskLabel(nationalMetric.avg)
+    : mapCategory === 'basic' && activeBasicMode === 'pm25'
+      ? getPm25QualityText(nationalMetric.avg).text
+      : mapCategory === 'basic' && activeBasicMode === 'uv'
+        ? getUvText(nationalMetric.avg)
+        : reportRegionFocus
+          ? `${reportSortAscending ? 'ค่าต่ำสุดเด่นที่' : 'ค่าสูงสุดเด่นที่'}ภาค${reportRegionFocus.name}`
+          : 'พร้อมใช้งาน';
+  const reportInsightText = reportTopRows.length
+    ? `${reportTopRows[0].areaTH.replace('จังหวัด', '')} เป็นพื้นที่อันดับ 1 ของชั้นข้อมูลนี้ (${formatReportValue(reportTopRows[0].displayVal)}) เทียบกับค่าเฉลี่ยทั้งประเทศ ${formatReportValue(nationalMetric.avg)}`
+    : 'ยังไม่มีข้อมูลเพียงพอสำหรับจัดอันดับ';
+  const reportMapPoints = reportTopRows.map((st, index) => {
+    const lat = Number(st.lat);
+    const lng = Number(st.long ?? st.lng ?? st.lon);
+    const x = Number.isFinite(lng) ? Math.min(92, Math.max(8, ((lng - 97) / 9.8) * 84 + 8)) : 50;
+    const y = Number.isFinite(lat) ? Math.min(92, Math.max(8, 92 - ((lat - 5) / 16) * 84)) : 50;
+    return { ...st, x, y, rank: index + 1 };
+  });
+
+  const handlePrintReport = () => {
+    window.print();
+  };
+
   const exportRows = (() => {
     const sortAscending = (mapCategory === 'yesterday' && activeYesterdayMode === 'minTemp') || (mapCategory === 'rain' && activeRainMode === 'tempMin30d');
     const sorted = sortAscending
@@ -1414,6 +1461,23 @@ export default function MapPage() {
 
   return (
     <div style={{ height: isMobile ? '100%' : desktopViewportHeight, width: '100%', background: appBg, display: 'flex', flexDirection: 'column', fontFamily: 'Kanit, sans-serif', padding: isMobile ? '0' : '8px', boxSizing: 'border-box', overflow: 'hidden' }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          .report-print-sheet, .report-print-sheet * { visibility: visible !important; }
+          .report-print-sheet {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+          }
+          .report-print-actions { display: none !important; }
+          @page { size: A4 landscape; margin: 10mm; }
+        }
+      `}</style>
 
       {/* === DESKTOP HEADER ROW 1: Logo + Title + Nav === */}
       {!isMobile && (
@@ -1438,6 +1502,7 @@ export default function MapPage() {
               {mapCategory === 'risk' && (
                 <button onClick={() => setShowReferenceModal(true)} style={{ background: 'var(--bg-secondary)', color: '#8b5cf6', border: '1px solid #8b5cf6', padding: '6px 12px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>📚 แหล่งอ้างอิง</button>
               )}
+              <button onClick={() => setShowReportModal(true)} disabled={!reportRows.length} title="เปิดรายงานอินโฟกราฟิก" style={{ background: reportRows.length ? (darkMode ? `${activeModeObj?.color || '#2563eb'}22` : `${activeModeObj?.color || '#2563eb'}14`) : 'var(--bg-secondary)', color: reportRows.length ? (activeModeObj?.color || '#2563eb') : subTextColor, border: `1px solid ${reportRows.length ? (activeModeObj?.color || '#2563eb') : borderColor}`, padding: '6px 12px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 'bold', cursor: reportRows.length ? 'pointer' : 'default', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px', opacity: reportRows.length ? 1 : 0.55 }}>🧾 รายงาน</button>
               <button onClick={handleExportCsv} disabled={!exportRows.length} title="ดาวน์โหลด CSV" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? '#0ea5e9' : subTextColor, border: `1px solid ${borderColor}`, width: '34px', height: '34px', borderRadius: '50%', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exportRows.length ? 1 : 0.5 }}>⬇️</button>
               <button onClick={handleExportJson} disabled={!exportRows.length} title="ดาวน์โหลด JSON" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? textColor : subTextColor, border: `1px solid ${borderColor}`, width: '34px', height: '34px', borderRadius: '50%', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.62rem', fontWeight: 900, fontFamily: 'Kanit', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exportRows.length ? 1 : 0.5 }}>JSON</button>
             </div>
@@ -1882,6 +1947,13 @@ export default function MapPage() {
                           style={{ width: '40px', height: '40px', borderRadius: '50%', background: cardBg, color: exportRows.length ? '#0ea5e9' : subTextColor, border: `1px solid ${borderColor}`, fontSize: '1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.3)', cursor: exportRows.length ? 'pointer' : 'default', opacity: exportRows.length ? 1 : 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >⬇️</button>
 
+                        <button
+                          aria-label="เปิดรายงานอินโฟกราฟิก"
+                          onClick={() => setShowReportModal(true)}
+                          disabled={!reportRows.length}
+                          style={{ width: '40px', height: '40px', borderRadius: '50%', background: reportRows.length ? (activeModeObj?.color || '#2563eb') : cardBg, color: reportRows.length ? '#fff' : subTextColor, border: `1px solid ${reportRows.length ? (activeModeObj?.color || '#2563eb') : borderColor}`, fontSize: '1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.3)', cursor: reportRows.length ? 'pointer' : 'default', opacity: reportRows.length ? 1 : 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >🧾</button>
+
                         {/* 📚 Reference (risk mode only) */}
                         {mapCategory === 'risk' && (
                           <button
@@ -2087,6 +2159,7 @@ export default function MapPage() {
                         เลเยอร์
                         <input aria-label="ความทึบเลเยอร์" type="range" min="0.1" max="1" step="0.1" value={polyOpacity} onChange={(e) => setPolyOpacity(parseFloat(e.target.value))} style={{ width: '74px', accentColor: activeModeObj?.color }} />
                       </label>
+                      <button aria-label="เปิดรายงานอินโฟกราฟิก" onClick={() => setShowReportModal(true)} disabled={!reportRows.length} style={{ background: reportRows.length ? (activeModeObj?.color || '#2563eb') : cardBg, color: reportRows.length ? '#fff' : subTextColor, border: `1px solid ${reportRows.length ? (activeModeObj?.color || '#2563eb') : borderColor}`, padding: '7px 11px', borderRadius: '999px', fontWeight: 'bold', fontSize: '0.76rem', cursor: reportRows.length ? 'pointer' : 'default', fontFamily: 'Kanit', opacity: reportRows.length ? 1 : 0.55, whiteSpace: 'nowrap' }}>🧾 รายงาน</button>
                       <button aria-label="ส่งออกข้อมูลแผนที่เป็น CSV" onClick={handleExportCsv} disabled={!exportRows.length} style={{ background: '#0ea5e9', color: '#fff', border: 'none', padding: '7px 11px', borderRadius: '999px', fontWeight: 'bold', fontSize: '0.76rem', cursor: exportRows.length ? 'pointer' : 'default', fontFamily: 'Kanit', opacity: exportRows.length ? 1 : 0.55, whiteSpace: 'nowrap' }}>⬇️ CSV</button>
                       <button aria-label="ส่งออกข้อมูลแผนที่เป็น JSON" onClick={handleExportJson} disabled={!exportRows.length} style={{ background: cardBg, color: textColor, border: `1px solid ${borderColor}`, padding: '7px 11px', borderRadius: '999px', fontWeight: 'bold', fontSize: '0.76rem', cursor: exportRows.length ? 'pointer' : 'default', fontFamily: 'Kanit', opacity: exportRows.length ? 1 : 0.55, whiteSpace: 'nowrap' }}>JSON</button>
                     </div>
@@ -2186,6 +2259,160 @@ export default function MapPage() {
             </div>
           )}
       </div>
+
+      {showReportModal && (
+        <div role="dialog" aria-modal="true" aria-label="รายงานอินโฟกราฟิกแผนที่" style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(2,6,23,0.74)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: isMobile ? '10px' : '22px' }} onClick={() => setShowReportModal(false)}>
+          <div className="report-print-sheet custom-scrollbar" tabIndex="-1" style={{ width: '100%', maxWidth: '1120px', maxHeight: '94vh', overflowY: 'auto', background: darkMode ? '#0f172a' : '#f8fafc', color: darkMode ? '#e5eefb' : '#0f172a', borderRadius: isMobile ? '18px' : '26px', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.28)' : 'rgba(15,23,42,0.12)'}`, boxShadow: '0 28px 80px rgba(0,0,0,0.45)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <div className="report-print-actions" style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: isMobile ? '10px' : '12px 16px', background: darkMode ? 'rgba(15,23,42,0.92)' : 'rgba(248,250,252,0.92)', backdropFilter: 'blur(12px)', borderBottom: `1px solid ${darkMode ? 'rgba(148,163,184,0.18)' : 'rgba(15,23,42,0.1)'}` }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.74rem', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: 900 }}>REPORT BUILDER</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 950, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>รายงานอินโฟกราฟิกจากชั้นข้อมูลที่เลือก</div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <button onClick={handlePrintReport} style={{ border: 0, background: activeModeObj?.color || '#2563eb', color: '#fff', borderRadius: '999px', padding: '9px 14px', fontWeight: 900, fontFamily: 'Kanit', cursor: 'pointer' }}>พิมพ์ / PDF</button>
+                <button aria-label="ปิดรายงาน" onClick={() => setShowReportModal(false)} style={{ border: `1px solid ${darkMode ? 'rgba(148,163,184,0.28)' : 'rgba(15,23,42,0.14)'}`, background: darkMode ? '#111827' : '#fff', color: darkMode ? '#e5eefb' : '#0f172a', borderRadius: '999px', width: '38px', height: '38px', fontWeight: 950, cursor: 'pointer' }}>✕</button>
+              </div>
+            </div>
+
+            <div style={{ padding: isMobile ? '14px' : '24px', display: 'grid', gap: isMobile ? '14px' : '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.15fr 0.85fr', gap: '16px', alignItems: 'stretch' }}>
+                <div style={{ borderRadius: '22px', padding: isMobile ? '18px' : '24px', background: `linear-gradient(135deg, ${activeModeObj?.color || '#2563eb'} 0%, ${darkMode ? '#111827' : '#e0f2fe'} 100%)`, color: '#fff', minHeight: '250px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ position: 'absolute', right: '-80px', top: '-90px', width: '240px', height: '240px', borderRadius: '50%', background: 'rgba(255,255,255,0.14)' }} />
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+                      <span style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: '999px', padding: '5px 10px', fontSize: '0.72rem', fontWeight: 900 }}>{activeCategoryLabel}</span>
+                      <span style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: '999px', padding: '5px 10px', fontSize: '0.72rem', fontWeight: 900 }}>{activeTimeOption?.sub}</span>
+                    </div>
+                    <h1 style={{ margin: 0, fontSize: isMobile ? '1.7rem' : '2.55rem', lineHeight: 1.08, fontWeight: 950, letterSpacing: 0 }}>{activeModeObj?.name || 'รายงานแผนที่'}</h1>
+                    <p style={{ margin: '12px 0 0', maxWidth: '660px', fontSize: isMobile ? '0.84rem' : '1rem', lineHeight: 1.6, opacity: 0.92 }}>{activeModeObj?.desc || timeContextNote}</p>
+                  </div>
+                  <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginTop: '22px' }}>
+                    {[
+                      { label: 'ค่าเฉลี่ยประเทศ', value: formatReportValue(nationalMetric.avg) },
+                      { label: 'จำนวนพื้นที่', value: `${nationalMetric.count || reportRows.length} จังหวัด` },
+                      { label: 'สถานะ', value: reportPrimaryStatus },
+                    ].map(item => (
+                      <div key={item.label} style={{ minWidth: 0, background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.22)', borderRadius: '16px', padding: '12px' }}>
+                        <div style={{ fontSize: '0.68rem', opacity: 0.78, fontWeight: 900, marginBottom: '6px' }}>{item.label}</div>
+                        <div style={{ fontSize: isMobile ? '0.95rem' : '1.15rem', fontWeight: 950, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ borderRadius: '22px', background: darkMode ? '#111827' : '#ffffff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.08)'}`, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.7rem', fontWeight: 900 }}>MAP SNAPSHOT</div>
+                      <div style={{ fontWeight: 950, fontSize: '1.05rem' }}>พื้นที่เด่นบนแผนที่</div>
+                    </div>
+                    <span style={{ color: activeModeObj?.color, fontWeight: 950, fontSize: '0.78rem' }}>Top {reportMapPoints.length}</span>
+                  </div>
+                  <div style={{ position: 'relative', minHeight: '250px', borderRadius: '18px', overflow: 'hidden', background: darkMode ? 'linear-gradient(160deg,#0f172a,#164e63)' : 'linear-gradient(160deg,#e0f2fe,#f8fafc)', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.18)' : 'rgba(15,23,42,0.08)'}` }}>
+                    <div style={{ position: 'absolute', inset: '28px 38px', borderRadius: '45% 55% 48% 52%', border: `2px dashed ${darkMode ? 'rgba(255,255,255,0.28)' : 'rgba(14,165,233,0.35)'}`, transform: 'rotate(-12deg)' }} />
+                    {reportMapPoints.map(point => (
+                      <div key={`${point.stationID}-${point.rank}`} title={point.areaTH} style={{ position: 'absolute', left: `${point.x}%`, top: `${point.y}%`, transform: 'translate(-50%, -50%)', width: point.rank === 1 ? '36px' : '28px', height: point.rank === 1 ? '36px' : '28px', borderRadius: '50%', background: point.color || activeModeObj?.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 950, fontSize: point.rank === 1 ? '0.9rem' : '0.72rem', border: '3px solid rgba(255,255,255,0.9)', boxShadow: `0 10px 24px ${point.color || activeModeObj?.color}55` }}>{point.rank}</div>
+                    ))}
+                    <div style={{ position: 'absolute', left: 12, bottom: 12, right: 12, display: 'grid', gap: '6px' }}>
+                      {reportTopRows.slice(0, 3).map((row, idx) => (
+                        <div key={row.stationID} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', background: darkMode ? 'rgba(15,23,42,0.72)' : 'rgba(255,255,255,0.86)', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.18)' : 'rgba(15,23,42,0.08)'}`, borderRadius: '12px', padding: '7px 9px', fontSize: '0.72rem', fontWeight: 900 }}>
+                          <span>{idx + 1}. {row.areaTH.replace('จังหวัด', '')}</span>
+                          <span style={{ color: row.color }}>{formatReportValue(row.displayVal)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 0.9fr', gap: '16px' }}>
+                <div style={{ borderRadius: '20px', background: darkMode ? '#111827' : '#ffffff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.08)'}`, padding: '16px' }}>
+                  <div style={{ color: activeModeObj?.color, fontSize: '0.72rem', fontWeight: 950, marginBottom: '8px' }}>KEY INSIGHT</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 950, lineHeight: 1.45 }}>{reportInsightText}</div>
+                  <div style={{ marginTop: '12px', color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.78rem', lineHeight: 1.55 }}>{timeContextNote || activeDataSourceMeta.detail}</div>
+                </div>
+
+                <div style={{ borderRadius: '20px', background: darkMode ? '#111827' : '#ffffff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.08)'}`, padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ fontWeight: 950 }}>รายภาค</div>
+                    <div style={{ color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.72rem', fontWeight: 900 }}>{reportRegionFocus ? `เด่น: ${reportRegionFocus.name}` : '-'}</div>
+                  </div>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {regionalMetric.map(region => {
+                      const maxAvg = Math.max(...regionalMetric.map(r => Number(r.avg) || 0), 1);
+                      const width = Math.max(6, Math.min(100, ((Number(region.avg) || 0) / maxAvg) * 100));
+                      return (
+                        <div key={region.name}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '0.76rem', fontWeight: 900, marginBottom: '4px' }}>
+                            <span>{region.name}</span>
+                            <span style={{ color: region.color }}>{formatReportValue(region.avg)}</span>
+                          </div>
+                          <div style={{ height: '8px', borderRadius: '999px', background: darkMode ? 'rgba(148,163,184,0.16)' : '#e2e8f0', overflow: 'hidden' }}>
+                            <div style={{ width: `${width}%`, height: '100%', borderRadius: '999px', background: region.color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ borderRadius: '20px', background: darkMode ? '#111827' : '#ffffff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.08)'}`, padding: '16px' }}>
+                  <div style={{ fontWeight: 950, marginBottom: '12px' }}>เกณฑ์สี</div>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {reportLegendRows.map(item => (
+                      <div key={`${item.c}-${item.r}`} style={{ display: 'grid', gridTemplateColumns: '12px 1fr auto', gap: '8px', alignItems: 'center', fontSize: '0.72rem' }}>
+                        <span style={{ width: 12, height: 12, borderRadius: '50%', background: item.c, display: 'inline-block' }} />
+                        <span style={{ fontWeight: 900 }}>{item.l}</span>
+                        <span style={{ color: darkMode ? '#94a3b8' : '#64748b', fontWeight: 900 }}>{item.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 0.75fr', gap: '16px' }}>
+                <div style={{ borderRadius: '20px', background: darkMode ? '#111827' : '#ffffff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.08)'}`, padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <div style={{ fontWeight: 950 }}>อันดับพื้นที่</div>
+                    <div style={{ color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.72rem', fontWeight: 900 }}>{reportSortAscending ? 'ค่าต่ำสุดเรียงก่อน' : 'ค่าสูงสุดเรียงก่อน'}</div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                    {reportTopRows.map((row, idx) => (
+                      <div key={row.stationID} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', borderRadius: '14px', padding: '10px 12px', background: darkMode ? 'rgba(15,23,42,0.72)' : '#f8fafc', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.14)' : 'rgba(15,23,42,0.08)'}`, borderLeft: `5px solid ${row.color || activeModeObj?.color}` }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.66rem', fontWeight: 950 }}>#{idx + 1}</div>
+                          <div style={{ fontWeight: 950, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>จ.{row.areaTH.replace('จังหวัด', '')}</div>
+                        </div>
+                        <div style={{ color: row.color || activeModeObj?.color, fontWeight: 950, fontSize: '1rem', whiteSpace: 'nowrap' }}>{formatReportValue(row.displayVal)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ borderRadius: '20px', background: darkMode ? '#111827' : '#ffffff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.08)'}`, padding: '16px' }}>
+                  <div style={{ fontWeight: 950, marginBottom: '10px' }}>พื้นที่ต่ำสุด/เบาสุด</div>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {reportBottomRows.map((row) => (
+                      <div key={`${row.stationID}-low`} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '0.78rem', borderBottom: `1px solid ${darkMode ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.08)'}`, paddingBottom: '7px' }}>
+                        <span style={{ fontWeight: 900 }}>จ.{row.areaTH.replace('จังหวัด', '')}</span>
+                        <span style={{ color: row.color || activeModeObj?.color, fontWeight: 950 }}>{formatReportValue(row.displayVal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: '12px', borderRadius: '14px', padding: '10px', background: darkMode ? 'rgba(37,99,235,0.12)' : '#eff6ff', color: darkMode ? '#bfdbfe' : '#1d4ed8', fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 800 }}>
+                    รายงานนี้เปลี่ยนตามกลุ่มข้อมูล ชั้นข้อมูล ช่วงเวลา และแหล่งข้อมูลที่เลือกบนแผนที่โดยอัตโนมัติ
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.72rem', fontWeight: 800, padding: '0 2px 4px' }}>
+                <span>แหล่งข้อมูล: {activeDataSourceMeta.detail}</span>
+                <span>สร้างรายงาน: {new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* POPUP 1: DIAGNOSTIC MODAL */}
       {selectedHotspot && selectedHotspot.type === 'risk' && (
