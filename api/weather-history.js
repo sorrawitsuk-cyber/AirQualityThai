@@ -137,12 +137,20 @@ export const buildHistoryPayload = async () => {
       const last7Rain = sliceLast(rain, 7);
       const last30Rain = sliceLast(rain, 30);
       const last90Rain = sliceLast(rain, 90);
+      const last30TempMax = sliceLast(tempMax, 30);
+      const last30TempMin = sliceLast(tempMin, 30);
+      const last30HeatMax = sliceLast(heatMax, 30);
+      const last30WindMax = sliceLast(windMax, 30);
 
       const metrics = {
         province: province?.n || '',
         provinceKey,
         dates,
         rainDaily: rain.map((value) => Math.round((Number(value) || 0) * 10) / 10),
+        tempMaxDaily: tempMax.map((value) => Math.round((Number(value) || 0) * 10) / 10),
+        tempMinDaily: tempMin.map((value) => Math.round((Number(value) || 0) * 10) / 10),
+        heatMaxDaily: heatMax.map((value) => Math.round((Number(value) || 0) * 10) / 10),
+        windMaxDaily: windMax.map((value) => Math.round((Number(value) || 0) * 10) / 10),
         source: 'openmeteo-archive',
         rain24h: Math.round((rain[rain.length - 1] || 0) * 10) / 10,
         rain7d: sum(last7Rain),
@@ -151,12 +159,17 @@ export const buildHistoryPayload = async () => {
         rainYtd: sum(rain),
         wetDays7d: last7Rain.filter((value) => Number(value) >= 1).length,
         wetDays30d: last30Rain.filter((value) => Number(value) >= 1).length,
+        dryDays30d: last30Rain.filter((value) => Number(value) < 1).length,
         maxDailyRain30d: max(last30Rain),
-        tempMax30d: max(sliceLast(tempMax, 30)),
-        tempMin30d: min(sliceLast(tempMin, 30)),
-        heatMax30d: max(sliceLast(heatMax, 30)),
-        windMax30d: max(sliceLast(windMax, 30)),
-        tempAvg30d: avg(sliceLast(tempMax, 30)),
+        tempMax30d: max(last30TempMax),
+        tempMin30d: min(last30TempMin),
+        heatMax30d: max(last30HeatMax),
+        windMax30d: max(last30WindMax),
+        tempAvg30d: avg(last30TempMax),
+        hotDays30d: last30TempMax.filter((value) => Number(value) >= 35).length,
+        veryHotDays30d: last30TempMax.filter((value) => Number(value) >= 40).length,
+        heatRiskDays30d: last30HeatMax.filter((value) => Number(value) >= 41).length,
+        windyDays30d: last30WindMax.filter((value) => Number(value) >= 30).length,
       };
 
       byStation[stationID] = metrics;
