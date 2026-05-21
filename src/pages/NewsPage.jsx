@@ -16,9 +16,14 @@ import {
 const categoryOptions = [
   { id: 'all', label: 'ทั้งหมด', icon: Search, color: '#2563eb' },
   { id: 'warning', label: 'เตือนภัย', icon: ShieldAlert, color: '#ef4444' },
-  { id: 'news', label: 'ข่าวทั่วไป', icon: Newspaper, color: '#475569' },
-  { id: 'weather', label: 'สภาพอากาศ', icon: CloudRain, color: '#0ea5e9' },
+  { id: 'rain', label: 'ฝนหนัก', icon: CloudRain, color: '#2563eb' },
+  { id: 'storm', label: 'พายุ/ลมแรง', icon: CloudRain, color: '#1d4ed8' },
+  { id: 'flood', label: 'น้ำท่วม', icon: ShieldAlert, color: '#0f766e' },
+  { id: 'quake', label: 'แผ่นดินไหว', icon: ShieldAlert, color: '#d97706' },
+  { id: 'air', label: 'ฝุ่น/อากาศ', icon: Newspaper, color: '#7c3aed' },
+  { id: 'weather', label: 'พยากรณ์', icon: CloudRain, color: '#0ea5e9' },
   { id: 'climate', label: 'ENSO/ภูมิอากาศ', icon: ThermometerSun, color: '#16a34a' },
+  { id: 'news', label: 'ข่าวทั่วไป', icon: Newspaper, color: '#475569' },
 ];
 
 const topicMeta = {
@@ -322,6 +327,38 @@ function normalizeDedupeText(text = '') {
     .trim();
 }
 
+function normalizeReportText(text = '') {
+  return normalizeDedupeText(text)
+    .replace(/\b\d{1,2}[:.]\d{2}\b/g, '')
+    .replace(/\b\d{1,2}\s*(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)\s*\d{2,4}\b/g, '')
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '')
+    .replace(/จังหวัด|จ\.|อำเภอ|อ\.|ตำบล|ต\./g, '')
+    .replace(/กรุงเทพมหานคร|ภาคเหนือ|ภาคตะวันออกเฉียงเหนือ|ภาคกลาง|ภาคตะวันออก|ภาคใต้|ภาคตะวันตก|อ่าวไทย|ทะเลอันดามัน/g, '')
+    .replace(/\d+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getReportGroupKey(item) {
+  const source = normalizeDedupeText(item.source || 'source');
+  const type = item.type || 'news';
+  const topic = item.topic || 'news';
+  const officialSources = /tmd|open meteo|open-meteo|usgs|gdacs|reliefweb|ddpm|ปภ|กรมอุตุ/i;
+  const groupableTopic = ['warning', 'weather', 'storm', 'rain', 'flood', 'quake', 'fire', 'air', 'climate'].includes(topic);
+
+  if (officialSources.test(item.source || '') && groupableTopic) {
+    return `${source}|${type}|${topic}`;
+  }
+
+  const signature = normalizeReportText(`${item.eventLabel || ''} ${item.title || ''}`)
+    .split(' ')
+    .filter((word) => word.length > 2)
+    .slice(0, 8)
+    .join(' ');
+
+  return `${source}|${type}|${topic}|${signature || normalizeReportText(item.title).slice(0, 48)}`;
+}
+
 function translateDisplayText(text = '') {
   const value = String(text || '').trim();
   if (!/[A-Za-z]/.test(value) || /[\u0E00-\u0E7F]/.test(value)) return value;
@@ -408,11 +445,11 @@ function getGroupTitle(source, topic, count) {
     return `คาดการณ์สภาพอากาศล่วงหน้า (${count} วัน)`;
   }
   const topicLabel = topicMeta[topic]?.label || topic;
-  return `รายงานสถานการณ์ ${topicLabel} (${count} ข่าว)`;
+  return `รายงานรวมจาก ${source}: ${topicLabel} (${count} รายการ)`;
 }
 
 function getGroupSummary(source, topic, items) {
-  const titles = items.map(item => {
+  const titles = items.map((item) => {
     let t = item.title;
     if (source === 'USGS' || source === 'TMD') {
       t = t.replace(/Significant earthquake|Earthquake|แผ่นดินไหว/gi, '').trim();
@@ -420,34 +457,32 @@ function getGroupSummary(source, topic, items) {
     return t;
   });
   const topicLabel = topicMeta[topic]?.label || 'ข่าวสาร';
-  return `รวมประกาศจาก ${source} เกี่ยวกับ${topicLabel} ทั้งหมด ${items.length} รายการ: ${titles.slice(0, 3).join(' | ')}${titles.length > 3 ? ' และอื่นๆ' : ''}`;
+  const areas = [...new Set(items.map((item) => item.area).filter(Boolean).filter((area) => area !== 'หลายพื้นที่'))].slice(0, 6);
+  const latestDate = toThaiDateTime(items[0]?.publishedAt);
+  return `รวมรายงานจาก ${source} ประเภท${topicLabel} ทั้งหมด ${items.length} รายการ อัปเดตล่าสุด ${latestDate}${areas.length ? ` ครอบคลุม ${areas.join(', ')}` : ''}: ${titles.slice(0, 3).join(' | ')}${titles.length > 3 ? ' และอื่นๆ' : ''}`;
 }
 
 function groupSimilarNews(items) {
   if (!items || !items.length) return [];
-  
-  const groups = {};
+
+  const groups = new Map();
   const ungrouped = [];
-  const groupableSources = ['USGS', 'TMD', 'ปภ.', 'ปภ. (DDPM)', 'Open-Meteo'];
-  const groupableTopics = ['quake', 'weather', 'storm', 'rain', 'flood', 'warning', 'air'];
-  
+
   items.forEach((item) => {
     if (!item) return;
-    const canGroup = groupableSources.includes(item.source) && groupableTopics.includes(item.topic);
+    const key = getReportGroupKey(item);
+    const canGroup = key && item.source && item.topic && item.topic !== 'news';
     if (!canGroup) {
       ungrouped.push(item);
       return;
     }
-    const key = `${item.source}-${item.topic}`;
-    if (!groups[key]) {
-      groups[key] = [];
-    }
-    groups[key].push(item);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
   });
-  
+
   const result = [...ungrouped];
-  
-  Object.entries(groups).forEach(([key, list]) => {
+
+  groups.forEach((list, key) => {
     if (list.length === 0) return;
     if (list.length === 1) {
       result.push(list[0]);
@@ -455,16 +490,18 @@ function groupSimilarNews(items) {
     }
     
     list.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
-    
+
     const latest = list[0];
-    const uniqueAreas = [...new Set(list.map(i => i.area).filter(Boolean))];
-    const totalSeverity = list.some(i => i.severity === 'high') ? 'high' : list.some(i => i.severity === 'medium') ? 'medium' : 'normal';
-    
+    const uniqueAreas = [...new Set(list.map((i) => i.area).filter(Boolean).filter((area) => area !== 'หลายพื้นที่'))];
+    const totalSeverity = list.some((i) => i.severity === 'high') ? 'high' : list.some((i) => i.severity === 'medium') ? 'medium' : 'normal';
+
     result.push({
       ...latest,
       id: `grouped-${key}-${latest.publishedAt || Date.now()}`,
       isGroup: true,
       children: list,
+      groupKey: key,
+      groupedSources: [...new Set(list.map((i) => i.source).filter(Boolean))],
       title: getGroupTitle(latest.source, latest.topic, list.length),
       summary: getGroupSummary(latest.source, latest.topic, list),
       area: uniqueAreas.length ? uniqueAreas.join(', ') : 'หลายพื้นที่',
@@ -472,7 +509,7 @@ function groupSimilarNews(items) {
       severityMeta: getSeverityMeta(totalSeverity),
     });
   });
-  
+
   return result.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
 }
 
@@ -721,17 +758,13 @@ function normalizeItem(item, forcedType) {
 
 function dedupeItems(items) {
   const seen = new Set();
-  const fuzzyTitles = [];
   return items.filter((item) => {
     const normalizedTitle = normalizeDedupeText(item.title);
-    const titleLead = normalizedTitle.split(' ').slice(0, 8).join(' ');
-    const key = `${item.source}-${titleLead}`;
+    const dateValue = item.publishedAt ? new Date(item.publishedAt) : null;
+    const normalizedDate = dateValue && !Number.isNaN(dateValue.getTime()) ? dateValue.toISOString().slice(0, 10) : '';
+    const key = `${item.source}-${item.topic}-${normalizedTitle}-${normalizedDate}-${item.url || ''}`;
     if (seen.has(key)) return false;
-    if (fuzzyTitles.some((title) => title && titleLead && (title.includes(titleLead) || titleLead.includes(title)))) {
-      return false;
-    }
     seen.add(key);
-    fuzzyTitles.push(titleLead);
     return true;
   });
 }
@@ -1180,7 +1213,7 @@ export default function NewsPage() {
                 )}
                 {item.isGroup && (
                   <span style={{ background: 'var(--bg-secondary)', color: 'var(--text-sub)', padding: '2px 8px', borderRadius: 6, fontSize: '0.64rem', fontWeight: 900 }}>
-                    🗂️ รวมแหล่งข่าว ({item.children.length})
+                    🗂️ รายงานรวม ({item.children.length})
                   </span>
                 )}
               </div>
@@ -1297,10 +1330,16 @@ export default function NewsPage() {
         </div>
       </div>
 
+      <div style={{ color: 'var(--text-sub)', fontSize: '0.74rem', fontWeight: 900, margin: '0 0 8px' }}>
+        โหมดแยกประเภทข่าว
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
         {categoryOptions.map((option) => {
           const Icon = option.icon;
           const active = activeCategory === option.id;
+          const count = option.id === 'all'
+            ? normalizedAlerts.length + normalizedStories.length
+            : [...normalizedAlerts, ...normalizedStories].filter((item) => matchesCategory(item, option.id)).length;
           return (
             <button
               key={option.id}
@@ -1324,6 +1363,9 @@ export default function NewsPage() {
             >
               <Icon size={15} />
               {option.label}
+              <span style={{ background: active ? 'rgba(255,255,255,0.2)' : `${option.color}12`, color: active ? '#fff' : option.color, borderRadius: 999, fontSize: '0.68rem', fontWeight: 950, minWidth: 22, padding: '2px 7px', textAlign: 'center' }}>
+                {count}
+              </span>
             </button>
           );
         })}
