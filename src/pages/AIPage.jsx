@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -46,6 +46,14 @@ const chartText = {
   fontSize: 11,
   fontWeight: 700,
 };
+
+const areaMetricOptions = [
+  { id: 'risk', label: 'เสี่ยงรวม', key: 'riskScore', unit: '', color: '#7c3aed', direction: 'desc' },
+  { id: 'rain', label: 'ฝน', key: 'rain', unit: '%', color: '#2563eb', direction: 'desc' },
+  { id: 'pm25', label: 'ฝุ่น', key: 'pm25', unit: '', color: '#f97316', direction: 'desc' },
+  { id: 'heat', label: 'ร้อน', key: 'feelsLike', unit: '°', color: '#ef4444', direction: 'desc' },
+  { id: 'wind', label: 'ลม', key: 'wind', unit: '', color: '#0f766e', direction: 'desc' },
+];
 
 function Panel({ children, style }) {
   return (
@@ -202,6 +210,111 @@ function RankList({ title, items = [], unit = '', color = '#2563eb' }) {
   );
 }
 
+function AreaWatchPanel({ activeMetric, isMobile, rows, setActiveMetric }) {
+  const activeConfig = areaMetricOptions.find((item) => item.id === activeMetric) || areaMetricOptions[0];
+  const topRow = rows[0];
+
+  return (
+    <Panel style={{ marginBottom: 12, padding: isMobile ? 14 : 18 }}>
+      <PanelHeader
+        icon={MapPin}
+        title="วิเคราะห์พื้นที่ที่ต้องจับตา"
+        subtitle="เลือกมุมมองเพื่อดูจังหวัดเด่นตามความเสี่ยงรวม ฝน ฝุ่น ความร้อน หรือลม"
+      />
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        {areaMetricOptions.map((option) => {
+          const active = option.id === activeMetric;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setActiveMetric(option.id)}
+              style={{
+                background: active ? option.color : 'var(--bg-secondary)',
+                border: `1px solid ${active ? option.color : 'var(--border-color)'}`,
+                borderRadius: 999,
+                color: active ? '#fff' : 'var(--text-main)',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 900,
+                padding: '8px 12px',
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'minmax(260px, 0.75fr) minmax(0, 1.25fr)' }}>
+        <div style={{ background: `${activeConfig.color}0f`, border: `1px solid ${activeConfig.color}28`, borderRadius: 16, padding: 16 }}>
+          <div style={{ color: activeConfig.color, fontSize: '0.76rem', fontWeight: 950 }}>อันดับ 1 ตอนนี้</div>
+          <div style={{ color: 'var(--text-main)', fontSize: '1.35rem', fontWeight: 950, lineHeight: 1.25, marginTop: 6 }}>
+            {topRow?.name || 'รอข้อมูลสถานี'}
+          </div>
+          <div style={{ color: activeConfig.color, fontSize: '2rem', fontWeight: 950, lineHeight: 1, marginTop: 10 }}>
+            {topRow ? round(topRow[activeConfig.key]) : '-'}{activeConfig.unit}
+          </div>
+          <div style={{ color: 'var(--text-sub)', fontSize: '0.76rem', fontWeight: 750, lineHeight: 1.55, marginTop: 10 }}>
+            {topRow
+              ? `ค่าประกอบ: ฝน ${topRow.rain}% · PM ${topRow.pm25} · รู้สึก ${topRow.feelsLike}° · ลม ${topRow.wind} กม./ชม.`
+              : 'เมื่อ API สถานีพร้อม หน้านี้จะจัดอันดับพื้นที่ให้อัตโนมัติ'}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          {rows.slice(0, 7).map((row, index) => {
+            const rawValue = round(row[activeConfig.key]);
+            const width = activeMetric === 'risk' || activeMetric === 'rain'
+              ? clamp(rawValue)
+              : activeMetric === 'pm25'
+                ? clamp((rawValue / 90) * 100)
+                : activeMetric === 'heat'
+                  ? clamp((rawValue / 45) * 100)
+                  : clamp(rawValue * 5);
+            return (
+              <div key={`${activeMetric}-${row.id || row.name}`} style={{ display: 'grid', gap: 8, gridTemplateColumns: '28px minmax(0, 1fr) 56px', alignItems: 'center' }}>
+                <div style={{ color: activeConfig.color, fontSize: '0.78rem', fontWeight: 950, textAlign: 'center' }}>{index + 1}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
+                    <span style={{ color: 'var(--text-main)', fontSize: '0.8rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
+                    <span style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 800 }}>{row.riskMeta?.label}</span>
+                  </div>
+                  <div style={{ background: 'rgba(148,163,184,0.16)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                    <div style={{ background: activeConfig.color, borderRadius: 999, height: '100%', width: `${width}%` }} />
+                  </div>
+                </div>
+                <div style={{ color: activeConfig.color, fontSize: '0.82rem', fontWeight: 950, textAlign: 'right' }}>{rawValue}{activeConfig.unit}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function SignalGrid({ items = [], isMobile }) {
+  return (
+    <section style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', marginBottom: 12 }}>
+      {items.map((item) => (
+        <Panel key={item.label} style={{ padding: 14 }}>
+          <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ color: item.color, fontSize: '0.74rem', fontWeight: 950 }}>{item.label}</div>
+            <div style={{ color: item.color, fontSize: '1.15rem', fontWeight: 950 }}>{item.value}</div>
+          </div>
+          <div style={{ color: 'var(--text-main)', fontSize: '0.84rem', fontWeight: 900, lineHeight: 1.4, marginTop: 8 }}>{item.title}</div>
+          <div style={{ color: 'var(--text-sub)', fontSize: '0.72rem', fontWeight: 750, lineHeight: 1.45, marginTop: 4 }}>{item.detail}</div>
+          <div style={{ background: 'rgba(148,163,184,0.16)', borderRadius: 999, height: 7, marginTop: 12, overflow: 'hidden' }}>
+            <div style={{ background: item.color, borderRadius: 999, height: '100%', width: `${clamp(item.percent)}%` }} />
+          </div>
+        </Panel>
+      ))}
+    </section>
+  );
+}
+
 function HourTile({ row }) {
   const rainColor = row.rain >= 60 ? '#2563eb' : row.rain >= 35 ? '#0ea5e9' : row.rain >= 15 ? '#f59e0b' : '#16a34a';
   return (
@@ -254,6 +367,7 @@ function getGistdaStats(summary) {
 }
 
 export default function AIPage() {
+  const [activeMetric, setActiveMetric] = useState('risk');
   const {
     isMobile,
     weatherData,
@@ -270,6 +384,18 @@ export default function AIPage() {
     rankings,
     national,
   } = useAIPageData();
+
+  const areaRankingRows = useMemo(() => {
+    const config = areaMetricOptions.find((item) => item.id === activeMetric) || areaMetricOptions[0];
+    return [...(stationRows || [])]
+      .filter((row) => Number.isFinite(Number(row?.[config.key])))
+      .sort((a, b) => (
+        config.direction === 'asc'
+          ? (Number(a[config.key]) || 0) - (Number(b[config.key]) || 0)
+          : (Number(b[config.key]) || 0) - (Number(a[config.key]) || 0)
+      ))
+      .slice(0, 10);
+  }, [activeMetric, stationRows]);
 
   const dashboardData = useMemo(() => {
     if (!weatherData) return null;
@@ -380,6 +506,40 @@ export default function AIPage() {
     { metric: 'UV', value: clamp(uv * 10) },
   ];
   const regionRows = (windAnalysis?.regions || []).slice(0, 6);
+  const insightSignals = [
+    {
+      label: 'พื้นที่เสี่ยง',
+      value: `${areaRankingRows[0]?.name || '-'}`,
+      title: areaRankingRows[0] ? `${areaRankingRows[0].riskScore}/100 ${areaRankingRows[0].riskMeta?.label}` : 'รอข้อมูลจังหวัด',
+      detail: 'จัดอันดับจากร้อน ฝุ่น ฝน และลม เพื่อหาพื้นที่ที่ควรดูต่อก่อน',
+      color: risk.color,
+      percent: areaRankingRows[0]?.riskScore || 0,
+    },
+    {
+      label: 'ฝนระยะใกล้',
+      value: `${rainProb}%`,
+      title: rainProb >= 55 ? 'มีแนวโน้มฝนชัดเจน' : rainProb >= 25 ? 'อาจมีฝนบางช่วง' : 'ฝนยังไม่เด่น',
+      detail: windAnalysis?.quickSummary || 'ใช้พยากรณ์รายชั่วโมงและข้อมูลลมประกอบ',
+      color: rainProb >= 55 ? '#2563eb' : rainProb >= 25 ? '#0ea5e9' : '#16a34a',
+      percent: rainProb,
+    },
+    {
+      label: 'คุณภาพอากาศ',
+      value: `${pm25}`,
+      title: pm.label,
+      detail: `ค่าเฉลี่ยประเทศ ${national?.pm25 || pm25} และดูอันดับจังหวัดฝุ่นสูงได้ทันที`,
+      color: pm.color,
+      percent: clamp((pm25 / 75) * 100),
+    },
+    {
+      label: 'ความร้อน',
+      value: `${feelsLike}°`,
+      title: heat.label,
+      detail: `UV ${uv} · ความชื้น ${humidity}% · ลม ${wind} กม./ชม.`,
+      color: heat.color,
+      percent: clamp((feelsLike / 45) * 100),
+    },
+  ];
 
   return (
     <main
@@ -404,13 +564,13 @@ export default function AIPage() {
         >
           <div>
             <div style={{ alignItems: 'center', color: '#0369a1', display: 'flex', fontSize: '0.74rem', fontWeight: 950, gap: 7, marginBottom: 6 }}>
-              <Sparkles size={16} /> ศูนย์สถิติข้อมูลอากาศ
+              <Sparkles size={16} /> วิเคราะห์พื้นที่และสถิติอากาศ
             </div>
             <h1 style={{ color: 'var(--text-main)', fontSize: isMobile ? '1.55rem' : '2.05rem', fontWeight: 950, letterSpacing: 0, lineHeight: 1.15, margin: 0 }}>
-              วิเคราะห์ภาพรวมวันนี้แบบ Infographic
+              พื้นที่ไหนน่าห่วงตอนนี้
             </h1>
             <p style={{ color: 'var(--text-sub)', fontSize: '0.84rem', fontWeight: 700, lineHeight: 1.45, margin: '7px 0 0', maxWidth: 760 }}>
-              รวมสถิติฝน ฝุ่น ความร้อน ลม ความชื้น และข้อมูลดาวเทียมในหน้าเดียว เพื่อเห็นสถานการณ์เร็วและครบกว่าหน้าแนะนำเดิม
+              รวมอันดับจังหวัด แนวโน้มฝน ฝุ่น ความร้อน ลม และข้อมูลดาวเทียมในหน้าเดียว เพื่อให้เห็นพื้นที่ที่ควรจับตาก่อน
             </p>
           </div>
 
@@ -427,6 +587,8 @@ export default function AIPage() {
           </div>
         </header>
 
+        <SignalGrid items={insightSignals} isMobile={isMobile} />
+
         <section style={{ display: 'grid', gap: 12, gridTemplateColumns: grid4, marginBottom: 12 }}>
           <StatCard icon={ThermometerSun} label="ความร้อนรู้สึกจริง" value={feelsLike} unit="°C" note={heat.label} color={heat.color} percent={clamp((feelsLike / 45) * 100)} />
           <StatCard icon={CloudRain} label="โอกาสฝนสูงสุดวันนี้" value={rainProb} unit="%" note={rainProb >= 55 ? 'มีโอกาสฝนชัดเจน' : rainProb >= 25 ? 'อาจมีฝนบางช่วง' : 'ฝนต่ำ'} color={rainProb >= 55 ? '#2563eb' : rainProb >= 25 ? '#0ea5e9' : '#16a34a'} percent={rainProb} />
@@ -439,6 +601,8 @@ export default function AIPage() {
           <StatCard icon={Droplets} label="ความชื้น" value={humidity} unit="%" note={`ทั่วประเทศเฉลี่ย ${national?.humidity || 0}%`} color="#0891b2" compact percent={humidity} />
           <StatCard icon={AlertTriangle} label="UV สูงสุด" value={uv} unit="" note={uvStatus.text} color={uvStatus.color} compact percent={clamp(uv * 10)} />
         </section>
+
+        <AreaWatchPanel activeMetric={activeMetric} isMobile={isMobile} rows={areaRankingRows} setActiveMetric={setActiveMetric} />
 
         <section style={{ display: 'grid', gap: 12, gridTemplateColumns: grid2, marginBottom: 12 }}>
           <Panel style={{ minHeight: 360 }}>

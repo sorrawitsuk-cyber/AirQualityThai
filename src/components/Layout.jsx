@@ -26,8 +26,8 @@ export default function Layout() {
   const navItems = [
     { path: '/', icon: '📊', label: 'ภาพรวม' },
     { path: '/map', icon: '🗺️', label: 'แผนที่' },
-    { path: '/ai', icon: '✨', label: 'วิเคราะห์' },
-    { path: '/news', icon: '📰', label: 'ข่าวสาร' },
+    { path: '/ai', icon: '✨', label: 'สถิติ' },
+    { path: '/news', icon: '📰', label: 'เตือนภัย' },
   ];
 
   const appBg = 'var(--bg-app)';

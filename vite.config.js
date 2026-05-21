@@ -8,6 +8,14 @@ function makeApiDevPlugin(route, file) {
     configureServer(server) {
       server.middlewares.use(`/api/${route}`, async (req, res) => {
         try {
+          if (!req.body && req.method && !['GET', 'HEAD'].includes(req.method)) {
+            const chunks = [];
+            for await (const chunk of req) chunks.push(chunk);
+            const rawBody = Buffer.concat(chunks).toString('utf8');
+            const contentType = req.headers['content-type'] || '';
+            req.body = contentType.includes('application/json') && rawBody ? JSON.parse(rawBody) : rawBody;
+          }
+
           const mod = await server.ssrLoadModule(`/api/${file}`);
           const handler = mod?.default;
           if (typeof handler !== 'function') throw new Error(`api/${file} does not export a default handler`);
@@ -99,6 +107,7 @@ export default defineConfig(({ mode }) => {
     apiNewsDevPlugin(),
     makeApiDevPlugin('weather-data', 'weather-data.js'),
     makeApiDevPlugin('weather-history', 'weather-history.js'),
+    makeApiDevPlugin('radar', 'radar.js'),
     makeApiDevPlugin('enso', 'enso.js'),
     makeApiDevPlugin('tmd-wind', 'tmd-wind.js'),
     VitePWA({

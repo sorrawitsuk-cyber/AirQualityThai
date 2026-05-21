@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CloudRain,
   ExternalLink,
+  MapPin,
   Newspaper,
   RefreshCw,
   Search,
@@ -15,7 +16,7 @@ import {
 const categoryOptions = [
   { id: 'all', label: 'ทั้งหมด', icon: Search, color: '#2563eb' },
   { id: 'warning', label: 'เตือนภัย', icon: ShieldAlert, color: '#ef4444' },
-  { id: 'news', label: 'ข่าวสาร', icon: Newspaper, color: '#475569' },
+  { id: 'news', label: 'ข่าวทั่วไป', icon: Newspaper, color: '#475569' },
   { id: 'weather', label: 'สภาพอากาศ', icon: CloudRain, color: '#0ea5e9' },
   { id: 'climate', label: 'ENSO/ภูมิอากาศ', icon: ThermometerSun, color: '#16a34a' },
 ];
@@ -798,6 +799,18 @@ function buildWeatherPhenomena(items = []) {
   return checks.filter((item) => item.pattern.test(text)).slice(0, 5);
 }
 
+function buildImpactAreas(items = []) {
+  const counts = new Map();
+  items.forEach((item) => {
+    const provinces = extractThaiProvinces(`${item.title || ''} ${item.summary || ''} ${item.area || ''}`, 8);
+    provinces.forEach((province) => counts.set(province, (counts.get(province) || 0) + 1));
+  });
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count }));
+}
+
 function openExternal(url) {
   if (!url || typeof window === 'undefined') return;
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -1031,6 +1044,29 @@ export default function NewsPage() {
     },
   ]), [feed, normalizedAlerts, ensoOutlook]);
 
+  const incidentBrief = useMemo(() => {
+    const highAlerts = normalizedAlerts.filter((item) => item.severity === 'high');
+    const mediumAlerts = normalizedAlerts.filter((item) => item.severity === 'medium');
+    const focusItems = [...highAlerts, ...mediumAlerts, ...normalizedAlerts].slice(0, 8);
+    const topIncident = focusItems[0] || normalizedStories[0] || null;
+    const impactAreas = buildImpactAreas(focusItems.length ? focusItems : normalizedStories.slice(0, 8));
+    const topicCounts = focusItems.reduce((acc, item) => {
+      acc[item.topic] = (acc[item.topic] || 0) + 1;
+      return acc;
+    }, {});
+    const leadingTopic = Object.entries(topicCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const leadingMeta = topicMeta[leadingTopic] || topicMeta.warning;
+
+    return {
+      highCount: highAlerts.length,
+      mediumCount: mediumAlerts.length,
+      impactAreas,
+      leadingMeta,
+      topIncident,
+      watchCount: normalizedAlerts.length,
+    };
+  }, [normalizedAlerts, normalizedStories]);
+
   useEffect(() => {
     if (!heroItems.length) {
       setCurrentHero(0);
@@ -1125,10 +1161,21 @@ export default function NewsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                 <span style={{ color: item.color, fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</span>
                 <span style={{ color: 'var(--text-sub)', fontSize: '0.72rem', fontWeight: 800 }}>{item.source}</span>
+                {item.area && item.area !== 'หลายพื้นที่' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2563eb10', color: '#2563eb', padding: '2px 8px', borderRadius: 6, fontSize: '0.64rem', fontWeight: 900 }}>
+                    <MapPin size={12} />
+                    {item.area}
+                  </span>
+                )}
                 {item.severity === 'high' && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '2px 8px', borderRadius: 6, fontSize: '0.64rem', fontWeight: 900 }}>
                     <span className="warning-pulse-dot" />
                     ด่วนที่สุด
+                  </span>
+                )}
+                {item.severity === 'medium' && (
+                  <span style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', padding: '2px 8px', borderRadius: 6, fontSize: '0.64rem', fontWeight: 900 }}>
+                    เฝ้าระวัง
                   </span>
                 )}
                 {item.isGroup && (
@@ -1190,9 +1237,9 @@ export default function NewsPage() {
     >
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto', gap: 16, alignItems: 'start', marginBottom: 20 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2.1rem', fontWeight: 950, letterSpacing: '-0.3px' }}>ศูนย์ข่าวอากาศ & ENSO</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2.1rem', fontWeight: 950, letterSpacing: 0 }}>เตือนภัยและข่าวอากาศ</h1>
           <p style={{ margin: '6px 0 0', color: 'var(--text-sub)', fontSize: '0.94rem', fontWeight: 550 }}>
-            ข่าวฝนฟ้า ประกาศเตือนภัย คุณภาพอากาศ และเอลนีโญ/ลานีญ่า จากแหล่งข้อมูลจริง
+            เรียงประกาศสำคัญก่อนข่าวทั่วไป พร้อมพื้นที่กระทบ แหล่งข้อมูล และสถานะ ENSO จากข้อมูลจริง
           </p>
         </div>
 
@@ -1245,7 +1292,7 @@ export default function NewsPage() {
             }}
           >
             <RefreshCw size={16} className={loading ? 'refresh-spin-active' : ''} />
-            รีเฟรชข่าวจริง
+            รีเฟรชข้อมูล
           </button>
         </div>
       </div>
@@ -1281,6 +1328,59 @@ export default function NewsPage() {
           );
         })}
       </div>
+
+      <Panel style={{ maxWidth: 1220, margin: '0 auto 20px', padding: isMobile ? 16 : 20, border: `1px solid ${incidentBrief.leadingMeta.color}22`, background: `linear-gradient(135deg, ${incidentBrief.leadingMeta.color}0d 0%, var(--bg-card) 54%, var(--bg-secondary) 100%)` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.2fr) minmax(280px, 0.8fr)', gap: 16, alignItems: 'stretch' }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: `1px solid ${incidentBrief.leadingMeta.color}28`, background: `${incidentBrief.leadingMeta.color}12`, color: incidentBrief.leadingMeta.color, borderRadius: 999, padding: '7px 12px', fontSize: '0.76rem', fontWeight: 950 }}>
+              <ShieldAlert size={16} />
+              สรุปเตือนภัยก่อนข่าวทั่วไป
+            </div>
+            <h2 style={{ color: 'var(--text-main)', fontSize: isMobile ? '1.18rem' : '1.45rem', fontWeight: 950, lineHeight: 1.3, margin: '12px 0 0' }}>
+              {incidentBrief.topIncident?.title || 'ยังไม่พบประกาศรุนแรงในขณะนี้'}
+            </h2>
+            <p style={{ color: 'var(--text-sub)', fontSize: '0.86rem', fontWeight: 700, lineHeight: 1.65, margin: '9px 0 0', maxWidth: 760 }}>
+              {incidentBrief.topIncident?.summary || 'เมื่อโหลดข้อมูลสำเร็จ หน้านี้จะจัดลำดับประกาศสำคัญ พื้นที่กระทบ และคำแนะนำให้อ่านได้เร็วขึ้น'}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+              {[
+                ['รุนแรง', incidentBrief.highCount, '#ef4444'],
+                ['เฝ้าระวัง', incidentBrief.mediumCount, '#f59e0b'],
+                ['ประกาศทั้งหมด', incidentBrief.watchCount, '#2563eb'],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ background: `${color}10`, border: `1px solid ${color}28`, borderRadius: 12, color, fontSize: '0.76rem', fontWeight: 950, padding: '8px 11px' }}>
+                  {label}: {value}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.58)', borderRadius: 18, padding: 14 }}>
+            <div style={{ alignItems: 'center', color: 'var(--text-main)', display: 'flex', fontSize: '0.9rem', fontWeight: 950, gap: 8, marginBottom: 10 }}>
+              <MapPin size={18} color="#2563eb" />
+              พื้นที่ที่ถูกกล่าวถึง
+            </div>
+            {incidentBrief.impactAreas.length ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {incidentBrief.impactAreas.map((area) => (
+                  <button
+                    key={area.name}
+                    type="button"
+                    onClick={() => setQuery(area.name)}
+                    style={{ background: '#2563eb10', border: '1px solid #2563eb24', borderRadius: 999, color: '#2563eb', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 900, padding: '7px 10px' }}
+                  >
+                    {area.name} · {area.count}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-sub)', fontSize: '0.8rem', fontWeight: 750, lineHeight: 1.5 }}>
+                ยังไม่พบชื่อจังหวัดชัดเจนในประกาศล่าสุด ใช้ตัวกรองด้านบนหรือค้นหาจังหวัดได้โดยตรง
+              </div>
+            )}
+          </div>
+        </div>
+      </Panel>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14, maxWidth: 1220, margin: '0 auto 20px' }}>
         {newsStats.map((stat) => (
@@ -1615,14 +1715,14 @@ export default function NewsPage() {
 
           <Panel ref={newsRef} style={{ padding: 20, borderRadius: 24, border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950 }}>ข่าวสารล่าสุด</h2>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950 }}>ฟีดเหตุการณ์และข่าวล่าสุด</h2>
               <button type="button" onClick={() => setActiveCategory('news')} style={{ border: 0, background: 'transparent', color: '#2563eb', fontWeight: 900, cursor: 'pointer', fontSize: '0.86rem' }}>
                 ดูทั้งหมด
               </button>
             </div>
 
             {loading && !feed ? (
-              <div style={{ color: 'var(--text-sub)', textAlign: 'center', padding: '24px 0' }}>กำลังดึงข่าวสารล่าสุด...</div>
+              <div style={{ color: 'var(--text-sub)', textAlign: 'center', padding: '24px 0' }}>กำลังดึงเหตุการณ์และข่าวล่าสุด...</div>
             ) : filteredStories.length ? (
               renderNewsList(filteredStories.slice(0, 16), 'ไม่พบข่าวสารในตัวกรองนี้')
             ) : (
@@ -1634,7 +1734,7 @@ export default function NewsPage() {
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
           <Panel style={{ padding: 20, borderRadius: 24, border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950 }}>สถานการณ์วันนี้</h2>
+              <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950 }}>ศูนย์สถานการณ์วันนี้</h2>
               <button type="button" onClick={() => scrollTo(newsRef)} style={{ border: 0, background: 'transparent', color: '#2563eb', fontWeight: 900, cursor: 'pointer', fontSize: '0.78rem' }}>
                 ดูข่าวล่าสุด
               </button>
@@ -1659,7 +1759,7 @@ export default function NewsPage() {
             </div>
 
             <div style={{ borderRadius: 18, background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: 14 }}>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-sub)', fontWeight: 800 }}>สรุปสถานการณ์โดย AI</div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-sub)', fontWeight: 800 }}>สรุปผลกระทบแบบอ่านเร็ว</div>
               <div style={{ marginTop: 6, fontWeight: 950, lineHeight: 1.5, fontSize: '0.88rem', color: 'var(--text-main)' }}>{feed?.digest?.headline || 'กำลังสรุปภาพรวมล่าสุด'}</div>
               {feed?.digest?.bullets?.length ? (
                 <ul style={{ margin: '10px 0 0', paddingLeft: 16, color: 'var(--text-sub)', lineHeight: 1.6, fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 6 }}>

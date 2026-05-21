@@ -574,13 +574,22 @@ export default function Dashboard() {
     const bestScore = (best?.probability || 0) + (best?.rain || 0) * 28;
     return score > bestScore ? item : best;
   }, minutelyRows[0]);
+  const peakHourlyRain3h = chartData.slice(0, 4).reduce((best, item) => ((item?.rain || 0) > (best?.rain || 0) ? item : best), chartData[0]);
+  const shortTermRainProb = Math.max(
+    currentRainProb,
+    peakMinutelyRain?.probability || 0,
+    peakHourlyRain3h?.rain || 0,
+  );
+  const shortTermRainLabel = peakMinutelyRain?.probability >= (peakHourlyRain3h?.rain || 0)
+    ? peakMinutelyRain?.label
+    : peakHourlyRain3h?.time;
   const rainNow = Number(current?.rain || current?.precipitation || currentRainAmount || 0);
   const nowRainAmount = Math.max(rainNow, radarRainNowCell?.rain || 0);
   const radarAlertTone = radarScan?.alertLevel >= 3 ? '#ef4444' : radarScan?.alertLevel === 2 ? '#f59e0b' : radarScan?.alertLevel === 1 ? '#16a34a' : '#0ea5e9';
   const radarScanAlert = radarScan
     ? {
       key: `radar-${radarScan.radarTime || 'latest'}-${radarScan.alertLevel}`,
-      level: radarScan.alertLevel >= 2 ? 'danger' : radarScan.alertLevel === 1 ? 'watch' : 'clear',
+      level: radarScan.alertLevel >= 3 ? 'danger' : radarScan.alertLevel >= 1 ? 'watch' : 'clear',
       icon: radarScan.cardIcon || (radarScan.alertLevel > 0 ? '🌧️' : '🌤️'),
       title: radarScan.cardTitle || (radarScan.alertLevel > 0 ? 'พบกลุ่มฝนใกล้พื้นที่' : 'ยังไม่พบฝนใกล้ตัว'),
       detail: radarScan.cardDesc || 'สแกนเรดาร์รอบพิกัดที่เลือกแล้ว',
@@ -628,7 +637,30 @@ export default function Dashboard() {
         bg: 'rgba(22,163,74,0.1)',
         progress: Math.min(100, Math.max(8, peakMinutelyRain?.probability || 8)),
       };
-  const nowcastRainAlert = radarScanAlert || fallbackRainAlert;
+  const alertSeverity = { clear: 0, watch: 1, danger: 2 };
+  const nowcastRainAlert = radarScanAlert && (alertSeverity[radarScanAlert.level] >= alertSeverity[fallbackRainAlert.level])
+    ? radarScanAlert
+    : fallbackRainAlert;
+  const radarScanFactors = Array.isArray(radarScan?.factors) ? radarScan.factors : [];
+  const radarScanKeyFactors = [
+    radarScanFactors.find((factor) => factor.label === 'สีเรดาร์'),
+    radarScanFactors.find((factor) => factor.label === 'ระยะฝนใกล้สุด'),
+    radarScanFactors.find((factor) => factor.label === 'ความมั่นใจ'),
+  ].filter(Boolean);
+  const radarScanFactorGrid = radarScanKeyFactors.length > 0 ? (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: '8px', marginTop: '12px' }}>
+      {radarScanKeyFactors.map((factor) => {
+        const tone = factor.tone || nowcastRainAlert.tone;
+        return (
+          <div key={`${factor.label}-${factor.value}`} style={{ border: `1px solid ${tone}2e`, background: `${tone}0f`, borderRadius: '13px', padding: '9px', minWidth: 0 }}>
+            <div style={{ color: tone, fontSize: '0.62rem', fontWeight: 950, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{factor.label}</div>
+            <div style={{ color: textColor, fontSize: '0.78rem', fontWeight: 950, marginTop: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{factor.value}</div>
+            <div style={{ color: subTextColor, fontSize: '0.58rem', fontWeight: 800, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{factor.detail}</div>
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
   const handleRainAlertToggle = async () => {
     if (!rainAlertEnabled && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
@@ -1012,10 +1044,10 @@ export default function Dashboard() {
 
   const briefingChips = [
     {
-      label: 'ฝนวันนี้',
-      value: `${dailyRainProb}%`,
-      tone: dailyRainProb >= 60 ? '#ef4444' : dailyRainProb >= 35 ? '#f59e0b' : '#2563eb',
-      bg: dailyRainProb >= 60 ? 'rgba(239,68,68,0.12)' : dailyRainProb >= 35 ? 'rgba(245,158,11,0.14)' : 'rgba(37,99,235,0.1)',
+      label: 'ฝน 3 ชม.',
+      value: `${shortTermRainProb}%`,
+      tone: shortTermRainProb >= 70 ? '#ef4444' : shortTermRainProb >= 45 ? '#f59e0b' : '#2563eb',
+      bg: shortTermRainProb >= 70 ? 'rgba(239,68,68,0.12)' : shortTermRainProb >= 45 ? 'rgba(245,158,11,0.14)' : 'rgba(37,99,235,0.1)',
     },
     {
       label: 'รู้สึกเหมือน',
@@ -1038,7 +1070,13 @@ export default function Dashboard() {
   ];
 
   const conciseBriefingText = [
-    currentRainProb >= 50 ? `วันนี้ฝนเด่นช่วง ${chartData.find((item) => item.rain >= 45)?.time || 'บ่าย-เย็น'}` : 'วันนี้ฝนยังไม่เด่นมาก',
+    nowcastRainAlert.level === 'watch' && shortTermRainProb < 60
+      ? 'เรดาร์พบฝนใกล้เคียง แต่ยังไม่เข้าเร็ว'
+      : shortTermRainProb >= 60
+      ? `ฝนระยะใกล้เด่นช่วง ${shortTermRainLabel || chartData.find((item) => item.rain >= 45)?.time || 'บ่าย-เย็น'}`
+      : currentRainProb >= 50
+        ? `วันนี้ฝนเด่นช่วง ${chartData.find((item) => item.rain >= 45)?.time || 'บ่าย-เย็น'}`
+        : 'ฝนระยะใกล้ยังไม่เด่นมาก',
     current?.feelsLike >= 38 ? `อากาศร้อน รู้สึกเหมือน ${Math.round(current?.feelsLike || 0)}°` : `อุณหภูมิประมาณ ${Math.round(current?.temp || 0)}°`,
     current?.pm25 >= 37.5 ? 'ฝุ่นเริ่มสูง ควรลดเวลานอกอาคาร' : 'คุณภาพอากาศยังพอใช้',
     tomorrowRainProb >= 40 ? `พรุ่งนี้มีโอกาสฝน ${tomorrowRainProb}%` : 'พรุ่งนี้ยังวางแผนกลางแจ้งได้',
@@ -1313,7 +1351,7 @@ export default function Dashboard() {
               {nowcastRainAlert.detail}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '11px' }}>
-              {[locationName, nowcastRainAlert.time, radarScanError ? 'ใช้พยากรณ์สำรอง' : null].filter(Boolean).map((item) => (
+              {[locationName, nowcastRainAlert.time, (radarScanError || radarScan?.unavailable) ? 'ใช้พยากรณ์สำรอง' : null].filter(Boolean).map((item) => (
                 <span key={item} style={{ color: nowcastRainAlert.tone, background: `${nowcastRainAlert.tone}12`, border: `1px solid ${nowcastRainAlert.tone}24`, borderRadius: '999px', fontSize: '0.68rem', fontWeight: 900, padding: '5px 9px', maxWidth: isMobile ? '100%' : '360px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item}
                 </span>
@@ -1343,6 +1381,8 @@ export default function Dashboard() {
       <div style={{ marginTop: '14px', height: '8px', borderRadius: '999px', background: 'rgba(148,163,184,0.18)', overflow: 'hidden' }}>
         <div style={{ width: `${nowcastRainAlert.progress}%`, height: '100%', borderRadius: '999px', background: `linear-gradient(90deg, ${nowcastRainAlert.tone}, ${nowcastRainAlert.level === 'clear' ? '#22c55e' : '#60a5fa'})` }} />
       </div>
+
+      {radarScanFactorGrid}
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(6, minmax(0, 1fr))', gap: '8px', marginTop: '12px' }}>
         {minutelyRows.slice(0, isMobile ? 3 : 6).map((item) => {
