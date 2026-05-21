@@ -1498,96 +1498,145 @@ export default function MapPage() {
       {/* === DESKTOP HEADER ROW 1: Logo + Title + Nav === */}
       {!isMobile && (
         <>
-          {/* Row 1: Logo + Title + Status + Icons */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '6px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>🗺️</div>
-              <div>
-                <div style={{ fontSize: '1rem', fontWeight: '900', color: textColor, lineHeight: 1.2 }}>แผนที่เฝ้าระวังภัย</div>
-                <div style={{ fontSize: '0.65rem', color: subTextColor, fontWeight: 'bold' }}>คุณภาพอากาศประเทศไทย</div>
-              </div>
-              <div style={{ marginLeft: '4px', borderLeft: `1px solid ${borderColor}`, paddingLeft: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'pulse 2s infinite' }}></span>
-                  <span style={{ fontSize: '0.7rem', color: subTextColor }}>อัปเดตล่าสุด: {getLastUpdatedText()}</span>
-                </div>
-                <div style={{ fontSize: '0.62rem', color: subTextColor, marginTop: '2px' }}>ข้อมูลจาก AIR4Thai{tmdAvailable ? ' + TMD' : ''} (PCD)</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {mapCategory === 'risk' && (
-                <button onClick={() => setShowReferenceModal(true)} style={{ background: 'var(--bg-secondary)', color: '#8b5cf6', border: '1px solid #8b5cf6', padding: '6px 12px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px' }}>📚 แหล่งอ้างอิง</button>
-              )}
-              <button onClick={() => setShowReportModal(true)} disabled={!reportRows.length} title="เปิดรายงานอินโฟกราฟิก" style={{ background: reportRows.length ? (darkMode ? `${activeModeObj?.color || '#2563eb'}22` : `${activeModeObj?.color || '#2563eb'}14`) : 'var(--bg-secondary)', color: reportRows.length ? (activeModeObj?.color || '#2563eb') : subTextColor, border: `1px solid ${reportRows.length ? (activeModeObj?.color || '#2563eb') : borderColor}`, padding: '6px 12px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 'bold', cursor: reportRows.length ? 'pointer' : 'default', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '5px', opacity: reportRows.length ? 1 : 0.55 }}>🧾 รายงาน</button>
-              <button onClick={handleExportCsv} disabled={!exportRows.length} title="ดาวน์โหลด CSV" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? '#0ea5e9' : subTextColor, border: `1px solid ${borderColor}`, width: '34px', height: '34px', borderRadius: '50%', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exportRows.length ? 1 : 0.5 }}>⬇️</button>
-              <button onClick={handleExportJson} disabled={!exportRows.length} title="ดาวน์โหลด JSON" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? textColor : subTextColor, border: `1px solid ${borderColor}`, width: '34px', height: '34px', borderRadius: '50%', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.62rem', fontWeight: 900, fontFamily: 'Kanit', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exportRows.length ? 1 : 0.5 }}>JSON</button>
-            </div>
-          </div>
-
-          {/* Row 2: Data explorer controls */}
-          <div className="hide-scrollbar" style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', alignItems: 'center', gap: '10px', marginBottom: '6px', flexShrink: 0, background: cardBg, padding: '9px 12px', borderRadius: '14px', border: `1px solid ${borderColor}`, overflowX: 'auto' }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>1. กลุ่มข้อมูล</div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {secondaryToolOptions.map(opt => (
-                  <button key={opt.id} onClick={() => setMapCategory(opt.id)} style={{ padding: '5px 9px', borderRadius: '999px', border: `1px solid ${mapCategory === opt.id ? opt.color : borderColor}`, background: mapCategory === opt.id ? (darkMode ? `${opt.color}28` : `${opt.color}16`) : 'transparent', color: mapCategory === opt.id ? opt.color : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s' }} title={opt.useFor}>
-                    {opt.icon} {opt.shortLabel}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ minWidth: 0 }}>
-              {mapCategory === 'rain' && (
-                <>
-                  <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>2. กรองประเภทข้อมูลย้อนหลัง</div>
-                  <div className="hide-scrollbar" style={{ display: 'flex', gap: '5px', overflowX: 'auto', minWidth: 0, marginBottom: '6px' }}>
-                    {historyFilterOptions.map(filter => {
-                      const active = activeHistoryFilter === filter.id;
-                      return (
-                        <button
-                          key={filter.id}
-                          onClick={() => setHistoryFilter(filter.id)}
-                          style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${active ? filter.color : borderColor}`, background: active ? (darkMode ? `${filter.color}28` : `${filter.color}16`) : 'transparent', color: active ? filter.color : subTextColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }}
-                          title={`กรองข้อมูลย้อนหลัง: ${filter.label}`}
-                        >
-                          {filter.icon} {filter.label}
-                        </button>
-                      );
-                    })}
+          <div style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: '18px', boxShadow: '0 10px 28px rgba(15,23,42,0.07)', padding: '10px', marginBottom: '8px', flexShrink: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) auto', alignItems: 'center', gap: '14px', marginBottom: '9px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'linear-gradient(135deg, #0ea5e9, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0, boxShadow: '0 10px 24px rgba(37,99,235,0.24)' }}>🗺️</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h1 style={{ margin: 0, color: textColor, fontSize: '1.05rem', fontWeight: 950, lineHeight: 1.2 }}>แผนที่เฝ้าระวังภัย</h1>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: darkMode ? `${activeDataSourceMeta.color}22` : `${activeDataSourceMeta.color}12`, color: activeDataSourceMeta.color, border: `1px solid ${activeDataSourceMeta.color}32`, borderRadius: '999px', padding: '4px 9px', fontSize: '0.66rem', fontWeight: 900 }}>
+                      {activeDataSourceMeta.icon} {activeDataSourceMeta.label}
+                    </span>
                   </div>
-                </>
-              )}
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>{mapCategory === 'rain' ? '3.' : '2.'} ตัวชี้วัดในกลุ่ม {activeCategoryOption?.shortLabel}</div>
-              <div className="hide-scrollbar" style={{ display: 'flex', gap: '5px', overflowX: 'auto', minWidth: 0 }}>
-                {primaryLayerSections.map(section => (
-                  <React.Fragment key={section.title}>
-                    {primaryLayerSections.length > 1 && (
-                      <span style={{ alignSelf: 'center', color: subTextColor, fontSize: '0.58rem', fontWeight: 900, padding: '0 2px', whiteSpace: 'nowrap', flexShrink: 0 }}>{section.title}</span>
-                    )}
-                    {section.items.map(layer => {
-                      const isAct = layer.category === mapCategory && activeModeId === layer.id;
-                      return (
-                        <button key={`${layer.category}-${layer.id}`} onClick={() => setPrimaryLayer(layer)} style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${isAct ? layer.color : borderColor}`, background: isAct ? (darkMode ? `${layer.color}28` : `${layer.color}16`) : 'transparent', color: isAct ? layer.color : subTextColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }} title={layer.desc}>
-                          {layer.name}
-                        </button>
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
+                  <div style={{ color: subTextColor, fontSize: '0.68rem', fontWeight: 800, lineHeight: 1.4, marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeDataSourceMeta.detail} • อัปเดตล่าสุด {getLastUpdatedText()}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+                {mapCategory === 'risk' && (
+                  <button onClick={() => setShowReferenceModal(true)} style={{ background: 'var(--bg-secondary)', color: '#8b5cf6', border: '1px solid #8b5cf6', padding: '8px 12px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '6px' }}>📚 อ้างอิง</button>
+                )}
+                <button onClick={() => setShowReportModal(true)} disabled={!reportRows.length} title="เปิดรายงานอินโฟกราฟิก" style={{ background: reportRows.length ? (activeModeObj?.color || '#2563eb') : 'var(--bg-secondary)', color: reportRows.length ? '#fff' : subTextColor, border: `1px solid ${reportRows.length ? (activeModeObj?.color || '#2563eb') : borderColor}`, padding: '8px 12px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 900, cursor: reportRows.length ? 'pointer' : 'default', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '6px', opacity: reportRows.length ? 1 : 0.55 }}>🧾 รายงาน</button>
+                <button onClick={handleExportCsv} disabled={!exportRows.length} title="ดาวน์โหลด CSV" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? '#0ea5e9' : subTextColor, border: `1px solid ${borderColor}`, padding: '8px 11px', borderRadius: '12px', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.72rem', fontWeight: 900, fontFamily: 'Kanit', opacity: exportRows.length ? 1 : 0.5 }}>CSV</button>
+                <button onClick={handleExportJson} disabled={!exportRows.length} title="ดาวน์โหลด JSON" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? textColor : subTextColor, border: `1px solid ${borderColor}`, padding: '8px 11px', borderRadius: '12px', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.72rem', fontWeight: 900, fontFamily: 'Kanit', opacity: exportRows.length ? 1 : 0.5 }}>JSON</button>
               </div>
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.58rem', color: subTextColor, fontWeight: 900, marginBottom: '5px' }}>{mapCategory === 'rain' ? '4.' : '3.'} ช่วงเวลา/แหล่งข้อมูล</div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {(canChooseTimeMode ? flatTimeOptions : []).map(opt => {
-                  const isAct = activeTimeKey === opt.id;
-                  return (
-                    <button key={opt.id} onClick={() => handleTimeOptionSelect(opt.id)} style={{ padding: '5px 10px', borderRadius: '999px', border: `1px solid ${isAct ? opt.color : borderColor}`, background: isAct ? opt.color : 'transparent', color: isAct ? '#fff' : subTextColor, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
-                      {opt.label}
-                    </button>
-                  );
-                })}
-                {!canChooseTimeMode && <span style={{ fontSize: '0.68rem', color: activeCategoryOption?.color || subTextColor, padding: '5px 8px', border: `1px solid ${borderColor}`, borderRadius: '999px', whiteSpace: 'nowrap' }}>{activeTimeOption?.sub}</span>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '360px minmax(0, 1fr) 230px', gap: '12px', alignItems: 'stretch' }}>
+              <div style={{ background: 'var(--bg-secondary)', border: `1px solid ${borderColor}`, borderRadius: '14px', padding: '8px', minWidth: 0 }}>
+                <div style={{ color: subTextColor, fontSize: '0.62rem', fontWeight: 950, marginBottom: '6px' }}>ชุดข้อมูลหลัก</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '7px' }}>
+                  {secondaryToolOptions.map(opt => {
+                    const active = mapCategory === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => setMapCategory(opt.id)}
+                        title={opt.useFor}
+                        style={{
+                          alignItems: 'center',
+                          background: active ? (darkMode ? `${opt.color}24` : `${opt.color}12`) : cardBg,
+                          border: `1px solid ${active ? opt.color : borderColor}`,
+                          borderRadius: '12px',
+                          color: active ? opt.color : textColor,
+                          cursor: 'pointer',
+                          display: 'grid',
+                          fontFamily: 'Kanit',
+                          gap: '6px',
+                          gridTemplateColumns: '1fr',
+                          minHeight: '68px',
+                          padding: '7px 6px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <span style={{ alignItems: 'center', background: `${opt.color}16`, borderRadius: '10px', display: 'flex', height: '28px', justifyContent: 'center', margin: '0 auto', width: '28px' }}>{opt.icon}</span>
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 950, lineHeight: 1.2 }}>{opt.shortLabel}</span>
+                          <span style={{ color: active ? opt.color : subTextColor, display: 'block', fontSize: '0.58rem', fontWeight: 750, lineHeight: 1.25, marginTop: '3px' }}>{opt.desc}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-secondary)', border: `1px solid ${borderColor}`, borderRadius: '14px', padding: '10px', minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ color: subTextColor, fontSize: '0.62rem', fontWeight: 950 }}>ตัวชี้วัดในชุด {activeCategoryOption?.shortLabel}</div>
+                    <div style={{ color: activeModeObj?.color || subTextColor, fontSize: '0.72rem', fontWeight: 900, marginTop: '2px' }}>{activeModeObj?.name}</div>
+                  </div>
+                  {mapCategory === 'rain' && (
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {historyFilterOptions.map(filter => {
+                        const active = activeHistoryFilter === filter.id;
+                        return (
+                          <button
+                            key={filter.id}
+                            onClick={() => setHistoryFilter(filter.id)}
+                            style={{ background: active ? filter.color : cardBg, border: `1px solid ${active ? filter.color : borderColor}`, borderRadius: '999px', color: active ? '#fff' : subTextColor, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', fontWeight: 900, padding: '6px 9px', whiteSpace: 'nowrap' }}
+                            title={`กรองข้อมูลย้อนหลัง: ${filter.label}`}
+                          >
+                            {filter.icon} {filter.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gap: '8px', maxHeight: '86px', overflowY: 'auto', paddingRight: '3px' }} className="custom-scrollbar">
+                  {primaryLayerSections.map(section => (
+                    <div key={section.title} style={{ display: 'grid', gap: '6px' }}>
+                      {primaryLayerSections.length > 1 && (
+                        <div style={{ color: subTextColor, fontSize: '0.62rem', fontWeight: 950 }}>{section.title}</div>
+                      )}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {section.items.map(layer => {
+                          const isAct = layer.category === mapCategory && activeModeId === layer.id;
+                          return (
+                            <button
+                              key={`${layer.category}-${layer.id}`}
+                              onClick={() => setPrimaryLayer(layer)}
+                              style={{ background: isAct ? layer.color : cardBg, border: `1px solid ${isAct ? layer.color : borderColor}`, borderRadius: '999px', color: isAct ? '#fff' : textColor, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.7rem', fontWeight: 900, padding: '7px 10px', whiteSpace: 'nowrap' }}
+                              title={layer.desc}
+                            >
+                              {layer.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-secondary)', border: `1px solid ${borderColor}`, borderRadius: '14px', padding: '10px', minWidth: 0 }}>
+                <div style={{ color: subTextColor, fontSize: '0.62rem', fontWeight: 950, marginBottom: '8px' }}>ช่วงเวลาและแหล่งข้อมูล</div>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  {canChooseTimeMode ? flatTimeOptions.map(opt => {
+                    const isAct = activeTimeKey === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => handleTimeOptionSelect(opt.id)}
+                        style={{ background: isAct ? opt.color : cardBg, border: `1px solid ${isAct ? opt.color : borderColor}`, borderRadius: '12px', color: isAct ? '#fff' : textColor, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1.2, minHeight: '42px', padding: '8px 10px', textAlign: 'left' }}
+                      >
+                        <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
+                        <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 750, marginTop: '2px', opacity: 0.78 }}>{opt.sub}</span>
+                      </button>
+                    );
+                  }) : (
+                    <div style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: '12px', color: activeTimeOption?.color || subTextColor, fontSize: '0.76rem', fontWeight: 900, lineHeight: 1.35, padding: '10px' }}>
+                      <div>{activeTimeOption?.label}</div>
+                      <div style={{ color: subTextColor, fontSize: '0.64rem', marginTop: '4px' }}>{activeTimeOption?.sub}</div>
+                    </div>
+                  )}
+                  <div style={{ color: subTextColor, display: '-webkit-box', fontSize: '0.62rem', fontWeight: 750, lineHeight: 1.45, overflow: 'hidden', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2 }}>{timeContextNote || 'เลือกช่วงเวลาที่ต้องการดูบนแผนที่'}</div>
+                </div>
               </div>
             </div>
           </div>
