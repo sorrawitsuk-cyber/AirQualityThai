@@ -7,6 +7,8 @@ const FIREBASE_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const CHUNK_SIZE = 20;
 const ARCHIVE_LAG_DAYS = 5;
 const FIREBASE_CACHE_PATH = 'weather_history';
+let memoryHistoryCache = null;
+let memoryHistoryBuildPromise = null;
 
 const getFirebaseUrl = (path) => {
   const dbUrl = process.env.FIREBASE_DATABASE_URL || process.env.VITE_FIREBASE_DATABASE_URL;
@@ -44,15 +46,16 @@ const fetchJson = async (url, timeoutMs = 15000) => {
 
 const readCachedHistory = async () => {
   const url = getFirebaseUrl(FIREBASE_CACHE_PATH);
-  if (!url) return null;
+  if (!url) return memoryHistoryCache;
   try {
-    return await fetchJson(url, 5000);
+    return (await fetchJson(url, 5000)) || memoryHistoryCache;
   } catch {
-    return null;
+    return memoryHistoryCache;
   }
 };
 
 export const writeCachedHistory = async (payload) => {
+  memoryHistoryCache = payload;
   const db = getFirebaseDb();
   if (!db) return false;
   await set(ref(db, FIREBASE_CACHE_PATH), payload);
@@ -188,9 +191,17 @@ export const buildHistoryPayload = async () => {
 };
 
 export const refreshHistoryCache = async () => {
-  const payload = await buildHistoryPayload();
-  await writeCachedHistory(payload).catch(() => false);
-  return payload;
+  if (!memoryHistoryBuildPromise) {
+    memoryHistoryBuildPromise = buildHistoryPayload()
+      .then(async (payload) => {
+        await writeCachedHistory(payload).catch(() => false);
+        return payload;
+      })
+      .finally(() => {
+        memoryHistoryBuildPromise = null;
+      });
+  }
+  return memoryHistoryBuildPromise;
 };
 
 export default async function handler(req, res) {

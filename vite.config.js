@@ -98,6 +98,7 @@ export default defineConfig(({ mode }) => {
     react(),
     apiNewsDevPlugin(),
     makeApiDevPlugin('weather-data', 'weather-data.js'),
+    makeApiDevPlugin('weather-history', 'weather-history.js'),
     makeApiDevPlugin('enso', 'enso.js'),
     makeApiDevPlugin('tmd-wind', 'tmd-wind.js'),
     VitePWA({
