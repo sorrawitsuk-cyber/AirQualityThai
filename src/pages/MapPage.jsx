@@ -136,7 +136,7 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState(window.innerWidth < 1024 ? 6 : 6);
   const [polyOpacity, setPolyOpacity] = useState(0.7);
   
-  const [mapCategory, setMapCategory] = useState('rain');
+  const [mapCategory, setMapCategory] = useState('basic');
   const [activeBasicMode, setActiveBasicMode] = useState('pm25'); 
   const [activeRainMode, setActiveRainMode] = useState('rain24h');
   const [activeRiskMode, setActiveRiskMode] = useState('respiratory');
@@ -300,7 +300,12 @@ export default function MapPage() {
 
   useEffect(() => {
       setSelectedHotspot(null);
-      if (mapCategory === 'rain' || mapCategory === 'gistda' || mapCategory === 'yesterday' || mapCategory === 'risk') setTimeMode('now');
+      if (!['basic', 'rain', 'forecast'].includes(mapCategory)) {
+        setMapCategory('basic');
+        return;
+      }
+      if (mapCategory === 'forecast') setTimeMode('tomorrow');
+      else setTimeMode('now');
   }, [mapCategory]);
 
   const basicModes = [
@@ -313,6 +318,13 @@ export default function MapPage() {
     { id: 'uv', name: '☀️ รังสี UV', color: '#a855f7', unit: 'ดัชนี', desc: 'ดัชนีรังสีอัลตราไวโอเลต' },
     { id: 'pressure', name: '🧭 ความกดอากาศ', color: '#64748b', unit: 'hPa', desc: 'ความกดบรรยากาศ (ระดับน้ำทะเล)' }
   ];
+  const forecastModes = basicModes.filter(mode => mode.id !== 'pm25');
+
+  useEffect(() => {
+    if (mapCategory === 'forecast' && activeBasicMode === 'pm25') {
+      setActiveBasicMode('rain');
+    }
+  }, [mapCategory, activeBasicMode]);
 
   const rainModes = [
     { id: 'rain24h', name: 'ฝน 24 ชม.', color: '#2563eb', unit: 'mm', desc: 'ปริมาณฝนที่ตกจริงล่าสุดจากค่ารายวัน/สถานี', section: 'ฝน' },
@@ -334,9 +346,9 @@ export default function MapPage() {
   ];
   const historyFilterOptions = [
     { id: 'all', label: 'ทั้งหมด', icon: '▦', color: '#2563eb' },
-    { id: 'ฝน', label: 'ฝน', icon: 'ฝ', color: '#0ea5e9' },
-    { id: 'อุณหภูมิ', label: 'อุณหภูมิ', icon: 'อ', color: '#ef4444' },
-    { id: 'ลม', label: 'ลม', icon: 'ล', color: '#0284c7' },
+    { id: 'ฝน', label: 'ฝน', icon: '', color: '#0ea5e9' },
+    { id: 'อุณหภูมิ', label: 'อุณหภูมิ', icon: '', color: '#ef4444' },
+    { id: 'ลม', label: 'ลม', icon: '', color: '#0284c7' },
   ];
 
   const yesterdayModes = [
@@ -371,12 +383,15 @@ export default function MapPage() {
     return baseColor;
   }, [darkMode, gistdaModes]);
 
-  // Derived from timeMode — day overview uses daily rollups; now uses the latest observed values.
-  const isNowMode = timeMode === 'now';
+  // Derived from the simplified category model: current = latest values, forecast = tomorrow rollups.
+  const isWeatherDataCategory = mapCategory === 'basic' || mapCategory === 'forecast';
+  const effectiveTimeMode = mapCategory === 'forecast' ? 'tomorrow' : 'now';
+  const isNowMode = effectiveTimeMode === 'now';
 
   const getBasicVal = useCallback((station, mode) => {
     if (!station) return null;
     const daily = stationDaily[station.stationID] || {};
+    if (!isNowMode && !daily.temp) return null;
     if (isNowMode || !daily.temp) {
         const data = stationTemps[station.stationID] || {};
         switch(mode) {
@@ -391,21 +406,22 @@ export default function MapPage() {
             default: return 0;
         }
     } else {
-        const idx = timeMode === 'tomorrow' ? 8 : 7;
+        const idx = effectiveTimeMode === 'tomorrow' ? 8 : 7;
+        const roundOrNull = (value) => value === null || value === undefined || Number.isNaN(value) ? null : Math.round(value);
         const currentData = stationTemps[station.stationID] || {};
         switch(mode) {
-            case 'pm25': return daily.pm25?.[idx] || 0;
-            case 'temp': return daily.temp?.[idx] || 0;
-            case 'heat': return daily.heat?.[idx] || 0;
-            case 'humidity': return daily.humidity?.[idx] || currentData.humidity || 0;
-            case 'rain': return daily.rain?.[idx] || 0;
-            case 'wind': return daily.wind?.[idx] || 0;
-            case 'uv': return daily.uv?.[idx] || 0;
-            case 'pressure': return daily.pressure?.[idx] || 0;
-            default: return 0;
+            case 'pm25': return roundOrNull(daily.pm25?.[idx]);
+            case 'temp': return roundOrNull(daily.temp?.[idx]);
+            case 'heat': return roundOrNull(daily.heat?.[idx]);
+            case 'humidity': return roundOrNull(daily.humidity?.[idx] ?? currentData.humidity);
+            case 'rain': return daily.rain?.[idx] ?? null;
+            case 'wind': return roundOrNull(daily.wind?.[idx]);
+            case 'uv': return daily.uv?.[idx] ?? null;
+            case 'pressure': return roundOrNull(daily.pressure?.[idx]);
+            default: return null;
         }
     }
-  }, [stationTemps, stationDaily, isNowMode, timeMode]);
+  }, [stationTemps, stationDaily, isNowMode, effectiveTimeMode]);
 
   const getBasicColor = useCallback((val, mode) => {
     if (val === null || val === undefined || val === '' || val === 0) return darkMode ? '#1a3050' : '#b8d9f5';
@@ -655,7 +671,7 @@ export default function MapPage() {
   const allMapData = useMemo(() => {
     return (stations || []).map(st => {
         let val = null, color = null;
-        if (mapCategory === 'basic') {
+        if (isWeatherDataCategory) {
             val = getBasicVal(st, activeBasicMode);
             color = getBasicColor(val, activeBasicMode);
         } else if (mapCategory === 'rain') {
@@ -686,7 +702,7 @@ export default function MapPage() {
         }
         return { ...st, displayVal: val, color };
     }).filter(st => st.displayVal !== null && st.displayVal !== undefined);
-  }, [stations, mapCategory, activeBasicMode, activeRainMode, activeGistdaMode, activeYesterdayMode, calculateRisk, getBasicVal, getBasicColor, getRainVal, getRainColor, getRiskColor, getGistdaColor, getYesterdayVal, getYesterdayColor, gistdaSummary, darkMode]);
+  }, [stations, mapCategory, isWeatherDataCategory, activeBasicMode, activeRainMode, activeGistdaMode, activeYesterdayMode, calculateRisk, getBasicVal, getBasicColor, getRainVal, getRainColor, getRiskColor, getGistdaColor, getYesterdayVal, getYesterdayColor, gistdaSummary, darkMode]);
 
   const rankedSidebarData = useMemo(() => {
     if (mapCategory === 'gistda' && gistdaSummary && gistdaSummary[activeGistdaMode]) {
@@ -729,7 +745,7 @@ export default function MapPage() {
         if (mapDataNode && mapDataNode.color) {
             color = mapDataNode.color;
         } else {
-            if (mapCategory === 'basic') color = getBasicColor(getBasicVal(station, activeBasicMode), activeBasicMode);
+            if (isWeatherDataCategory) color = getBasicColor(getBasicVal(station, activeBasicMode), activeBasicMode);
             else if (mapCategory === 'rain') color = getRainColor(getRainVal(station, activeRainMode), activeRainMode);
             else if (mapCategory === 'risk') color = getRiskColor(calculateRisk(station).score);
         }
@@ -746,7 +762,7 @@ export default function MapPage() {
         fillOpacity: polyOpacity,
         className: isFlashed ? 'arcgis-flash-polygon' : '' 
     };
-  }, [activeBasicMode, activeRainMode, allMapData, calculateRisk, darkMode, flashProv, getBasicColor, getBasicVal, getRainColor, getRainVal, getRiskColor, mapCategory, polyOpacity, stations]);
+  }, [activeBasicMode, activeRainMode, allMapData, calculateRisk, darkMode, flashProv, getBasicColor, getBasicVal, getRainColor, getRainVal, getRiskColor, isWeatherDataCategory, mapCategory, polyOpacity, stations]);
 
   const handleRegionClick = (station) => {
       if (mapCategory === 'risk') {
@@ -781,7 +797,7 @@ export default function MapPage() {
       } else {
           const daily = stationDaily[station.stationID] || {};
           const currentData = stationTemps[station.stationID] || {};
-          const idx = timeMode === 'tomorrow' ? 8 : 7;
+          const idx = effectiveTimeMode === 'tomorrow' ? 8 : 7;
           const data = isNowMode ? currentData : {
               temp: daily.temp?.[idx], feelsLike: daily.heat?.[idx],
               rainProb: daily.rain?.[idx], windSpeed: daily.wind?.[idx], uv: daily.uv?.[idx],
@@ -861,30 +877,32 @@ export default function MapPage() {
   const visibleRainModes = activeHistoryFilter === 'all'
     ? rainModes
     : rainModes.filter(mode => mode.section === activeHistoryFilter);
+  const visibleWeatherModes = mapCategory === 'forecast' ? forecastModes : basicModes;
   const activeModeObj = mapCategory === 'rain' ? (visibleRainModes.find(m => m.id === activeRainMode) || visibleRainModes[0] || rainModes.find(m => m.id === activeRainMode)) :
-                        mapCategory === 'basic' ? basicModes.find(m => m.id === activeBasicMode) :
+                        isWeatherDataCategory ? (visibleWeatherModes.find(m => m.id === activeBasicMode) || visibleWeatherModes[0]) :
                         mapCategory === 'risk' ? riskModes.find(m => m.id === activeRiskMode) :
                         mapCategory === 'yesterday' ? yesterdayModes.find(m => m.id === activeYesterdayMode) :
                         gistdaModes.find(m => m.id === activeGistdaMode);
   const activeModeList = mapCategory === 'rain' ? visibleRainModes :
-                         mapCategory === 'basic' ? basicModes :
+                         isWeatherDataCategory ? visibleWeatherModes :
                          mapCategory === 'risk' ? riskModes :
                          mapCategory === 'yesterday' ? yesterdayModes :
                          gistdaModes;
   const activeModeIndex = Math.max(0, activeModeList.findIndex(m => m.id === activeModeObj?.id));
   const activeCategoryLabel = mapCategory === 'rain' ? 'สถิติย้อนหลังจริง' :
-                              mapCategory === 'basic' ? 'อากาศตอนนี้และพยากรณ์' :
+                              mapCategory === 'basic' ? 'ข้อมูลปัจจุบัน' :
+                              mapCategory === 'forecast' ? 'ข้อมูลพยากรณ์' :
                               mapCategory === 'risk' ? 'ความเสี่ยงใช้งานจริง' :
                               mapCategory === 'yesterday' ? 'เมื่อวานจากสถานี' :
                               'ดาวเทียม GISTDA';
 
   const setActiveModeById = useCallback((modeId) => {
     if (mapCategory === 'rain') setActiveRainMode(modeId);
-    else if (mapCategory === 'basic') setActiveBasicMode(modeId);
+    else if (isWeatherDataCategory) setActiveBasicMode(modeId);
     else if (mapCategory === 'risk') setActiveRiskMode(modeId);
     else if (mapCategory === 'yesterday') setActiveYesterdayMode(modeId);
     else setActiveGistdaMode(modeId);
-  }, [mapCategory]);
+  }, [mapCategory, isWeatherDataCategory]);
 
   const setHistoryFilter = (filterId) => {
     setActiveHistoryFilter(filterId);
@@ -1068,7 +1086,7 @@ export default function MapPage() {
     const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
     const color = mapCategory === 'rain'
       ? getRainColor(avg, activeRainMode)
-      : mapCategory === 'basic'
+      : isWeatherDataCategory
       ? getBasicColor(avg, activeBasicMode)
       : mapCategory === 'risk'
         ? getRiskColor(avg)
@@ -1079,15 +1097,15 @@ export default function MapPage() {
       ? getPm25QualityText(avg).text
       : mapCategory === 'rain'
         ? `ค่าจริงเฉลี่ย ${activeModeObj?.name || 'ฝน'}`
-        : mapCategory === 'basic'
-        ? activeModeObj?.name || 'ข้อมูลทั่วไป'
+        : isWeatherDataCategory
+        ? activeModeObj?.name || (mapCategory === 'forecast' ? 'ข้อมูลพยากรณ์' : 'ข้อมูลปัจจุบัน')
         : mapCategory === 'risk'
           ? 'คะแนนความเสี่ยงเฉลี่ย'
           : mapCategory === 'yesterday'
             ? `ย้อนหลัง ${activeModeObj?.name}`
             : 'ข้อมูล GISTDA';
     return { avg, count: vals.length, color, label };
-  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, activeModeObj, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
+  }, [allMapData, mapCategory, isWeatherDataCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, activeModeObj, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
   const regionalMetric = useMemo(() => {
     return Object.entries(REGION_GROUPS).map(([name, provs]) => {
       const sts = allMapData.filter(st => provs.includes(st.areaTH.replace('จังหวัด', '').trim()));
@@ -1098,7 +1116,7 @@ export default function MapPage() {
         : null;
       const color = mapCategory === 'rain'
         ? getRainColor(avg, activeRainMode)
-        : mapCategory === 'basic'
+        : isWeatherDataCategory
         ? getBasicColor(avg, activeBasicMode)
         : mapCategory === 'risk'
           ? getRiskColor(avg)
@@ -1107,9 +1125,10 @@ export default function MapPage() {
             : getGistdaColor(avg, activeGistdaMode);
       return { name, avg, color, trend: 0, windDirection };
     });
-  }, [allMapData, mapCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor]);
+  }, [allMapData, mapCategory, isWeatherDataCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor]);
   const sparkline7d = useMemo(() => {
-    return Array.from({ length: 8 }, (_, i) => {
+    const pointCount = mapCategory === 'forecast' ? 7 : 8;
+    return Array.from({ length: pointCount }, (_, i) => {
       const vals = (mapCategory === 'rain'
         ? stations.map(st => {
             const provinceKey = getProvinceKey(st);
@@ -1132,10 +1151,11 @@ export default function MapPage() {
             if (activeRainMode === 'windyDays30d') return value >= 30 ? 1 : 0;
             return value;
           })
-        : mapCategory === 'basic'
+        : isWeatherDataCategory
         ? stations.map(st => {
             const daily = stationDaily[st.stationID] || {};
-            if (i === 7) {
+            const dailyIndex = mapCategory === 'forecast' ? i + 8 : i;
+            if (isNowMode && i === 7) {
               const live = stationTemps[st.stationID] || {};
               if (activeBasicMode === 'temp') return live.temp || 0;
               if (activeBasicMode === 'heat') return live.feelsLike || 0;
@@ -1143,13 +1163,13 @@ export default function MapPage() {
               if (activeBasicMode === 'wind') return live.windSpeed || 0;
               return live[activeBasicMode] || 0;
             }
-            return daily[activeBasicMode]?.[i] || 0;
+            return daily[activeBasicMode]?.[dailyIndex] || 0;
           })
         : stations.map(st => stationDaily[st.stationID]?.pm25?.[i] || 0))
         .filter(v => v > 0);
       return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
     });
-  }, [stations, stationDaily, stationTemps, historyWeather, mapCategory, activeBasicMode, activeRainMode]);
+  }, [stations, stationDaily, stationTemps, historyWeather, mapCategory, isWeatherDataCategory, isNowMode, activeBasicMode, activeRainMode]);
   const forecastStId = selectedHotspot?.station?.stationID || stations.find(st => st.areaTH.includes('กรุงเทพ'))?.stationID;
   const forecastStName = selectedHotspot?.station?.areaTH?.replace('จังหวัด', '') || 'กรุงเทพมหานคร';
   const forecast7d = useMemo(() => {
@@ -1176,14 +1196,14 @@ export default function MapPage() {
       if (mode === 'heat') return '🥵';
       return '🌤️';
     };
-    const mode = mapCategory === 'basic' ? activeBasicMode : 'pm25';
+    const mode = isWeatherDataCategory ? activeBasicMode : 'pm25';
     return Array.from({ length: 7 }, (_, i) => {
       const idx = 8 + i;
       const d = new Date(); d.setDate(d.getDate() + i + 1);
       const value = getValue(mode, idx);
       return { date: d, value, icon: getIcon(mode, value), unit: activeModeObj?.unit || 'µg/m³' };
     });
-  }, [forecastStId, stationDaily, mapCategory, activeBasicMode, activeModeObj]);
+  }, [forecastStId, stationDaily, isWeatherDataCategory, activeBasicMode, activeModeObj]);
 
   if (geoError) return (
     <div className="loading-container" style={{ background: appBg, color: textColor }}>
@@ -1202,13 +1222,13 @@ export default function MapPage() {
   const showRealtimeDataWarning = !loading && !hasRealtimeData;
 
   const mapCategoryOptions = [
-    { id: 'rain', label: 'ย้อนหลังจริง', shortLabel: 'ย้อนหลังจริง', icon: '📈', color: '#2563eb', desc: 'ฝน อุณหภูมิ ลม 30/90 วัน', useFor: 'ดูค่าที่เกิดขึ้นจริงย้อนหลังจาก archive' },
-    { id: 'basic', label: 'ตอนนี้/พยากรณ์', shortLabel: 'ตอนนี้', icon: '🌤️', color: '#0ea5e9', desc: 'PM2.5 อากาศ ฝน ลม UV', useFor: 'เช็กค่าล่าสุด วันนี้ และพรุ่งนี้' },
-    { id: 'risk', label: 'ความเสี่ยง', shortLabel: 'เสี่ยง', icon: '⚠️', color: '#8b5cf6', desc: 'สุขภาพ ไฟป่า ความร้อน', useFor: 'ดูพื้นที่ที่ควรระวังเชิงปฏิบัติ' },
+    { id: 'basic', label: 'ข้อมูลปัจจุบัน', shortLabel: 'ปัจจุบัน', icon: '🟢', color: '#22c55e', desc: 'PM2.5 อุณหภูมิ ฝน ลม', useFor: 'ดูค่าล่าสุดจากสถานีและข้อมูลอากาศที่ระบบมีตอนนี้' },
+    { id: 'rain', label: 'ย้อนหลังข้อมูลจริง', shortLabel: 'ย้อนหลังจริง', icon: '📈', color: '#2563eb', desc: 'ฝน อุณหภูมิ ลม', useFor: 'ดูค่าที่เกิดขึ้นจริงย้อนหลังจาก archive' },
+    { id: 'forecast', label: 'ข้อมูลพยากรณ์', shortLabel: 'พยากรณ์', icon: '🔮', color: '#a855f7', desc: 'ฝน อุณหภูมิ ลม UV', useFor: 'ดูค่าคาดการณ์พรุ่งนี้จากข้อมูลพยากรณ์รายวัน' },
   ];
 
   const activeModeId = mapCategory === 'rain' ? activeRainMode :
-    mapCategory === 'basic' ? activeBasicMode :
+    isWeatherDataCategory ? activeBasicMode :
     mapCategory === 'risk' ? activeRiskMode :
     mapCategory === 'yesterday' ? activeYesterdayMode :
     activeGistdaMode;
@@ -1226,7 +1246,7 @@ export default function MapPage() {
     setMapCategory(layer.category);
     if (layer.category === 'rain') {
       setActiveRainMode(layer.id);
-    } else if (layer.category === 'basic') {
+    } else if (layer.category === 'basic' || layer.category === 'forecast') {
       setActiveBasicMode(layer.id);
     } else if (layer.category === 'risk') {
       setActiveRiskMode(layer.id);
@@ -1244,11 +1264,9 @@ export default function MapPage() {
   const activeDataSourceMeta = mapCategory === 'rain'
     ? { label: 'Archive', icon: '📈', color: '#2563eb', detail: historyLoading ? 'กำลังโหลดสถิติย้อนหลังจริง' : historyError ? 'รอข้อมูลย้อนหลังจาก archive' : `Open-Meteo Archive ถึง ${historyWeather?.period?.endDate || getDateLabel(-(historyWeather?.period?.archiveLagDays || 5))}` }
     : mapCategory === 'basic'
-    ? (timeMode === 'now'
-        ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: `ข้อมูลตอนนี้ ${nowDataTimeText} จาก AIR4Thai${tmdAvailable ? ' + TMD' : ''}` }
-        : timeMode === 'today'
-          ? { label: 'วันนี้', icon: '📅', color: '#0ea5e9', detail: 'ภาพรวมรายวันของวันนี้' }
-          : { label: 'พยากรณ์', icon: '🔮', color: '#a855f7', detail: 'TMD คาดการณ์รายวัน' })
+    ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: `ข้อมูลตอนนี้ ${nowDataTimeText} จาก AIR4Thai${tmdAvailable ? ' + TMD' : ''}` }
+    : mapCategory === 'forecast'
+      ? { label: 'Forecast', icon: '🔮', color: '#a855f7', detail: `ข้อมูลพยากรณ์พรุ่งนี้ ${getDateLabel(1)} จาก TMD/Open-Meteo` }
     : mapCategory === 'risk'
       ? (timeMode === 'now'
           ? { label: 'วิเคราะห์สด', icon: '⚠️', color: '#8b5cf6', detail: 'คำนวณจากข้อมูลล่าสุด' }
@@ -1258,53 +1276,51 @@ export default function MapPage() {
       : mapCategory === 'yesterday'
         ? { label: 'ย้อนหลัง', icon: '🕘', color: '#f59e0b', detail: 'ค่าที่เกิดขึ้นจริงของเมื่อวาน' }
         : { label: 'ดาวเทียม', icon: '🛰️', color: '#ef4444', detail: 'ข้อมูล GISTDA ล่าสุด' };
-  const shouldShowSeparateUpdatedTime = !(mapCategory === 'basic' && timeMode === 'now');
+  const shouldShowSeparateUpdatedTime = mapCategory !== 'basic';
 
   const timeHelperText = mapCategory === 'basic'
-    ? (timeMode === 'now'
-        ? `Now = ใช้ค่าล่าสุดที่ระบบมีอยู่ในขณะนี้ เวลา ${nowDataTimeText}`
-        : timeMode === 'today'
-          ? 'ภาพรวมวันนี้ = ใช้ค่าสรุปรายวันของวันนี้'
-          : 'พรุ่งนี้ = ค่าพยากรณ์รายวันของวันถัดไป')
+    ? `ตอนนี้ = ใช้ค่าล่าสุดที่ระบบมีอยู่ในขณะนี้ เวลา ${nowDataTimeText}`
+    : mapCategory === 'forecast'
+      ? `พยากรณ์ = ใช้ค่าคาดการณ์รายวันของพรุ่งนี้ ${getDateLabel(1)}`
     : '';
 
-  const canChooseTimeMode = mapCategory === 'basic';
-  const timeModeSections = [
-    {
-      id: 'now',
-      title: 'Now',
-      helper: 'ข้อมูลล่าสุด ณ ตอนนี้',
-      options: [
-        { id: 'now', label: `🟢 ตอนนี้ ${getDateLabel(0)}`, sub: nowDataTimeText, color: '#22c55e' },
-      ],
-    },
-    {
-      id: 'today',
-      title: 'วันนี้',
-      helper: 'ภาพรวมรายวัน',
-      options: [
-        { id: 'today', label: `📅 ภาพรวมวันนี้ ${getDateLabel(0)}`, sub: 'ค่าสรุปวันนี้', color: '#0ea5e9' },
-        { id: 'tomorrow', label: `🔮 พรุ่งนี้ ${getDateLabel(1)}`, sub: 'พยากรณ์รายวัน', color: '#a855f7' },
-      ],
-    },
-  ];
+  const canChooseTimeMode = false;
+  const timeModeSections = mapCategory === 'forecast'
+    ? [{
+        id: 'forecast',
+        title: 'พยากรณ์',
+        helper: 'ค่าคาดการณ์รายวัน',
+        options: [
+          { id: 'tomorrow', label: `🔮 พรุ่งนี้ ${getDateLabel(1)}`, sub: 'พยากรณ์รายวัน', color: '#a855f7' },
+        ],
+      }]
+    : [{
+        id: 'now',
+        title: 'ตอนนี้',
+        helper: 'ข้อมูลล่าสุด ณ ตอนนี้',
+        options: [
+          { id: 'now', label: `🟢 ตอนนี้ ${getDateLabel(0)}`, sub: nowDataTimeText, color: '#22c55e' },
+        ],
+      }];
   const flatTimeOptions = timeModeSections.flatMap(section => section.options);
-  const activeTimeKey = mapCategory === 'rain' ? 'history' : mapCategory === 'yesterday' ? 'yesterday' : (canChooseTimeMode ? timeMode : 'latest');
+  const activeTimeKey = mapCategory === 'rain' ? 'history' : mapCategory === 'forecast' ? 'tomorrow' : mapCategory === 'yesterday' ? 'yesterday' : 'now';
   const activeTimeOption = mapCategory === 'rain'
     ? { label: `📈 ย้อนหลังถึง ${historyWeather?.period?.endDate || getDateLabel(-(historyWeather?.period?.archiveLagDays || 5))}`, sub: 'ค่าจริงย้อนหลัง', color: '#2563eb' }
+    : mapCategory === 'forecast'
+    ? { label: `🔮 พรุ่งนี้ ${getDateLabel(1)}`, sub: 'พยากรณ์รายวัน', color: '#a855f7' }
     : mapCategory === 'yesterday'
     ? { label: `🕘 เมื่อวาน ${getDateLabel(-1)}`, sub: 'สถิติย้อนหลัง', color: '#f59e0b' }
     : flatTimeOptions.find(opt => opt.id === activeTimeKey) || { label: '🛰️ ล่าสุด', sub: 'ข้อมูลเฉพาะเครื่องมือ', color: activeCategoryOption?.color || '#64748b' };
   const handleTimeOptionSelect = (id) => {
-    if (mapCategory === 'rain' || mapCategory === 'yesterday' || mapCategory === 'gistda') {
-      setMapCategory('basic');
-    }
+    setMapCategory(id === 'now' ? 'basic' : 'forecast');
     setTimeMode(id);
   };
   const timeContextNote = mapCategory === 'rain'
     ? 'กลุ่มย้อนหลังจริงใช้ Open-Meteo Historical Weather API (ERA5) สำหรับฝน อุณหภูมิ ดัชนีร้อน และลม ไม่ใช่ค่าพยากรณ์'
+    : mapCategory === 'forecast'
+    ? 'กลุ่มพยากรณ์ใช้ข้อมูลคาดการณ์รายวันสำหรับฝน อุณหภูมิ ลม UV และความกดอากาศ'
     : mapCategory === 'gistda'
-    ? 'โหมดดาวเทียมเป็นข้อมูลสะสมล่าสุดจาก GISTDA หากเลือกช่วงเวลาอื่นจะสลับไปแผนที่อากาศ'
+    ? 'โหมดดาวเทียมเป็นข้อมูลสะสมล่าสุดจาก GISTDA'
     : mapCategory === 'yesterday'
       ? `กำลังดูสถิติย้อนหลังของเมื่อวาน ${getDateLabel(-1)}`
       : timeHelperText;
@@ -1334,7 +1350,7 @@ export default function MapPage() {
     ? getRiskLabel(nationalMetric.avg)
     : mapCategory === 'basic' && activeBasicMode === 'pm25'
       ? getPm25QualityText(nationalMetric.avg).text
-      : mapCategory === 'basic' && activeBasicMode === 'uv'
+      : isWeatherDataCategory && activeBasicMode === 'uv'
         ? getUvText(nationalMetric.avg)
         : reportRegionFocus
           ? `${reportSortAscending ? 'ค่าต่ำสุดเด่นที่' : 'ค่าสูงสุดเด่นที่'}ภาค${reportRegionFocus.name}`
@@ -1375,7 +1391,7 @@ export default function MapPage() {
                 : value >= 100 ? 'ฝนสะสมสูงมาก' : value >= 50 ? 'ฝนสะสมสูง' : value > 0 ? 'มีฝน' : 'ไม่มีฝน'
         : mapCategory === 'basic' && activeBasicMode === 'pm25'
           ? getPm25QualityText(value).text
-          : mapCategory === 'basic' && activeBasicMode === 'uv'
+          : isWeatherDataCategory && activeBasicMode === 'uv'
             ? getUvText(value)
             : '';
 
@@ -1388,7 +1404,7 @@ export default function MapPage() {
         period: activeTimeOption?.label || activeTimeKey,
         source: activeDataSourceMeta?.label || '',
         value,
-        unit: (mapCategory === 'basic' || mapCategory === 'rain' || mapCategory === 'yesterday' || mapCategory === 'gistda') ? (activeModeObj?.unit || '') : 'score',
+        unit: (isWeatherDataCategory || mapCategory === 'rain' || mapCategory === 'yesterday' || mapCategory === 'gistda') ? (activeModeObj?.unit || '') : 'score',
         status,
         latitude: st.lat ?? '',
         longitude: st.long ?? '',
@@ -1695,7 +1711,7 @@ export default function MapPage() {
                             style={{ background: active ? filter.color : cardBg, border: `1px solid ${active ? filter.color : borderColor}`, borderRadius: '999px', color: active ? '#fff' : subTextColor, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.66rem', fontWeight: 900, padding: '6px 9px', whiteSpace: 'nowrap' }}
                             title={`กรองข้อมูลย้อนหลัง: ${filter.label}`}
                           >
-                            {filter.icon} {filter.label}
+                            {filter.icon ? `${filter.icon} ` : ''}{filter.label}
                           </button>
                         );
                       })}
@@ -1862,7 +1878,7 @@ export default function MapPage() {
                     );
                   })()}
                 </svg>
-                <div style={{ fontSize: '0.6rem', color: subTextColor, marginTop: '4px', textAlign: 'right' }}>ย้อนหลัง 8 วัน</div>
+                <div style={{ fontSize: '0.6rem', color: subTextColor, marginTop: '4px', textAlign: 'right' }}>{mapCategory === 'forecast' ? 'พยากรณ์ 7 วัน' : 'ย้อนหลัง 8 วัน'}</div>
               </div>
 
               {/* Regional breakdown */}
@@ -1935,7 +1951,7 @@ export default function MapPage() {
                         }
 
                         if (!isVisible) return null;
-                        const windDir = (mapCategory === 'basic' && activeBasicMode === 'wind' && isNowMode)
+                        const windDir = (isWeatherDataCategory && activeBasicMode === 'wind' && isNowMode)
                             ? getWindDirection(stationTemps[st.stationID]?.windDir)
                             : null;
                         return <Marker key={st.stationID} position={[st.lat, st.long]} icon={createMapIcon(st.areaTH.replace('จังหวัด',''), st.displayVal, st.color, windDir)} interactive={false} />;
@@ -2195,7 +2211,7 @@ export default function MapPage() {
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
                             <div>
                               <div style={{ fontSize: '0.78rem', fontWeight: 900, color: textColor }}>🧰 เครื่องมือแยก</div>
-                              <div style={{ fontSize: '0.62rem', color: subTextColor, marginTop: '2px', lineHeight: 1.35 }}>สถิติย้อนหลัง อากาศล่าสุด และวิเคราะห์ความเสี่ยง</div>
+                              <div style={{ fontSize: '0.62rem', color: subTextColor, marginTop: '2px', lineHeight: 1.35 }}>ข้อมูลปัจจุบัน ย้อนหลังจริง และพยากรณ์</div>
                             </div>
                             <span style={{ flexShrink: 0, color: activeCategoryOption?.color, background: darkMode ? `${activeCategoryOption?.color}20` : `${activeCategoryOption?.color}12`, border: `1px solid ${activeCategoryOption?.color}35`, borderRadius: '999px', padding: '4px 9px', fontSize: '0.62rem', fontWeight: 900 }}>
                               {activeCategoryOption?.shortLabel}
@@ -2262,7 +2278,7 @@ export default function MapPage() {
                                       onClick={() => setHistoryFilter(filter.id)}
                                       style={{ padding: '8px 10px', borderRadius: '999px', border: `1px solid ${active ? filter.color : borderColor}`, background: active ? (darkMode ? `${filter.color}25` : `${filter.color}18`) : 'var(--bg-secondary)', color: active ? filter.color : textColor, fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.72rem', whiteSpace: 'nowrap', flexShrink: 0 }}
                                     >
-                                      {filter.icon} {filter.label}
+                                      {filter.icon ? `${filter.icon} ` : ''}{filter.label}
                                     </button>
                                   );
                                 })}
@@ -2333,7 +2349,7 @@ export default function MapPage() {
                       {activePanel === 'rank' && (
                         <div className="fade-in" style={{ position: 'fixed', bottom: mobilePanelBottom, left: '12px', right: '12px', zIndex: 2000, background: cardBg, borderRadius: '20px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.3)', maxHeight: '62vh', display: 'flex', flexDirection: 'column', padding: '16px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <h3 style={{ margin: 0, fontSize: '1rem', color: textColor }}>📍 {mapCategory === 'rain' ? 'อันดับย้อนหลังจริง' : mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด' : mapCategory === 'gistda' ? 'พื้นที่ดาวเทียม' : mapCategory === 'yesterday' ? 'สถิติเมื่อวาน' : 'อันดับสูงสุด'}</h3>
+                            <h3 style={{ margin: 0, fontSize: '1rem', color: textColor }}>📍 {mapCategory === 'rain' ? 'อันดับย้อนหลังจริง' : mapCategory === 'forecast' ? 'อันดับพยากรณ์' : mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด' : mapCategory === 'gistda' ? 'พื้นที่ดาวเทียม' : mapCategory === 'yesterday' ? 'สถิติเมื่อวาน' : 'อันดับสูงสุด'}</h3>
                             <button onClick={() => setActivePanel(null)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: textColor, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>✕</button>
                           </div>
                           <p style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: activeModeObj?.color, fontWeight: 'bold' }}>{activeModeObj?.desc}</p>
@@ -2361,7 +2377,7 @@ export default function MapPage() {
                                   {mapCategory === 'risk' && <div style={{ fontSize: '0.65rem', color: subTextColor, marginTop: '2px' }}>สถานะ: {getRiskLabel(st.displayVal)}</div>}
                                 </div>
                                 <div style={{ background: cardBg, padding: '4px 10px', borderRadius: '10px', textAlign: 'center', border: `1px solid ${borderColor}` }}>
-                                  <div style={{ fontSize: '1rem', fontWeight: '900', color: st.color }}>{st.displayVal} <span style={{ fontSize: '0.6rem', color: subTextColor, fontWeight: 'normal' }}>{mapCategory === 'basic' || mapCategory === 'rain' ? activeModeObj?.unit : ''}</span></div>
+                                  <div style={{ fontSize: '1rem', fontWeight: '900', color: st.color }}>{st.displayVal} <span style={{ fontSize: '0.6rem', color: subTextColor, fontWeight: 'normal' }}>{isWeatherDataCategory || mapCategory === 'rain' ? activeModeObj?.unit : ''}</span></div>
                                 </div>
                               </div>
                             ))}
@@ -2418,7 +2434,7 @@ export default function MapPage() {
           {!isMobile && (
             <div style={{ width: '280px', background: cardBg, borderRadius: '18px', padding: '12px', border: `1px solid ${borderColor}`, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', zIndex: 10, flexShrink: 0, minHeight: 0 }}>
                <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: textColor, display: 'flex', alignItems: 'center' }}>
-                  📍 {mapCategory === 'rain' ? 'ค่าย้อนหลังสูงสุด (Top 5)' : mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 5)' : mapCategory === 'gistda' ? 'พื้นที่ดาวเทียม (Top 5)' : mapCategory === 'yesterday' ? `สถิติเมื่อวาน ${getDateLabel(-1)}` : 'จังหวัดที่น่าสนใจ (Top 5)'}
+                  📍 {mapCategory === 'rain' ? 'ค่าย้อนหลังสูงสุด (Top 5)' : mapCategory === 'forecast' ? 'ค่าพยากรณ์สูงสุด (Top 5)' : mapCategory === 'risk' ? 'พื้นที่เสี่ยงสูงสุด (Top 5)' : mapCategory === 'gistda' ? 'พื้นที่ดาวเทียม (Top 5)' : mapCategory === 'yesterday' ? `สถิติเมื่อวาน ${getDateLabel(-1)}` : 'จังหวัดที่น่าสนใจ (Top 5)'}
                </h3>
                <p style={{ margin: '0 0 8px 0', fontSize: '0.68rem', color: activeModeObj?.color, fontWeight: 'bold', lineHeight: 1.35 }}>{activeModeObj?.desc}</p>
                {mapCategory === 'yesterday' && (
@@ -2455,7 +2471,7 @@ export default function MapPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ fontSize: '1.05rem', fontWeight: '900', color: textColor }}>จ.{st.areaTH.replace('จังหวัด', '')}</div>
                             <div style={{ fontSize: '1.45rem', fontWeight: '900', color: st.color }}>
-                                {st.displayVal} <span style={{fontSize:'0.8rem', color: subTextColor, fontWeight:'bold'}}>{mapCategory==='basic' || mapCategory==='rain' || mapCategory==='yesterday' || mapCategory==='gistda' ? activeModeObj?.unit : ''}</span>
+                                {st.displayVal} <span style={{fontSize:'0.8rem', color: subTextColor, fontWeight:'bold'}}>{isWeatherDataCategory || mapCategory==='rain' || mapCategory==='yesterday' || mapCategory==='gistda' ? activeModeObj?.unit : ''}</span>
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
