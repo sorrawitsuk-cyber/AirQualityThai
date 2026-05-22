@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
   BarChart3,
   CloudRain,
   Database,
+  FileText,
   Droplets,
   Gauge,
   MapPin,
+  Printer,
   RefreshCw,
   Sparkles,
   ThermometerSun,
@@ -366,8 +368,201 @@ function getGistdaStats(summary) {
     .slice(0, 4);
 }
 
+const cleanProvinceName = (value = '') => String(value).replace(/^จังหวัด/, '').trim();
+const metricAverage = (rows = [], key) => {
+  const values = rows.map((row) => Number(row?.[key])).filter(Number.isFinite);
+  return values.length ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10 : 0;
+};
+const metricSum = (rows = [], key) => Math.round(rows.reduce((sum, row) => sum + (Number(row?.[key]) || 0), 0) * 10) / 10;
+const latestSeriesValue = (series = [], offsetFromEnd = 0) => {
+  const index = series.length - 1 - offsetFromEnd;
+  const value = Number(series[index]);
+  return Number.isFinite(value) ? value : null;
+};
+
+function buildHistoryAnalytics(historyWeather) {
+  const rows = Object.values(historyWeather?.byProvince || {})
+    .map((item) => ({
+      ...item,
+      name: cleanProvinceName(item.province || item.provinceKey),
+      rain30d: Number(item.rain30d) || 0,
+      rain90d: Number(item.rain90d) || 0,
+      rainYtd: Number(item.rainYtd) || 0,
+      wetDays30d: Number(item.wetDays30d) || 0,
+      dryDays30d: Number(item.dryDays30d) || 0,
+      maxDailyRain30d: Number(item.maxDailyRain30d) || 0,
+      tempMax30d: Number(item.tempMax30d) || 0,
+      tempMin30d: Number(item.tempMin30d) || 0,
+      tempAvg30d: Number(item.tempAvg30d) || 0,
+      heatMax30d: Number(item.heatMax30d) || 0,
+      hotDays30d: Number(item.hotDays30d) || 0,
+      heatRiskDays30d: Number(item.heatRiskDays30d) || 0,
+      windMax30d: Number(item.windMax30d) || 0,
+      windyDays30d: Number(item.windyDays30d) || 0,
+    }))
+    .filter((row) => row.name);
+
+  const sortBy = (key, direction = 'desc') => [...rows]
+    .filter((row) => Number.isFinite(Number(row[key])))
+    .sort((a, b) => direction === 'asc' ? Number(a[key]) - Number(b[key]) : Number(b[key]) - Number(a[key]));
+
+  const topRain = sortBy('rain30d')[0];
+  const topHeat = sortBy('tempMax30d')[0];
+  const topWind = sortBy('windMax30d')[0];
+  const driest = sortBy('rain30d', 'asc')[0];
+  const mostDryDays = sortBy('dryDays30d')[0];
+  const heatRiskCount = rows.filter((row) => row.heatRiskDays30d >= 3).length;
+  const heavyRainCount = rows.filter((row) => row.rain30d >= 180 || row.maxDailyRain30d >= 50).length;
+  const windyAreaCount = rows.filter((row) => row.windMax30d >= 35 || row.windyDays30d >= 7).length;
+
+  const dates = rows.find((row) => row.dates?.length)?.dates || [];
+  const trendRows = dates.slice(-30).map((date, idx, arr) => {
+    const offset = arr.length - 1 - idx;
+    const rainValues = rows.map((row) => latestSeriesValue(row.rainDaily, offset)).filter(Number.isFinite);
+    const tempValues = rows.map((row) => latestSeriesValue(row.tempMaxDaily, offset)).filter(Number.isFinite);
+    const windValues = rows.map((row) => latestSeriesValue(row.windMaxDaily, offset)).filter(Number.isFinite);
+    return {
+      date: new Date(date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' }),
+      rain: rainValues.length ? Math.round((rainValues.reduce((sum, value) => sum + value, 0) / rainValues.length) * 10) / 10 : 0,
+      temp: tempValues.length ? Math.round((tempValues.reduce((sum, value) => sum + value, 0) / tempValues.length) * 10) / 10 : 0,
+      wind: windValues.length ? Math.round((windValues.reduce((sum, value) => sum + value, 0) / windValues.length) * 10) / 10 : 0,
+    };
+  });
+
+  const insights = [
+    topRain ? `ฝนสะสม 30 วันสูงสุดอยู่ที่ ${topRain.name} ${topRain.rain30d.toLocaleString('th-TH')} มม. และวันที่ฝนหนักสุดแตะ ${topRain.maxDailyRain30d} มม.` : 'ยังไม่มีข้อมูลฝนย้อนหลังเพียงพอ',
+    driest ? `พื้นที่แห้งที่สุดจากฝนสะสม 30 วันคือ ${driest.name} ${driest.rain30d} มม. โดยมีวันแล้ง ${driest.dryDays30d} วัน` : 'ยังไม่มีข้อมูลพื้นที่แห้ง',
+    topHeat ? `อุณหภูมิสูงสุดย้อนหลัง 30 วันเด่นที่ ${topHeat.name} ${topHeat.tempMax30d}°C และดัชนีร้อนสูงสุด ${topHeat.heatMax30d}°C` : 'ยังไม่มีข้อมูลอุณหภูมิย้อนหลัง',
+    topWind ? `ลมแรงสุดย้อนหลัง 30 วันพบที่ ${topWind.name} ${topWind.windMax30d} กม./ชม. มีวันลมแรง ${topWind.windyDays30d} วัน` : 'ยังไม่มีข้อมูลลมย้อนหลัง',
+  ];
+
+  return {
+    rows,
+    trendRows,
+    period: historyWeather?.period,
+    source: historyWeather?.source || 'Open-Meteo Historical Weather API (ERA5)',
+    updatedAt: historyWeather?.updatedAt,
+    cacheStatus: historyWeather?.cacheStatus,
+    warning: historyWeather?.warning,
+    summary: {
+      provinceCount: rows.length,
+      avgRain30d: metricAverage(rows, 'rain30d'),
+      totalRain30d: metricSum(rows, 'rain30d'),
+      avgTempMax30d: metricAverage(rows, 'tempMax30d'),
+      avgHeatMax30d: metricAverage(rows, 'heatMax30d'),
+      avgWindMax30d: metricAverage(rows, 'windMax30d'),
+      avgWetDays30d: metricAverage(rows, 'wetDays30d'),
+      heatRiskCount,
+      heavyRainCount,
+      windyAreaCount,
+    },
+    rankings: {
+      rain: sortBy('rain30d').slice(0, 8),
+      dry: sortBy('dryDays30d').slice(0, 8),
+      heat: sortBy('tempMax30d').slice(0, 8),
+      cool: sortBy('tempMin30d', 'asc').slice(0, 8),
+      wind: sortBy('windMax30d').slice(0, 8),
+    },
+    topRain,
+    topHeat,
+    topWind,
+    driest,
+    mostDryDays,
+    insights,
+  };
+}
+
+function HistoryRankTable({ title, rows = [], metricKey, unit, color }) {
+  return (
+    <Panel style={{ padding: 14 }}>
+      <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ color: 'var(--text-main)', fontSize: '0.83rem', fontWeight: 950 }}>{title}</div>
+        <BarChart3 color={color} size={17} />
+      </div>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {rows.slice(0, 5).map((row, index) => (
+          <div key={`${title}-${row.name}`} style={{ alignItems: 'center', display: 'grid', gap: 8, gridTemplateColumns: '26px 1fr auto' }}>
+            <div style={{ alignItems: 'center', background: `${color}13`, borderRadius: 9, color, display: 'flex', fontSize: '0.7rem', fontWeight: 950, height: 26, justifyContent: 'center' }}>{index + 1}</div>
+            <div style={{ color: 'var(--text-main)', fontSize: '0.75rem', fontWeight: 850, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</div>
+            <div style={{ color, fontSize: '0.78rem', fontWeight: 950 }}>{Number(row[metricKey] || 0).toLocaleString('th-TH')}{unit}</div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function HistoryReportModal({ analytics, darkMode, onClose }) {
+  const generatedAt = new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  const periodText = `${analytics.period?.startDate || '-'} ถึง ${analytics.period?.endDate || '-'}`;
+  return (
+    <div role="dialog" aria-modal="true" aria-label="รายงานสถิติย้อนหลังจริง" style={{ alignItems: 'center', background: 'rgba(2,6,23,0.72)', backdropFilter: 'blur(8px)', display: 'flex', inset: 0, justifyContent: 'center', padding: 20, position: 'fixed', zIndex: 12000 }} onClick={onClose}>
+      <div className="stats-report-print custom-scrollbar" style={{ background: darkMode ? '#0f172a' : '#ffffff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.28)' : 'rgba(15,23,42,0.12)'}`, borderRadius: 24, boxShadow: '0 30px 90px rgba(0,0,0,0.42)', color: darkMode ? '#e5eefb' : '#0f172a', maxHeight: '92vh', maxWidth: 1100, overflowY: 'auto', width: '100%' }} onClick={(event) => event.stopPropagation()}>
+        <div className="stats-report-actions" style={{ alignItems: 'center', borderBottom: `1px solid ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.1)'}`, display: 'flex', justifyContent: 'space-between', padding: '12px 16px', position: 'sticky', top: 0, zIndex: 3, background: darkMode ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.95)' }}>
+          <strong>รายงานสถิติย้อนหลังจริง</strong>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => window.print()} style={{ alignItems: 'center', background: '#2563eb', border: 0, borderRadius: 999, color: '#fff', cursor: 'pointer', display: 'flex', fontWeight: 900, gap: 7, padding: '9px 13px' }}><Printer size={15} /> พิมพ์ / PDF</button>
+            <button onClick={onClose} style={{ background: darkMode ? '#111827' : '#fff', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.3)' : 'rgba(15,23,42,0.14)'}`, borderRadius: 999, color: darkMode ? '#e5eefb' : '#0f172a', cursor: 'pointer', fontWeight: 950, height: 38, width: 38 }}>×</button>
+          </div>
+        </div>
+        <div style={{ padding: 24 }}>
+          <div style={{ color: '#2563eb', fontSize: '0.78rem', fontWeight: 950 }}>Open-Meteo Historical Weather API (ERA5)</div>
+          <h1 style={{ fontSize: '1.8rem', lineHeight: 1.2, margin: '6px 0 8px' }}>รายงานวิเคราะห์สถิติย้อนหลังจริง</h1>
+          <div style={{ color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.82rem', fontWeight: 800 }}>ช่วงข้อมูล {periodText} · สร้างรายงาน {generatedAt} · {analytics.summary.provinceCount} จังหวัด</div>
+
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', marginTop: 18 }}>
+            {[
+              ['ฝนเฉลี่ย 30 วัน', `${analytics.summary.avgRain30d} มม.`],
+              ['อุณหภูมิสูงสุดเฉลี่ย', `${analytics.summary.avgTempMax30d}°C`],
+              ['ลมแรงสุดเฉลี่ย', `${analytics.summary.avgWindMax30d} กม./ชม.`],
+              ['พื้นที่ฝนหนัก', `${analytics.summary.heavyRainCount} จังหวัด`],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: darkMode ? '#111827' : '#f8fafc', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.22)' : 'rgba(15,23,42,0.08)'}`, borderRadius: 16, padding: 14 }}>
+                <div style={{ color: darkMode ? '#94a3b8' : '#64748b', fontSize: '0.72rem', fontWeight: 900 }}>{label}</div>
+                <div style={{ color: '#2563eb', fontSize: '1.45rem', fontWeight: 950, marginTop: 5 }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          <section style={{ marginTop: 18 }}>
+            <h2 style={{ fontSize: '1.05rem', margin: '0 0 10px' }}>ข้อสรุปวิเคราะห์</h2>
+            <div style={{ display: 'grid', gap: 9 }}>
+              {analytics.insights.map((insight) => (
+                <div key={insight} style={{ background: darkMode ? '#111827' : '#f8fafc', borderLeft: '4px solid #2563eb', borderRadius: 12, fontSize: '0.86rem', fontWeight: 800, lineHeight: 1.55, padding: '10px 12px' }}>{insight}</div>
+              ))}
+            </div>
+          </section>
+
+          <section style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', marginTop: 18 }}>
+            {[
+              ['ฝนสะสม 30 วันสูงสุด', analytics.rankings.rain, 'rain30d', ' มม.'],
+              ['พื้นที่แห้งต่อเนื่อง', analytics.rankings.dry, 'dryDays30d', ' วัน'],
+              ['อุณหภูมิสูงสุดย้อนหลัง', analytics.rankings.heat, 'tempMax30d', '°C'],
+              ['ลมแรงสุดย้อนหลัง', analytics.rankings.wind, 'windMax30d', ' กม./ชม.'],
+            ].map(([title, rows, key, unit]) => (
+              <div key={title} style={{ background: darkMode ? '#111827' : '#f8fafc', border: `1px solid ${darkMode ? 'rgba(148,163,184,0.22)' : 'rgba(15,23,42,0.08)'}`, borderRadius: 16, padding: 14 }}>
+                <h3 style={{ fontSize: '0.92rem', margin: '0 0 10px' }}>{title}</h3>
+                {rows.slice(0, 6).map((row, index) => (
+                  <div key={`${title}-${row.name}`} style={{ alignItems: 'center', borderTop: index ? `1px solid ${darkMode ? 'rgba(148,163,184,0.14)' : 'rgba(15,23,42,0.08)'}` : 'none', display: 'flex', justifyContent: 'space-between', padding: '7px 0' }}>
+                    <span>{index + 1}. {row.name}</span>
+                    <strong style={{ color: '#2563eb' }}>{Number(row[key] || 0).toLocaleString('th-TH')}{unit}</strong>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AIPage() {
   const [activeMetric, setActiveMetric] = useState('risk');
+  const [historyWeather, setHistoryWeather] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [showHistoryReport, setShowHistoryReport] = useState(false);
   const {
     isMobile,
     weatherData,
@@ -380,10 +575,32 @@ export default function AIPage() {
     gistdaSummary,
     lastUpdated,
     tmdAvailable,
+    darkMode,
     stationRows,
     rankings,
     national,
   } = useAIPageData();
+
+  useEffect(() => {
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError('');
+    fetch('/api/weather-history', { cache: 'no-store' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`History API ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setHistoryWeather(data);
+      })
+      .catch((error) => {
+        if (!cancelled) setHistoryError(error.message || 'โหลดข้อมูลย้อนหลังจริงไม่สำเร็จ');
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const areaRankingRows = useMemo(() => {
     const config = areaMetricOptions.find((item) => item.id === activeMetric) || areaMetricOptions[0];
@@ -461,6 +678,7 @@ export default function AIPage() {
   }, [stationRows, weatherData]);
 
   const gistdaStats = useMemo(() => getGistdaStats(gistdaSummary), [gistdaSummary]);
+  const historyAnalytics = useMemo(() => buildHistoryAnalytics(historyWeather), [historyWeather]);
 
   if (loadingWeather || !weatherData || !dashboardData) {
     return (
@@ -551,6 +769,26 @@ export default function AIPage() {
         minHeight: '100%',
       }}
     >
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          .stats-report-print, .stats-report-print * { visibility: visible !important; }
+          .stats-report-print {
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            left: 0 !important;
+            max-height: none !important;
+            max-width: none !important;
+            overflow: visible !important;
+            position: absolute !important;
+            top: 0 !important;
+            width: 100% !important;
+          }
+          .stats-report-actions { display: none !important; }
+          @page { size: A4 landscape; margin: 10mm; }
+        }
+      `}</style>
       <div style={{ margin: '0 auto', maxWidth: isMobile ? 960 : 1380, padding: isMobile ? '14px' : '22px' }}>
         <header
           style={{
@@ -588,6 +826,105 @@ export default function AIPage() {
         </header>
 
         <SignalGrid items={insightSignals} isMobile={isMobile} />
+
+        <section style={{ marginBottom: 12 }}>
+          <PanelHeader
+            icon={Database}
+            title="สถิติย้อนหลังจริงและการวิเคราะห์"
+            subtitle={
+              historyLoading
+                ? 'กำลังโหลดข้อมูลย้อนหลังจริงจาก Open-Meteo Archive'
+                : historyError
+                  ? `โหลดข้อมูลย้อนหลังจริงไม่สำเร็จ: ${historyError}`
+                  : `ค่าจริงจาก ${historyAnalytics.period?.startDate || '-'} ถึง ${historyAnalytics.period?.endDate || '-'} · ${historyAnalytics.summary.provinceCount} จังหวัด`
+            }
+            action={
+              <button
+                type="button"
+                onClick={() => setShowHistoryReport(true)}
+                disabled={!historyAnalytics.rows.length}
+                title="เปิดรายงานสถิติย้อนหลังจริง"
+                style={{
+                  alignItems: 'center',
+                  background: historyAnalytics.rows.length ? '#2563eb' : 'var(--bg-secondary)',
+                  border: `1px solid ${historyAnalytics.rows.length ? '#2563eb' : 'var(--border-color)'}`,
+                  borderRadius: 999,
+                  color: historyAnalytics.rows.length ? '#fff' : 'var(--text-sub)',
+                  cursor: historyAnalytics.rows.length ? 'pointer' : 'default',
+                  display: 'flex',
+                  fontSize: '0.76rem',
+                  fontWeight: 900,
+                  gap: 7,
+                  padding: '9px 13px',
+                }}
+              >
+                <FileText size={15} /> รายงาน
+              </button>
+            }
+          />
+
+          {historyLoading ? (
+            <div style={{ alignItems: 'center', color: 'var(--text-sub)', display: 'flex', fontSize: '0.85rem', fontWeight: 800, gap: 10, minHeight: 160 }}>
+              <div className="loading-spinner" style={{ height: 24, width: 24 }} />
+              กำลังรวบรวมฝน อุณหภูมิ และลมย้อนหลังจริง
+            </div>
+          ) : historyAnalytics.rows.length ? (
+            <>
+              <section style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', marginBottom: 12 }}>
+                <StatCard icon={CloudRain} label="ฝนเฉลี่ย 30 วัน" value={historyAnalytics.summary.avgRain30d} unit="มม." note={`${historyAnalytics.summary.heavyRainCount} จังหวัดฝนสะสม/ฝนหนักเด่น`} color="#2563eb" compact percent={clamp((historyAnalytics.summary.avgRain30d / 250) * 100)} />
+                <StatCard icon={ThermometerSun} label="ร้อนสุดเฉลี่ย 30 วัน" value={historyAnalytics.summary.avgTempMax30d} unit="°C" note={`${historyAnalytics.summary.heatRiskCount} จังหวัดมีวันดัชนีร้อนสูง`} color="#ef4444" compact percent={clamp((historyAnalytics.summary.avgTempMax30d / 42) * 100)} />
+                <StatCard icon={Wind} label="ลมแรงสุดเฉลี่ย" value={historyAnalytics.summary.avgWindMax30d} unit="กม./ชม." note={`${historyAnalytics.summary.windyAreaCount} จังหวัดลมแรงเด่น`} color="#0f766e" compact percent={clamp((historyAnalytics.summary.avgWindMax30d / 55) * 100)} />
+                <StatCard icon={Droplets} label="วันที่มีฝนเฉลี่ย" value={historyAnalytics.summary.avgWetDays30d} unit="วัน" note="จำนวนวันที่ฝนอย่างน้อย 1 มม. ในรอบ 30 วัน" color="#14b8a6" compact percent={clamp((historyAnalytics.summary.avgWetDays30d / 30) * 100)} />
+              </section>
+
+              <section style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.35fr) minmax(320px, 0.65fr)', marginBottom: 12 }}>
+                <Panel style={{ background: 'var(--bg-secondary)', boxShadow: 'none', minHeight: 340 }}>
+                  <PanelHeader icon={BarChart3} title="แนวโน้มย้อนหลังจริง 30 วัน" subtitle="ค่าเฉลี่ยประเทศของฝนรายวัน อุณหภูมิสูงสุด และลมแรงสุดจาก archive" />
+                  <div style={{ height: 270 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={historyAnalytics.trendRows} margin={{ bottom: 0, left: -18, right: 12, top: 12 }}>
+                        <CartesianGrid stroke="var(--border-color)" strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="date" tick={chartText} tickLine={false} axisLine={false} minTickGap={18} />
+                        <YAxis tick={chartText} tickLine={false} axisLine={false} />
+                        <Tooltip content={<TooltipBox />} />
+                        <Line dataKey="rain" name="ฝนเฉลี่ย มม." type="monotone" stroke="#2563eb" strokeWidth={3} dot={false} />
+                        <Line dataKey="temp" name="อุณหภูมิสูงสุด °C" type="monotone" stroke="#ef4444" strokeWidth={3} dot={false} />
+                        <Line dataKey="wind" name="ลมแรงสุด กม./ชม." type="monotone" stroke="#0f766e" strokeWidth={3} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
+
+                <Panel style={{ background: 'var(--bg-secondary)', boxShadow: 'none' }}>
+                  <PanelHeader icon={Sparkles} title="ข้อสรุปเชิงวิเคราะห์" subtitle="อ่านเร็วจากข้อมูลย้อนหลังจริง ไม่ใช่ค่าพยากรณ์" />
+                  <div style={{ display: 'grid', gap: 9 }}>
+                    {historyAnalytics.insights.map((insight) => (
+                      <div key={insight} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderLeft: '4px solid #2563eb', borderRadius: 12, color: 'var(--text-main)', fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.55, padding: '10px 12px' }}>
+                        {insight}
+                      </div>
+                    ))}
+                  </div>
+                  {historyAnalytics.warning && (
+                    <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 12, color: '#b45309', fontSize: '0.72rem', fontWeight: 850, lineHeight: 1.45, marginTop: 10, padding: 10 }}>
+                      ใช้ cache เก่า: {historyAnalytics.warning}
+                    </div>
+                  )}
+                </Panel>
+              </section>
+
+              <section style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))' }}>
+                <HistoryRankTable title="ฝนสะสมสูงสุด" rows={historyAnalytics.rankings.rain} metricKey="rain30d" unit=" มม." color="#2563eb" />
+                <HistoryRankTable title="แห้งต่อเนื่อง" rows={historyAnalytics.rankings.dry} metricKey="dryDays30d" unit=" วัน" color="#f59e0b" />
+                <HistoryRankTable title="ร้อนสุดย้อนหลัง" rows={historyAnalytics.rankings.heat} metricKey="tempMax30d" unit="°C" color="#ef4444" />
+                <HistoryRankTable title="ลมแรงสุด" rows={historyAnalytics.rankings.wind} metricKey="windMax30d" unit=" กม./ชม." color="#0f766e" />
+              </section>
+            </>
+          ) : (
+            <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.24)', borderRadius: 16, color: '#b45309', fontSize: '0.84rem', fontWeight: 850, lineHeight: 1.55, padding: 16 }}>
+              ยังไม่มีข้อมูลย้อนหลังจริงสำหรับวิเคราะห์ หาก API archive พร้อมใช้งาน ระบบจะแสดงผลอัตโนมัติ
+            </div>
+          )}
+        </section>
 
         <section style={{ display: 'grid', gap: 12, gridTemplateColumns: grid4, marginBottom: 12 }}>
           <StatCard icon={ThermometerSun} label="ความร้อนรู้สึกจริง" value={feelsLike} unit="°C" note={heat.label} color={heat.color} percent={clamp((feelsLike / 45) * 100)} />
@@ -818,6 +1155,10 @@ export default function AIPage() {
           วิเคราะห์จากตำแหน่งปัจจุบันหรือกรุงเทพมหานครเมื่อไม่สามารถเข้าถึง GPS
         </footer>
       </div>
+
+      {showHistoryReport && historyAnalytics.rows.length > 0 && (
+        <HistoryReportModal analytics={historyAnalytics} darkMode={darkMode} onClose={() => setShowHistoryReport(false)} />
+      )}
     </main>
   );
 }

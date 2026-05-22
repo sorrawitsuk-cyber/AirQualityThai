@@ -47,6 +47,7 @@ export function useAIPageData() {
     gistdaSummary,
     lastUpdated,
     tmdAvailable,
+    darkMode,
   } = useContext(WeatherContext);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const { weatherData, loadingWeather, fetchWeatherByCoords } = useWeatherData();
@@ -153,6 +154,6 @@ export function useAIPageData() {
 
   return {
     isMobile, weatherData, loadingWeather, windAnalysis, windLoading, windError, windLastFetch, fetchWindAnalysis,
-    gistdaSummary, lastUpdated, tmdAvailable, stationRows, rankings, national,
+    gistdaSummary, lastUpdated, tmdAvailable, darkMode, stationRows, rankings, national,
   };
 }
