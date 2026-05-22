@@ -95,6 +95,17 @@ const REGION_GROUPS = {
   'ใต้': ['นครศรีธรรมราช','สุราษฎร์ธานี','กระบี่','พังงา','ภูเก็ต','ตรัง','พัทลุง','สตูล','สงขลา','ปัตตานี','ยะลา','นราธิวาส','ระนอง','ชุมพร'],
 };
 
+const WINDY_MODES = [
+  { id: 'radar', label: 'เรดาร์ฝน', overlay: 'radar', product: 'radar', color: '#2563eb', icon: '🌧️', note: 'ดูฝนจริง/กลุ่มฝนใกล้เวลา' },
+  { id: 'rain', label: 'ฝนพยากรณ์', overlay: 'rain', product: 'ecmwf', color: '#0ea5e9', icon: '☔', note: 'แนวโน้มฝนจากแบบจำลอง' },
+  { id: 'wind', label: 'ลม', overlay: 'wind', product: 'ecmwf', color: '#0f766e', icon: '🌬️', note: 'ทิศทางและความเร็วลมผิวพื้น' },
+  { id: 'gust', label: 'ลมกระโชก', overlay: 'gust', product: 'ecmwf', color: '#f97316', icon: '💨', note: 'จุดเสี่ยงลมแรงฉับพลัน' },
+  { id: 'temp', label: 'อุณหภูมิ', overlay: 'temp', product: 'ecmwf', color: '#ef4444', icon: '🌡️', note: 'ความร้อนและแนวปะทะอากาศ' },
+  { id: 'clouds', label: 'เมฆ', overlay: 'clouds', product: 'ecmwf', color: '#64748b', icon: '☁️', note: 'เมฆปกคลุมและการก่อตัว' },
+  { id: 'pm2p5', label: 'PM2.5', overlay: 'pm2p5', product: 'cams', color: '#7c3aed', icon: '😷', note: 'ฝุ่นละอองขนาดเล็ก' },
+  { id: 'thunder', label: 'ฟ้าคะนอง', overlay: 'thunder', product: 'ecmwf', color: '#eab308', icon: '⚡', note: 'โซนเสี่ยงฟ้าคะนอง' },
+];
+
 const getProvinceKey = (stationOrName = '') => {
     const raw = typeof stationOrName === 'string'
         ? stationOrName
@@ -145,7 +156,9 @@ export default function MapPage() {
   const [basemapStyle, setBasemapStyle] = useState('dark'); 
   const [flyToPos, setFlyToPos] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
-  const [activePanel, setActivePanel] = useState(null); // 'legend' | 'filter' | 'category' | 'layer' | 'time' | 'rank'
+  const [activePanel, setActivePanel] = useState(null); // 'legend' | 'filter' | 'category' | 'layer' | 'time' | 'rank' | 'windy'
+  const [showWindyMap, setShowWindyMap] = useState(false);
+  const [activeWindyMode, setActiveWindyMode] = useState('radar');
 
 
   const [flashProv, setFlashProv] = useState(null);
@@ -1227,11 +1240,12 @@ export default function MapPage() {
   const secondaryToolOptions = mapCategoryOptions;
 
   const activeCategoryOption = mapCategoryOptions.find(opt => opt.id === mapCategory);
+  const nowDataTimeText = getLastUpdatedText();
   const activeDataSourceMeta = mapCategory === 'rain'
     ? { label: 'Archive', icon: '📈', color: '#2563eb', detail: historyLoading ? 'กำลังโหลดสถิติย้อนหลังจริง' : historyError ? 'รอข้อมูลย้อนหลังจาก archive' : `Open-Meteo Archive ถึง ${historyWeather?.period?.endDate || getDateLabel(-(historyWeather?.period?.archiveLagDays || 5))}` }
     : mapCategory === 'basic'
     ? (timeMode === 'now'
-        ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: 'AIR4Thai + TMD อัปเดตล่าสุด' }
+        ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: `ข้อมูลตอนนี้ ${nowDataTimeText} จาก AIR4Thai${tmdAvailable ? ' + TMD' : ''}` }
         : timeMode === 'today'
           ? { label: 'วันนี้', icon: '📅', color: '#0ea5e9', detail: 'ภาพรวมรายวันของวันนี้' }
           : { label: 'พยากรณ์', icon: '🔮', color: '#a855f7', detail: 'TMD คาดการณ์รายวัน' })
@@ -1244,10 +1258,11 @@ export default function MapPage() {
       : mapCategory === 'yesterday'
         ? { label: 'ย้อนหลัง', icon: '🕘', color: '#f59e0b', detail: 'ค่าที่เกิดขึ้นจริงของเมื่อวาน' }
         : { label: 'ดาวเทียม', icon: '🛰️', color: '#ef4444', detail: 'ข้อมูล GISTDA ล่าสุด' };
+  const shouldShowSeparateUpdatedTime = !(mapCategory === 'basic' && timeMode === 'now');
 
   const timeHelperText = mapCategory === 'basic'
     ? (timeMode === 'now'
-        ? 'Now = ใช้ค่าล่าสุดที่ระบบมีอยู่ในขณะนี้'
+        ? `Now = ใช้ค่าล่าสุดที่ระบบมีอยู่ในขณะนี้ เวลา ${nowDataTimeText}`
         : timeMode === 'today'
           ? 'ภาพรวมวันนี้ = ใช้ค่าสรุปรายวันของวันนี้'
           : 'พรุ่งนี้ = ค่าพยากรณ์รายวันของวันถัดไป')
@@ -1260,7 +1275,7 @@ export default function MapPage() {
       title: 'Now',
       helper: 'ข้อมูลล่าสุด ณ ตอนนี้',
       options: [
-        { id: 'now', label: `🟢 Now ${getDateLabel(0)}`, sub: 'ค่าล่าสุด', color: '#22c55e' },
+        { id: 'now', label: `🟢 ตอนนี้ ${getDateLabel(0)}`, sub: nowDataTimeText, color: '#22c55e' },
       ],
     },
     {
@@ -1434,6 +1449,97 @@ export default function MapPage() {
     downloadTextFile(`thaiweather-map-${mapCategory}-${activeModeId}-${activeTimeKey}-${dateKey}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
   };
 
+  const activeWindyModeObj = WINDY_MODES.find(mode => mode.id === activeWindyMode) || WINDY_MODES[0];
+  const windyLat = flyToPos?.pos?.[0] || 13.5;
+  const windyLon = flyToPos?.pos?.[1] || 100.5;
+  const windyEmbedUrl = `https://embed.windy.com/embed.html?${new URLSearchParams({
+    lat: String(windyLat),
+    lon: String(windyLon),
+    detailLat: String(windyLat),
+    detailLon: String(windyLon),
+    width: '650',
+    height: '450',
+    zoom: '5',
+    level: 'surface',
+    overlay: activeWindyModeObj.overlay,
+    product: activeWindyModeObj.product,
+    menu: '',
+    message: '',
+    marker: '',
+    calendar: 'now',
+    pressure: '',
+    type: 'map',
+    location: 'coordinates',
+    detail: '',
+    metricWind: 'km/h',
+    metricTemp: '°C',
+    metricRain: 'mm',
+  }).toString()}`;
+
+  const renderWindyPanel = (floating = false) => (
+    <div
+      className="fade-in"
+      style={{
+        background: cardBg,
+        border: `1px solid ${borderColor}`,
+        borderRadius: floating ? '18px' : '16px',
+        boxShadow: floating ? '0 18px 42px rgba(0,0,0,0.3)' : '0 10px 26px rgba(15,23,42,0.08)',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        overflow: 'hidden',
+        ...(floating
+          ? { position: 'fixed', left: '12px', right: '12px', bottom: mobilePanelBottom, height: '58vh', zIndex: 1004 }
+          : { height: 300, flexShrink: 0 }),
+      }}
+    >
+      <div style={{ alignItems: 'center', display: 'flex', gap: '10px', justifyContent: 'space-between', padding: '10px 12px', borderBottom: `1px solid ${borderColor}` }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ alignItems: 'center', color: activeWindyModeObj.color, display: 'flex', fontSize: '0.8rem', fontWeight: 950, gap: '7px' }}>
+            <span>{activeWindyModeObj.icon}</span>
+            Windy · {activeWindyModeObj.label}
+          </div>
+          <div style={{ color: subTextColor, fontSize: '0.64rem', fontWeight: 750, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            ใช้ดูประกอบกับแผนที่หลัก ไม่แทนข้อมูลสถานีในระบบ
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => (floating ? setActivePanel(null) : setShowWindyMap(false))}
+          aria-label="ปิดแผนที่ Windy"
+          style={{ background: 'var(--bg-secondary)', border: `1px solid ${borderColor}`, borderRadius: '999px', color: textColor, cursor: 'pointer', flexShrink: 0, fontWeight: 950, height: 30, width: 30 }}
+        >
+          ×
+        </button>
+      </div>
+      <div className="hide-scrollbar" style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '8px 10px', borderBottom: `1px solid ${borderColor}` }}>
+        {WINDY_MODES.map(mode => {
+          const active = activeWindyMode === mode.id;
+          return (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => setActiveWindyMode(mode.id)}
+              title={mode.note}
+              style={{ alignItems: 'center', background: active ? mode.color : 'var(--bg-secondary)', border: `1px solid ${active ? mode.color : borderColor}`, borderRadius: '999px', color: active ? '#fff' : textColor, cursor: 'pointer', display: 'inline-flex', flexShrink: 0, fontFamily: 'Kanit', fontSize: '0.7rem', fontWeight: 900, gap: '5px', padding: '7px 10px', whiteSpace: 'nowrap' }}
+            >
+              <span>{mode.icon}</span>
+              {mode.label}
+            </button>
+          );
+        })}
+      </div>
+      <iframe
+        key={windyEmbedUrl}
+        title={`Windy ${activeWindyModeObj.label}`}
+        src={windyEmbedUrl}
+        style={{ border: 0, flex: 1, minHeight: 0, width: '100%' }}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+      />
+    </div>
+  );
+
   const mobileDockButtons = [
     {
       id: 'layer',
@@ -1465,6 +1571,14 @@ export default function MapPage() {
       label: 'อันดับ',
       value: 'จังหวัด',
       color: '#f97316',
+      disabled: false,
+    },
+    {
+      id: 'windy',
+      icon: '🌀',
+      label: 'Windy',
+      value: activeWindyModeObj.label,
+      color: activeWindyModeObj.color,
       disabled: false,
     }
   ];
@@ -1510,7 +1624,7 @@ export default function MapPage() {
                     </span>
                   </div>
                   <div style={{ color: subTextColor, fontSize: '0.68rem', fontWeight: 800, lineHeight: 1.4, marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activeDataSourceMeta.detail} • อัปเดตล่าสุด {getLastUpdatedText()}
+                    {activeDataSourceMeta.detail}{shouldShowSeparateUpdatedTime ? ` • อัปเดตล่าสุด ${getLastUpdatedText()}` : ''}
                   </div>
                 </div>
               </div>
@@ -1519,6 +1633,7 @@ export default function MapPage() {
                 {mapCategory === 'risk' && (
                   <button onClick={() => setShowReferenceModal(true)} style={{ background: 'var(--bg-secondary)', color: '#8b5cf6', border: '1px solid #8b5cf6', padding: '8px 12px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '6px' }}>📚 อ้างอิง</button>
                 )}
+                <button onClick={() => setShowWindyMap((value) => !value)} title="เปิด/ปิดแผนที่ Windy" style={{ background: showWindyMap ? activeWindyModeObj.color : 'var(--bg-secondary)', color: showWindyMap ? '#fff' : activeWindyModeObj.color, border: `1px solid ${showWindyMap ? activeWindyModeObj.color : `${activeWindyModeObj.color}55`}`, padding: '8px 12px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '6px' }}>🌀 Windy</button>
                 <button onClick={() => setShowReportModal(true)} disabled={!reportRows.length} title="เปิดรายงานอินโฟกราฟิก" style={{ background: reportRows.length ? (activeModeObj?.color || '#2563eb') : 'var(--bg-secondary)', color: reportRows.length ? '#fff' : subTextColor, border: `1px solid ${reportRows.length ? (activeModeObj?.color || '#2563eb') : borderColor}`, padding: '8px 12px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 900, cursor: reportRows.length ? 'pointer' : 'default', fontFamily: 'Kanit', display: 'flex', alignItems: 'center', gap: '6px', opacity: reportRows.length ? 1 : 0.55 }}>🧾 รายงาน</button>
                 <button onClick={handleExportCsv} disabled={!exportRows.length} title="ดาวน์โหลด CSV" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? '#0ea5e9' : subTextColor, border: `1px solid ${borderColor}`, padding: '8px 11px', borderRadius: '12px', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.72rem', fontWeight: 900, fontFamily: 'Kanit', opacity: exportRows.length ? 1 : 0.5 }}>CSV</button>
                 <button onClick={handleExportJson} disabled={!exportRows.length} title="ดาวน์โหลด JSON" style={{ background: 'var(--bg-secondary)', color: exportRows.length ? textColor : subTextColor, border: `1px solid ${borderColor}`, padding: '8px 11px', borderRadius: '12px', cursor: exportRows.length ? 'pointer' : 'default', fontSize: '0.72rem', fontWeight: 900, fontFamily: 'Kanit', opacity: exportRows.length ? 1 : 0.5 }}>JSON</button>
@@ -1789,6 +1904,8 @@ export default function MapPage() {
           )}
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '0' : '10px', minHeight: 0 }}>
+              {!isMobile && showWindyMap && renderWindyPanel(false)}
+
               <div style={{ flex: 1, borderRadius: isMobile ? '0' : '18px', overflow: 'hidden', border: isMobile ? 'none' : `1px solid ${borderColor}`, position: 'relative', minHeight: isMobile ? 'calc(100vh - 120px)' : 0, background: cardBg }}>
 
                 <MapContainer center={[13.5, 100.5]} zoom={isMobile ? 6 : 6} style={{ height: '100%', width: '100%', background: appBg }} zoomControl={false}>
@@ -1973,7 +2090,7 @@ export default function MapPage() {
                   {isMobile ? (
                     /* ---- MOBILE floating icon row ---- */
                     <>
-                      <div style={{ position: 'fixed', left: '12px', right: '12px', bottom: mobileDockBottom, zIndex: 1002, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px' }}>
+                      <div style={{ position: 'fixed', left: '12px', right: '12px', bottom: mobileDockBottom, zIndex: 1002, display: 'grid', gridTemplateColumns: `repeat(${mobileDockButtons.length}, minmax(0, 1fr))`, gap: '8px' }}>
                         {mobileDockButtons.map(btn => {
                           const isActive = activePanel === btn.id;
                           return (
@@ -2363,6 +2480,8 @@ export default function MapPage() {
             </div>
           )}
       </div>
+
+      {isMobile && activePanel === 'windy' && renderWindyPanel(true)}
 
       {showReportModal && (
         <div role="dialog" aria-modal="true" aria-label="รายงานอินโฟกราฟิกแผนที่" style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(2,6,23,0.74)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: isMobile ? '10px' : '22px' }} onClick={() => setShowReportModal(false)}>
