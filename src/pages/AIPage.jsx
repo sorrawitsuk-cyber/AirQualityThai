@@ -317,6 +317,19 @@ function SignalGrid({ items = [], isMobile }) {
   );
 }
 
+function StatGroupLabel({ badge, color = '#2563eb', subtitle, title }) {
+  return (
+    <div style={{ alignItems: 'flex-start', display: 'flex', gap: 10, margin: '4px 0 10px', minWidth: 0 }}>
+      <div style={{ background: color, borderRadius: 999, flex: '0 0 auto', height: 34, marginTop: 2, width: 5 }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color, fontSize: '0.72rem', fontWeight: 950, letterSpacing: 0 }}>{badge}</div>
+        <h2 style={{ color: 'var(--text-main)', fontSize: '1.06rem', fontWeight: 950, lineHeight: 1.2, margin: '2px 0 0' }}>{title}</h2>
+        <p style={{ color: 'var(--text-sub)', fontSize: '0.78rem', fontWeight: 750, lineHeight: 1.45, margin: '4px 0 0' }}>{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
 function HourTile({ row }) {
   const rainColor = row.rain >= 60 ? '#2563eb' : row.rain >= 35 ? '#0ea5e9' : row.rain >= 15 ? '#f59e0b' : '#16a34a';
   return (
@@ -825,9 +838,62 @@ export default function AIPage() {
           </div>
         </header>
 
-        <SignalGrid items={insightSignals} isMobile={isMobile} />
+        <section style={{ marginBottom: 16 }}>
+          <div
+            style={{
+              alignItems: isMobile ? 'flex-start' : 'center',
+              background: 'linear-gradient(135deg, rgba(37,99,235,0.10), rgba(20,184,166,0.08))',
+              border: '1px solid rgba(37,99,235,0.16)',
+              borderRadius: 18,
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: 10,
+              justifyContent: 'space-between',
+              marginBottom: 14,
+              padding: isMobile ? 14 : 16,
+            }}
+          >
+            <div>
+              <div style={{ color: '#2563eb', fontSize: '0.74rem', fontWeight: 950, marginBottom: 4 }}>ศูนย์สถิติหลัก</div>
+              <h2 style={{ color: 'var(--text-main)', fontSize: isMobile ? '1.08rem' : '1.28rem', fontWeight: 950, lineHeight: 1.2, margin: 0 }}>ตอนนี้และย้อนหลังจริง</h2>
+              <p style={{ color: 'var(--text-sub)', fontSize: '0.8rem', fontWeight: 750, lineHeight: 1.45, margin: '5px 0 0', maxWidth: 820 }}>
+                แยกข้อมูลล่าสุด/สัญญาณระยะใกล้ ออกจากสถิติที่เกิดขึ้นจริงจาก Archive เพื่ออ่านเทียบกันได้ในกลุ่มเดียว
+              </p>
+            </div>
+            <div style={{ alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 999, color: 'var(--text-sub)', display: 'flex', fontSize: '0.72rem', fontWeight: 900, gap: 7, padding: '8px 11px' }}>
+              <Database size={14} /> ปัจจุบัน + ย้อนหลังจริง
+            </div>
+          </div>
 
-        <section style={{ marginBottom: 12 }}>
+          <StatGroupLabel
+            badge="ข้อมูลตอนนี้"
+            color="#0ea5e9"
+            title="ค่าล่าสุดและสัญญาณระยะใกล้"
+            subtitle="ใช้ข้อมูลสถานี พยากรณ์รายชั่วโมง และค่าเฉลี่ยประเทศ เพื่อบอกสถานการณ์ที่ต้องจับตาในตอนนี้"
+          />
+          <SignalGrid items={insightSignals} isMobile={isMobile} />
+
+          <section style={{ display: 'grid', gap: 12, gridTemplateColumns: grid4, marginBottom: 12 }}>
+            <StatCard icon={ThermometerSun} label="ความร้อนรู้สึกจริง" value={feelsLike} unit="°C" note={heat.label} color={heat.color} percent={clamp((feelsLike / 45) * 100)} />
+            <StatCard icon={CloudRain} label="โอกาสฝนสูงสุดวันนี้" value={rainProb} unit="%" note={rainProb >= 55 ? 'มีโอกาสฝนชัดเจน' : rainProb >= 25 ? 'อาจมีฝนบางช่วง' : 'ฝนต่ำ'} color={rainProb >= 55 ? '#2563eb' : rainProb >= 25 ? '#0ea5e9' : '#16a34a'} percent={rainProb} />
+            <StatCard icon={Activity} label="PM2.5 ปัจจุบัน" value={pm25} unit="µg/m³" note={pm.label} color={pm.color} percent={clamp((pm25 / 75) * 100)} />
+            <StatCard icon={Gauge} label="ดัชนีเสี่ยงรวม" value={riskScore} unit="/100" note={risk.label} color={risk.color} percent={riskScore} />
+          </section>
+
+          <section style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', marginBottom: 16 }}>
+            <StatCard icon={Wind} label="ลมเฉลี่ยตำแหน่งนี้" value={wind} unit="กม./ชม." note={`ทั่วประเทศเฉลี่ย ${national?.wind || 0} กม./ชม.`} color="#0f766e" compact percent={clamp(wind * 5)} />
+            <StatCard icon={Droplets} label="ความชื้น" value={humidity} unit="%" note={`ทั่วประเทศเฉลี่ย ${national?.humidity || 0}%`} color="#0891b2" compact percent={humidity} />
+            <StatCard icon={AlertTriangle} label="UV สูงสุด" value={uv} unit="" note={uvStatus.text} color={uvStatus.color} compact percent={clamp(uv * 10)} />
+          </section>
+
+          <StatGroupLabel
+            badge="ย้อนหลังจริง"
+            color="#2563eb"
+            title="ค่าที่เกิดขึ้นจริงจาก Archive"
+            subtitle="สรุปฝน อุณหภูมิ ลม และอันดับจังหวัดย้อนหลังจากข้อมูลจริง พร้อมรายงานสำหรับพิมพ์หรือส่งต่อ"
+          />
+
+          <section style={{ marginBottom: 0 }}>
           <PanelHeader
             icon={Database}
             title="สถิติย้อนหลังจริงและการวิเคราะห์"
@@ -926,17 +992,6 @@ export default function AIPage() {
           )}
         </section>
 
-        <section style={{ display: 'grid', gap: 12, gridTemplateColumns: grid4, marginBottom: 12 }}>
-          <StatCard icon={ThermometerSun} label="ความร้อนรู้สึกจริง" value={feelsLike} unit="°C" note={heat.label} color={heat.color} percent={clamp((feelsLike / 45) * 100)} />
-          <StatCard icon={CloudRain} label="โอกาสฝนสูงสุดวันนี้" value={rainProb} unit="%" note={rainProb >= 55 ? 'มีโอกาสฝนชัดเจน' : rainProb >= 25 ? 'อาจมีฝนบางช่วง' : 'ฝนต่ำ'} color={rainProb >= 55 ? '#2563eb' : rainProb >= 25 ? '#0ea5e9' : '#16a34a'} percent={rainProb} />
-          <StatCard icon={Activity} label="PM2.5 ปัจจุบัน" value={pm25} unit="µg/m³" note={pm.label} color={pm.color} percent={clamp((pm25 / 75) * 100)} />
-          <StatCard icon={Gauge} label="ดัชนีเสี่ยงรวม" value={riskScore} unit="/100" note={risk.label} color={risk.color} percent={riskScore} />
-        </section>
-
-        <section style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', marginBottom: 12 }}>
-          <StatCard icon={Wind} label="ลมเฉลี่ยตำแหน่งนี้" value={wind} unit="กม./ชม." note={`ทั่วประเทศเฉลี่ย ${national?.wind || 0} กม./ชม.`} color="#0f766e" compact percent={clamp(wind * 5)} />
-          <StatCard icon={Droplets} label="ความชื้น" value={humidity} unit="%" note={`ทั่วประเทศเฉลี่ย ${national?.humidity || 0}%`} color="#0891b2" compact percent={humidity} />
-          <StatCard icon={AlertTriangle} label="UV สูงสุด" value={uv} unit="" note={uvStatus.text} color={uvStatus.color} compact percent={clamp(uv * 10)} />
         </section>
 
         <AreaWatchPanel activeMetric={activeMetric} isMobile={isMobile} rows={areaRankingRows} setActiveMetric={setActiveMetric} />
