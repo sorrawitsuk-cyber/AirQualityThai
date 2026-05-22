@@ -771,8 +771,6 @@ function dedupeItems(items) {
 
 function matchesCategory(item, activeCategory) {
   if (activeCategory === 'all') return true;
-  if (activeCategory === 'warning') return item.type === 'warning';
-  if (activeCategory === 'news') return item.type === 'news';
   return item.topic === activeCategory;
 }
 
@@ -1041,21 +1039,21 @@ export default function NewsPage() {
 
   const showClimatePanel = activeCategory === 'all' || activeCategory === 'climate';
   const detectedPhenomena = useMemo(
-    () => buildWeatherPhenomena([...normalizedAlerts, ...normalizedStories]),
-    [normalizedAlerts, normalizedStories],
+    () => buildWeatherPhenomena([...filteredAlerts, ...filteredStories]),
+    [filteredAlerts, filteredStories],
   );
 
   const heroItems = useMemo(() => {
     const items = dedupeItems([...filteredAlerts.slice(0, 4), ...filteredStories.slice(0, 4)]);
-    return items.length ? items.slice(0, 4) : dedupeItems([...normalizedAlerts.slice(0, 4), ...normalizedStories.slice(0, 4)]).slice(0, 4);
-  }, [filteredAlerts, filteredStories, normalizedAlerts, normalizedStories]);
+    return items.slice(0, 4);
+  }, [filteredAlerts, filteredStories]);
 
   const heroItem = heroItems[currentHero] || null;
   const newsStats = useMemo(() => ([
     {
       label: 'ประกาศสำคัญ',
-      value: normalizedAlerts.filter((item) => item.severity === 'high' || item.severity === 'medium').length,
-      detail: normalizedAlerts[0]?.title || 'ยังไม่มีประกาศรุนแรงในตัวกรอง',
+      value: filteredAlerts.filter((item) => item.severity === 'high' || item.severity === 'medium').length,
+      detail: filteredAlerts[0]?.title || 'ยังไม่มีประกาศรุนแรงในตัวกรอง',
       icon: '🚨',
       color: '#ef4444',
     },
@@ -1075,14 +1073,14 @@ export default function NewsPage() {
       icon: '🌊',
       color: '#16a34a',
     },
-  ]), [feed, normalizedAlerts, ensoOutlook]);
+  ]), [feed, filteredAlerts, ensoOutlook]);
 
   const incidentBrief = useMemo(() => {
-    const highAlerts = normalizedAlerts.filter((item) => item.severity === 'high');
-    const mediumAlerts = normalizedAlerts.filter((item) => item.severity === 'medium');
-    const focusItems = [...highAlerts, ...mediumAlerts, ...normalizedAlerts].slice(0, 8);
-    const topIncident = focusItems[0] || normalizedStories[0] || null;
-    const impactAreas = buildImpactAreas(focusItems.length ? focusItems : normalizedStories.slice(0, 8));
+    const highAlerts = filteredAlerts.filter((item) => item.severity === 'high');
+    const mediumAlerts = filteredAlerts.filter((item) => item.severity === 'medium');
+    const focusItems = [...highAlerts, ...mediumAlerts, ...filteredAlerts, ...filteredStories].slice(0, 8);
+    const topIncident = focusItems[0] || null;
+    const impactAreas = buildImpactAreas(focusItems);
     const topicCounts = focusItems.reduce((acc, item) => {
       acc[item.topic] = (acc[item.topic] || 0) + 1;
       return acc;
@@ -1096,9 +1094,23 @@ export default function NewsPage() {
       impactAreas,
       leadingMeta,
       topIncident,
-      watchCount: normalizedAlerts.length,
+      watchCount: filteredAlerts.length,
     };
-  }, [normalizedAlerts, normalizedStories]);
+  }, [filteredAlerts, filteredStories]);
+  const filteredDigest = useMemo(() => {
+    const focusItems = dedupeItems([...filteredAlerts, ...filteredStories]).slice(0, 4);
+    const activeLabel = categoryOptions.find((option) => option.id === activeCategory)?.label || 'ข่าว';
+    if (!focusItems.length) {
+      return {
+        headline: `ไม่พบข่าวในประเภท${activeLabel}ตอนนี้`,
+        bullets: ['ลองเปลี่ยนประเภทข่าวหรือรีเฟรชข้อมูลเพื่อดึงรายการล่าสุด'],
+      };
+    }
+    return {
+      headline: focusItems[0].summary || focusItems[0].title,
+      bullets: focusItems.slice(0, 3).map((item) => `${item.title} (${item.source || 'ไม่ระบุแหล่งข่าว'})`),
+    };
+  }, [activeCategory, filteredAlerts, filteredStories]);
 
   useEffect(() => {
     if (!heroItems.length) {
@@ -1788,9 +1800,9 @@ export default function NewsPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
               {[
-                { icon: '🚨', value: normalizedAlerts.filter((item) => item.severity === 'high').length, label: 'อันตราย', color: '#ef4444' },
-                { icon: '⚠️', value: normalizedAlerts.filter((item) => item.severity === 'medium').length, label: 'เฝ้าระวัง', color: '#f59e0b' },
-                { icon: '📰', value: normalizedStories.length, label: 'ข่าวใหม่', color: '#2563eb' },
+                { icon: '🚨', value: filteredAlerts.filter((item) => item.severity === 'high').length, label: 'อันตราย', color: '#ef4444' },
+                { icon: '⚠️', value: filteredAlerts.filter((item) => item.severity === 'medium').length, label: 'เฝ้าระวัง', color: '#f59e0b' },
+                { icon: '📰', value: filteredStories.length, label: 'ข่าวใหม่', color: '#2563eb' },
                 { icon: '🌍', value: 'ไทย/โลก', label: 'ขอบเขต', color: '#22c55e' },
               ].map((stat) => (
                 <div key={stat.label} style={{ textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: 14, padding: '8px 4px' }}>
@@ -1802,10 +1814,10 @@ export default function NewsPage() {
 
             <div style={{ borderRadius: 18, background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: 14 }}>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-sub)', fontWeight: 800 }}>สรุปผลกระทบแบบอ่านเร็ว</div>
-              <div style={{ marginTop: 6, fontWeight: 950, lineHeight: 1.5, fontSize: '0.88rem', color: 'var(--text-main)' }}>{feed?.digest?.headline || 'กำลังสรุปภาพรวมล่าสุด'}</div>
-              {feed?.digest?.bullets?.length ? (
+              <div style={{ marginTop: 6, fontWeight: 950, lineHeight: 1.5, fontSize: '0.88rem', color: 'var(--text-main)' }}>{filteredDigest.headline}</div>
+              {filteredDigest.bullets?.length ? (
                 <ul style={{ margin: '10px 0 0', paddingLeft: 16, color: 'var(--text-sub)', lineHeight: 1.6, fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {feed.digest.bullets.slice(0, 3).map((bullet) => (
+                  {filteredDigest.bullets.slice(0, 3).map((bullet) => (
                     <li key={bullet}>{bullet}</li>
                   ))}
                 </ul>
