@@ -1,4 +1,4 @@
-import { runWindAnalysis, writeFirebaseCache } from './_wind-core.js';
+import { runWindAnalysis, writeFirebaseCache } from '../src/server/wind-core.js';
 
 export default async function handler(req, res) {
   // Vercel cron injects Authorization: Bearer <CRON_SECRET>

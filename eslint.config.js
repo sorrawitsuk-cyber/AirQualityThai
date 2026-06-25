@@ -49,6 +49,24 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/server/**/*.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.node,
+        ...globals.es2021,
+      },
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^(_|e)$', caughtErrorsIgnorePattern: '^(_|e)$', varsIgnorePattern: '^[A-Z_]' }],
+    },
+  },
+  {
     files: ['scripts/**/*.js'],
     extends: [js.configs.recommended],
     languageOptions: {
