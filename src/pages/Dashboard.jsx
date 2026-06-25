@@ -494,8 +494,6 @@ export default function Dashboard() {
   });
 
   const maxTemp = Math.round(daily?.temperature_2m_max?.[0] || 0);
-  const dailyRainProb = daily?.precipitation_probability_max?.[0] || 0;
-  
   const tomorrowMaxTemp = daily?.temperature_2m_max?.[1] ? Math.round(daily.temperature_2m_max[1]) : null;
   const tomorrowRainProb = daily?.precipitation_probability_max?.[1] || 0;
 
