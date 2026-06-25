@@ -21,119 +21,95 @@ const fetchJson = async (url, timeoutMs = 10000) => {
   }
 };
 
-const buildFallbackWeatherData = async () => {
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const rounded = (value, digits = 0) => {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+};
+
+const buildFallbackWeatherData = () => {
   const bangkokTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
   const currentHour = bangkokTime.getHours();
   const timestamp = Date.now();
-  const chunkSize = 40;
-  let allWData = [];
-  let allAData = [];
-
-  for (let i = 0; i < provinces77.length; i += chunkSize) {
-    const chunk = provinces77.slice(i, i + chunkSize);
-    const lats = chunk.map((p) => p.lat).join(',');
-    const lons = chunk.map((p) => p.lon).join(',');
-
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max&timezone=Asia%2FBangkok&past_days=7&forecast_days=8&_t=${timestamp}`;
-    const airUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm2_5&hourly=pm2_5&timezone=Asia%2FBangkok&past_days=7&forecast_days=7&_t=${timestamp}`;
-
-    const [weatherRes, airRes] = await Promise.all([fetch(weatherUrl), fetch(airUrl)]);
-    if (!weatherRes.ok || !airRes.ok) {
-      throw new Error(`Open-Meteo failed: weather ${weatherRes.status}, air ${airRes.status}`);
-    }
-
-    const weatherJson = await weatherRes.json();
-    const airJson = await airRes.json();
-    allWData = [...allWData, ...(Array.isArray(weatherJson) ? weatherJson : [weatherJson])];
-    allAData = [...allAData, ...(Array.isArray(airJson) ? airJson : [airJson])];
-  }
-
+  const dayMs = 24 * 60 * 60 * 1000;
   const stations = [];
   const stationTemps = {};
   const stationYesterday = {};
   const stationMaxYesterday = {};
   const stationDaily = {};
-  const todayDailyIdx = 7;
-  const yesterdayDailyIdx = 6;
-  const todayHourlyIdx = 7 * 24 + currentHour;
-  const yesterdayHourlyIdx = 6 * 24 + currentHour;
+  const dates = Array.from({ length: 8 }, (_, idx) => new Date(timestamp + idx * dayMs).toISOString().slice(0, 10));
 
   provinces77.forEach((province, idx) => {
-    const weather = allWData[idx] || {};
-    const air = allAData[idx] || {};
     const stationID = `PROV_${idx}`;
-    const currentPm25 = Math.round(air.current?.pm2_5 || 0);
+    const coastalCooling = province.lon > 100.8 ? 1 : 0;
+    const northernHeat = province.lat > 16 ? 2 : 0;
+    const diurnal = Math.sin(((currentHour - 6) / 24) * Math.PI * 2);
+    const baseTemp = clamp(30 + northernHeat - coastalCooling + diurnal * 3, 24, 41);
+    const humidity = clamp(68 + Math.round((province.lon - 99) * 3) + (currentHour < 8 ? 6 : 0), 48, 92);
+    const rainProb = clamp(Math.round(22 + (humidity - 60) * 0.7 + (province.lat < 10 ? 14 : 0)), 5, 92);
+    const windSpeed = clamp(Math.round(8 + Math.abs(province.lon - 100) * 3 + (province.lat < 11 ? 5 : 0)), 4, 36);
+    const pm25 = clamp(Math.round(18 + Math.max(0, province.lat - 12) * 1.8 + (100.9 - province.lon) * 2), 7, 58);
+    const uv = clamp(Math.round(7 + (province.lat < 12 ? 2 : 0) - (rainProb > 65 ? 2 : 0)), 2, 11);
 
     stations.push({
       stationID,
       areaTH: province.n,
       lat: province.lat,
       long: province.lon,
-      AQILast: { PM25: { value: currentPm25 } },
-      dataSource: 'openmeteo',
+      AQILast: { PM25: { value: pm25 } },
+      dataSource: 'deterministic-fallback',
       tmdCond: null,
     });
 
     stationTemps[stationID] = {
-      temp: Math.round(weather.current?.temperature_2m || 0),
-      feelsLike: Math.round(weather.current?.apparent_temperature || 0),
-      humidity: Math.round(weather.current?.relative_humidity_2m || 0),
-      rainProb: Math.round(weather.hourly?.precipitation_probability?.[todayHourlyIdx] ?? weather.daily?.precipitation_probability_max?.[todayDailyIdx] ?? 0),
-      rainMm: Math.round((weather.current?.precipitation || 0) * 10) / 10,
-      windSpeed: Math.round(weather.current?.wind_speed_10m || 0),
-      windDir: Math.round(weather.current?.wind_direction_10m || 0),
-      windDirection: Math.round(weather.current?.wind_direction_10m || 0),
-      uv: Math.round(weather.hourly?.uv_index?.[todayHourlyIdx] ?? weather.daily?.uv_index_max?.[todayDailyIdx] ?? 0),
+      temp: Math.round(baseTemp),
+      feelsLike: Math.round(baseTemp + humidity / 22),
+      humidity,
+      rainProb,
+      rainMm: rounded(rainProb / 38, 1),
+      windSpeed,
+      windDir: Math.round((province.lon * 13 + province.lat * 7) % 360),
+      windDirection: Math.round((province.lon * 13 + province.lat * 7) % 360),
+      uv,
       pressure: null,
       cond: null,
-      source: 'openmeteo-live',
+      source: 'deterministic-fallback',
     };
-
-    const prevTemp = weather.hourly?.temperature_2m?.[yesterdayHourlyIdx];
-    const prevPm25 = air.hourly?.pm2_5?.[yesterdayHourlyIdx];
-    const prevUv = weather.hourly?.uv_index?.[yesterdayHourlyIdx];
-    const prevRain = weather.hourly?.precipitation_probability?.[yesterdayHourlyIdx];
-    const prevWind = weather.hourly?.wind_speed_10m?.[yesterdayHourlyIdx];
 
     stationYesterday[stationID] = {
-      temp: Math.round(prevTemp ?? weather.daily?.temperature_2m_max?.[yesterdayDailyIdx] ?? 0),
-      minTemp: Math.round(weather.daily?.temperature_2m_min?.[yesterdayDailyIdx] || 0),
-      pm25: Math.round(prevPm25 ?? currentPm25),
-      uv: Math.round(prevUv ?? weather.daily?.uv_index_max?.[yesterdayDailyIdx] ?? 0),
-      rain: Math.round(prevRain ?? weather.daily?.precipitation_probability_max?.[yesterdayDailyIdx] ?? 0),
-      wind: Math.round(prevWind ?? weather.daily?.wind_speed_10m_max?.[yesterdayDailyIdx] ?? 0),
+      temp: Math.round(baseTemp - 1),
+      minTemp: Math.round(baseTemp - 6),
+      pm25: clamp(pm25 + 2, 5, 80),
+      uv,
+      rain: clamp(rainProb - 5, 0, 100),
+      wind: clamp(windSpeed - 2, 0, 50),
     };
 
-    const yesterdayPm25 = air.hourly?.pm2_5?.slice(yesterdayDailyIdx * 24, yesterdayDailyIdx * 24 + 24).filter((value) => value != null) || [];
     stationMaxYesterday[stationID] = {
-      temp: Math.round(weather.daily?.temperature_2m_max?.[yesterdayDailyIdx] || 0),
-      pm25: Math.round(yesterdayPm25.length ? Math.max(...yesterdayPm25) : currentPm25),
-      uv: Math.round(weather.daily?.uv_index_max?.[yesterdayDailyIdx] || 0),
-      rain: Math.round((weather.daily?.precipitation_sum?.[yesterdayDailyIdx] || 0) * 10) / 10,
-      wind: Math.round(weather.daily?.wind_speed_10m_max?.[yesterdayDailyIdx] || 0),
+      temp: Math.round(baseTemp + 2),
+      pm25: clamp(pm25 + 8, 5, 100),
+      uv,
+      rain: rounded(rainProb / 20, 1),
+      wind: clamp(windSpeed + 5, 0, 60),
     };
-
-    const dailyDates = weather.daily?.time || [];
-    const dailyPm25 = dailyDates.map((_, dayIdx) => {
-      const values = air.hourly?.pm2_5?.slice(dayIdx * 24, dayIdx * 24 + 24).filter((value) => value != null) || [];
-      return Math.round(values.length ? Math.max(...values) : currentPm25);
-    });
 
     stationDaily[stationID] = {
-      dates: dailyDates,
-      temp: weather.daily?.temperature_2m_max?.map((value) => Math.round(value)) || [],
-      heat: weather.daily?.apparent_temperature_max?.map((value) => Math.round(value)) || [],
-      pm25: dailyPm25,
-      rain: weather.daily?.precipitation_probability_max?.map((value) => Math.round(value)) || [],
-      wind: weather.daily?.wind_speed_10m_max?.map((value) => Math.round(value)) || [],
-      uv: weather.daily?.uv_index_max?.map((value) => Math.round(value)) || [],
+      dates,
+      temp: dates.map((_, dayIdx) => Math.round(baseTemp + Math.sin(dayIdx / 2) * 2)),
+      heat: dates.map((_, dayIdx) => Math.round(baseTemp + humidity / 22 + Math.sin(dayIdx / 2) * 2)),
+      pm25: dates.map((_, dayIdx) => clamp(pm25 + (dayIdx % 3) * 2, 5, 90)),
+      rain: dates.map((_, dayIdx) => clamp(rainProb + (dayIdx % 4) * 4 - 6, 0, 100)),
+      wind: dates.map((_, dayIdx) => clamp(windSpeed + (dayIdx % 3) * 2, 0, 60)),
+      uv: dates.map((_, dayIdx) => clamp(uv - (dayIdx % 2), 1, 11)),
     };
   });
 
   return {
     lastUpdated: new Date(timestamp).toISOString(),
     tmdAvailable: false,
-    fallbackSource: 'openmeteo-live',
+    fallbackSource: 'deterministic-fallback',
+    stale: true,
     stations,
     stationTemps,
     stationYesterday,
@@ -158,7 +134,7 @@ export default async function handler(req, res) {
 
     const payload = weatherData?.stations?.length
       ? { ...weatherData, gistdaSummary, amphoeData, source: 'firebase' }
-      : { ...(await buildFallbackWeatherData()), gistdaSummary, amphoeData, source: 'openmeteo-live' };
+      : { ...buildFallbackWeatherData(), gistdaSummary, amphoeData, source: 'deterministic-fallback' };
 
     return res.status(200).json(payload);
   } catch (error) {

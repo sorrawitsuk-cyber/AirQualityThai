@@ -102,6 +102,8 @@ const thaiProvinceNames = [
 
 const defaultPrefs = { push: true, line: true, email: false };
 
+const asArray = (value) => Array.isArray(value) ? value : [];
+
 function inferTopic(item = {}) {
   const text = `${item.title || ''} ${item.summary || ''} ${item.description || ''} ${item.category || ''}`.toLowerCase();
   if (/earthquake|แผ่นดินไหว/.test(text) || item.category === 'earthquake') return 'quake';
@@ -372,7 +374,7 @@ export default function NewsPage() {
   const enso = ensoFeed || fallbackEnso;
   const allItems = useMemo(() => {
     if (!feed) return [];
-    const weatherCards = (feed.weather?.days || []).slice(0, 5).map((day) => normalizeItem({
+    const weatherCards = asArray(feed.weather?.days).slice(0, 5).map((day) => normalizeItem({
       title: `พยากรณ์ ${toThaiDate(day.time)}`,
       summary: `${day.label || 'สภาพอากาศ'} สูงสุด ${day.max ?? '-'}°C ต่ำสุด ${day.min ?? '-'}°C โอกาสฝน ${day.rainChance ?? 0}%`,
       source: 'Open-Meteo',
@@ -381,20 +383,20 @@ export default function NewsPage() {
       url: sourceLinks['Open-Meteo'],
     }));
     return dedupe([
-      ...(feed.topStories || []).map((item) => normalizeItem(item)),
-      ...(feed.thailand?.warnings || []).map((item) => normalizeItem(item, { source: 'TMD' })),
-      ...(feed.thailand?.storms || []).map((item) => normalizeItem(item, { source: 'TMD' })),
-      ...(feed.thailand?.earthquakes || []).map((item) => normalizeItem(item, { source: 'TMD แผ่นดินไหว' })),
-      ...(feed.thailand?.disasters || []).map((item) => normalizeItem(item, { source: 'ปภ.' })),
-      ...(feed.thailand?.ddpm || []).map((item) => normalizeItem(item, { source: 'ปภ.' })),
-      ...(feed.thailand?.tmdEq || []).map((item) => normalizeItem(item, { source: 'TMD แผ่นดินไหว' })),
-      ...(feed.thailand?.thaiPbs || []).map((item) => normalizeItem(item, { source: 'Thai PBS' })),
-      ...(feed.thailand?.webSevenday || []).map((item) => normalizeItem(item, { source: 'TMD' })),
-      ...(feed.global?.alerts || []).map((item) => normalizeItem(item, { source: 'GDACS' })),
-      ...(feed.global?.earthquakes || []).map((item) => normalizeItem(item, { source: 'USGS' })),
-      ...(feed.global?.disasters || []).map((item) => normalizeItem(item, { source: 'ReliefWeb Global' })),
-      ...(feed.global?.eonet || []).map((item) => normalizeItem(item, { source: 'NASA EONET' })),
-      ...(feed.global?.climate || []).map((item) => normalizeItem(item, { source: 'NASA Climate / WMO' })),
+      ...asArray(feed.topStories).map((item) => normalizeItem(item)),
+      ...asArray(feed.thailand?.warnings).map((item) => normalizeItem(item, { source: 'TMD' })),
+      ...asArray(feed.thailand?.storms).map((item) => normalizeItem(item, { source: 'TMD' })),
+      ...asArray(feed.thailand?.earthquakes).map((item) => normalizeItem(item, { source: 'TMD แผ่นดินไหว' })),
+      ...asArray(feed.thailand?.disasters).map((item) => normalizeItem(item, { source: 'ปภ.' })),
+      ...asArray(feed.thailand?.ddpm).map((item) => normalizeItem(item, { source: 'ปภ.' })),
+      ...asArray(feed.thailand?.tmdEq).map((item) => normalizeItem(item, { source: 'TMD แผ่นดินไหว' })),
+      ...asArray(feed.thailand?.thaiPbs).map((item) => normalizeItem(item, { source: 'Thai PBS' })),
+      ...asArray(feed.thailand?.webSevenday).map((item) => normalizeItem(item, { source: 'TMD' })),
+      ...asArray(feed.global?.alerts).map((item) => normalizeItem(item, { source: 'GDACS' })),
+      ...asArray(feed.global?.earthquakes).map((item) => normalizeItem(item, { source: 'USGS' })),
+      ...asArray(feed.global?.disasters).map((item) => normalizeItem(item, { source: 'ReliefWeb Global' })),
+      ...asArray(feed.global?.eonet).map((item) => normalizeItem(item, { source: 'NASA EONET' })),
+      ...asArray(feed.global?.climate).map((item) => normalizeItem(item, { source: 'NASA Climate / WMO' })),
       ...weatherCards,
       normalizeItem({
         title: `ENSO: ${enso.status || 'ติดตามสัญญาณภูมิอากาศ'}`,

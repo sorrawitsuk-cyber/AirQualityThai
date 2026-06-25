@@ -111,6 +111,14 @@ function processTmdData(forecasts) {
 
 export default async function handler(req, res) {
   try {
+    const expected = process.env.CRON_SECRET;
+    if (!expected) {
+      return res.status(500).json({ success: false, error: 'CRON_SECRET is not configured' });
+    }
+    if (req.headers.authorization !== `Bearer ${expected}`) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
     console.log("Cron: เริ่มทำงาน — Hybrid TMD + Open-Meteo Pipeline...");
 
     const dbUrl = process.env.FIREBASE_DATABASE_URL || process.env.VITE_FIREBASE_DATABASE_URL;

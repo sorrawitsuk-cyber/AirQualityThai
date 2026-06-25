@@ -212,9 +212,18 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}, stale-while-revalidate=86400`);
 
   try {
+    const expected = process.env.CRON_SECRET;
+    const allowRefresh = Boolean(expected && req.headers.authorization === `Bearer ${expected}`);
     const cached = await readCachedHistory();
-    if (!req.query?.fresh && isFreshCache(cached)) {
+    if (isFreshCache(cached)) {
       return res.status(200).json({ ...cached, cacheStatus: 'fresh' });
+    }
+
+    if (!allowRefresh) {
+      if (cached?.byStation || cached?.byProvince) {
+        return res.status(200).json({ ...cached, cacheStatus: 'stale' });
+      }
+      return res.status(503).json({ error: 'Historical weather cache is not ready' });
     }
 
     try {

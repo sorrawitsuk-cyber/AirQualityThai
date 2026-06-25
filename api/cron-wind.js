@@ -3,7 +3,8 @@ import { runWindAnalysis, writeFirebaseCache } from '../src/server/wind-core.js'
 export default async function handler(req, res) {
   // Vercel cron injects Authorization: Bearer <CRON_SECRET>
   const expected = process.env.CRON_SECRET;
-  if (expected && req.headers.authorization !== `Bearer ${expected}`) {
+  if (!expected) return res.status(500).json({ error: 'CRON_SECRET is not configured' });
+  if (req.headers.authorization !== `Bearer ${expected}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

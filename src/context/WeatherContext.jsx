@@ -45,7 +45,7 @@ export const WeatherProvider = ({ children }) => {
     const loadWeatherData = async () => {
       setLoading(true);
       try {
-        const response = await fetch('/api/weather-data', { cache: 'no-store' });
+        const response = await fetch('/api/weather-data');
         if (!response.ok) throw new Error(`Weather API ${response.status}`);
         const data = await response.json();
         if (cancelled) return;

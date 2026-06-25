@@ -455,6 +455,14 @@ export default function Dashboard() {
   );
 
   const { current, hourly, daily, coords, minutely } = weatherData;
+  const weatherDataMode = weatherData.fallback || current?.fallback ? 'ข้อมูลสำรอง' : 'ข้อมูลสด';
+  const weatherDataModeColor = weatherData.fallback || current?.fallback ? '#f59e0b' : '#16a34a';
+  const weatherSourceText = weatherData.fallback || current?.fallback
+    ? 'ระบบประเมินสำรอง'
+    : 'Open-Meteo / Air Quality API';
+  const coordText = Number.isFinite(Number(coords?.lat)) && Number.isFinite(Number(coords?.lon))
+    ? `${Number(coords.lat).toFixed(3)}, ${Number(coords.lon).toFixed(3)}`
+    : '-';
   
   const aqiTheme = getAqiTheme(current?.pm25);
   
@@ -1497,6 +1505,22 @@ export default function Dashboard() {
                 <span style={{ fontSize: '1.4rem' }}>{alertBanner.icon}</span> {alertBanner.text}
             </div>
         )}
+
+        <div style={{ background: 'var(--bg-card)', border: `1px solid ${borderColor}`, borderRadius: isMobile ? '16px' : '18px', padding: isMobile ? '12px' : '14px 16px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '10px', boxShadow: '0 10px 26px rgba(2,6,23,0.06)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: weatherDataModeColor, background: `${weatherDataModeColor}12`, border: `1px solid ${weatherDataModeColor}28`, borderRadius: '999px', padding: '6px 10px', fontSize: '0.74rem', fontWeight: 950 }}>
+              {weatherDataMode}
+            </span>
+            <span style={{ color: textColor, fontSize: '0.82rem', fontWeight: 900 }}>
+              แหล่งอากาศ: {weatherSourceText}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', color: subTextColor, fontSize: '0.72rem', fontWeight: 800 }}>
+            <span>ระบบ: {lastUpdateText}</span>
+            <span>พิกัด: {coordText}</span>
+            <span>TMD: {tmdAvailable ? 'พร้อมใช้' : 'สำรอง'}</span>
+          </div>
+        </div>
 
         {isMobile ? mobileOverviewLayout : desktopOverviewLayout}
 

@@ -1481,7 +1481,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const bypassCache = req.query?._fresh || req.query?.fresh || req.headers['cache-control'] === 'no-cache';
+  const expected = process.env.CRON_SECRET;
+  const allowPrivilegedRefresh = Boolean(expected && req.headers.authorization === `Bearer ${expected}`);
+  const bypassCache = allowPrivilegedRefresh && (req.query?._fresh || req.query?.fresh || req.headers['cache-control'] === 'no-cache');
 
   // Return cached response immediately on warm instances (dev + warm Vercel lambdas)
   if (!bypassCache && _newsCache && (Date.now() - _newsCacheAt) < SERVER_CACHE_TTL_MS) {
