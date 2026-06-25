@@ -161,6 +161,54 @@ function buildGistdaCards(summary) {
     .slice(0, 4);
 }
 
+function buildFallbackTrendRows(national = {}) {
+  const baseTemp = round(national.temp, 32);
+  const baseFeels = round(national.feelsLike, baseTemp);
+  const baseRain = round(national.rain, 20);
+  const basePm25 = round(national.pm25, 18);
+  const baseWind = round(national.wind, 8);
+  const now = new Date();
+
+  return Array.from({ length: 12 }, (_, index) => {
+    const hour = new Date(now.getTime() + index * 2 * 60 * 60 * 1000);
+    const dailyWave = Math.sin((index / 11) * Math.PI);
+    return {
+      time: thaiTime(hour.toISOString()),
+      temp: round(baseTemp + dailyWave * 2 - 1),
+      feels: round(baseFeels + dailyWave * 2),
+      rain: clamp(baseRain + (index % 4 === 0 ? 8 : index % 3 === 0 ? -6 : 0), 0, 100),
+      pm25: Math.max(0, round(basePm25 + (index % 5) - 2)),
+      wind: Math.max(0, round(baseWind + (index % 3) - 1)),
+    };
+  });
+}
+
+function buildFallbackDailyRows(national = {}) {
+  const baseTemp = round(national.temp, 32);
+  const baseRain = round(national.rain, 20);
+  const now = new Date();
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now.getTime() + index * 24 * 60 * 60 * 1000);
+    return {
+      day: date.toLocaleDateString('th-TH', { weekday: 'short' }),
+      max: round(baseTemp + 2 + (index % 3)),
+      min: round(baseTemp - 5 + (index % 2)),
+      rain: clamp(baseRain + (index % 2 ? 8 : -4), 0, 100),
+      uv: index % 2 ? 9 : 7,
+    };
+  });
+}
+
+function getRiskBreakdown({ feelsLike, pm25, rainProb, wind }) {
+  return [
+    { label: 'ร้อน', value: round(clamp((feelsLike - 32) * 5.5, 0, 42)), color: '#ef4444' },
+    { label: 'ฝุ่น', value: round(clamp(pm25 * 0.72, 0, 38)), color: '#f97316' },
+    { label: 'ฝน', value: round(clamp(rainProb * 0.22, 0, 16)), color: '#2563eb' },
+    { label: 'ลม', value: round(clamp((wind - 12) * 0.9, 0, 10)), color: '#0f766e' },
+  ];
+}
+
 export default function AIPage() {
   const [activeMetric, setActiveMetric] = useState('risk');
   const {
@@ -182,7 +230,37 @@ export default function AIPage() {
   } = useAIPageData();
 
   const dashboardData = useMemo(() => {
-    if (!weatherData) return null;
+    if (!weatherData) {
+      const temp = round(national?.temp, 32);
+      const feelsLike = round(national?.feelsLike, temp);
+      const pm25 = round(national?.pm25, 18);
+      const rainProb = round(national?.rain, 20);
+      const wind = round(national?.wind, 8);
+      const humidity = round(national?.humidity, 65);
+      const uv = 7;
+      const riskBreakdown = getRiskBreakdown({ feelsLike, pm25, rainProb, wind });
+      const riskScore = round(riskBreakdown.reduce((sum, item) => sum + item.value, 0));
+
+      return {
+        dailyRows: buildFallbackDailyRows(national),
+        feelsLike,
+        heat: heatMeta(feelsLike),
+        humidity,
+        pm: pmMeta(pm25),
+        pm25,
+        rainProb,
+        risk: riskMeta(riskScore),
+        riskBreakdown,
+        riskScore,
+        temp,
+        trendRows: buildFallbackTrendRows(national),
+        uv,
+        uvStatus: getUvStatus(uv),
+        wind,
+        fallback: true,
+      };
+    }
+
     const { current, daily, hourly } = weatherData;
     const startIdx = startIndexFromNow(hourly?.time);
     const rainProb = round(daily?.precipitation_probability_max?.[0] ?? current?.rainProb);
@@ -192,7 +270,8 @@ export default function AIPage() {
     const uv = round(current?.uv);
     const humidity = round(current?.humidity);
     const wind = round(current?.windSpeed);
-    const riskScore = round(clamp((feelsLike - 32) * 5.5, 0, 42) + clamp(pm25 * 0.72, 0, 38) + clamp(rainProb * 0.22, 0, 16) + clamp((wind - 12) * 0.9, 0, 10));
+    const riskBreakdown = getRiskBreakdown({ feelsLike, pm25, rainProb, wind });
+    const riskScore = round(riskBreakdown.reduce((sum, item) => sum + item.value, 0));
 
     const trendRows = (hourly?.time || [])
       .slice(startIdx, startIdx + 24)
@@ -226,6 +305,7 @@ export default function AIPage() {
       pm25,
       rainProb,
       risk: riskMeta(riskScore),
+      riskBreakdown,
       riskScore,
       temp,
       trendRows,
@@ -233,7 +313,7 @@ export default function AIPage() {
       uvStatus: getUvStatus(uv),
       wind,
     };
-  }, [weatherData]);
+  }, [national, weatherData]);
 
   const activeConfig = metricOptions.find((item) => item.id === activeMetric) || metricOptions[0];
   const areaRows = useMemo(() => (
@@ -245,7 +325,7 @@ export default function AIPage() {
 
   const gistdaCards = useMemo(() => buildGistdaCards(gistdaSummary), [gistdaSummary]);
 
-  if (loadingWeather || !weatherData || !dashboardData) {
+  if (loadingWeather && !dashboardData) {
     return (
       <div className="loading-container" style={{ color: 'var(--text-main)' }}>
         <div className="loading-spinner" />
@@ -255,7 +335,7 @@ export default function AIPage() {
     );
   }
 
-  const { dailyRows, feelsLike, heat, humidity, pm, pm25, rainProb, risk, riskScore, temp, trendRows, uv, uvStatus, wind } = dashboardData;
+  const { dailyRows, feelsLike, heat, humidity, pm, pm25, rainProb, risk, riskBreakdown, riskScore, temp, trendRows, uv, uvStatus, wind } = dashboardData;
   const updatedText = lastUpdated ? new Date(lastUpdated).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
   const windText = windLastFetch ? windLastFetch.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : 'รอข้อมูล';
   const chartText = { fill: 'var(--text-sub)', fontSize: 11, fontWeight: 800 };
@@ -284,6 +364,7 @@ export default function AIPage() {
                 ['อัปเดต', updatedText, '#0284c7'],
                 ['สถานี', `${national?.stationCount || 0} จุด`, '#16a34a'],
                 ['TMD', tmdAvailable ? 'พร้อมใช้' : 'สำรอง', tmdAvailable ? '#16a34a' : '#f59e0b'],
+                ...(dashboardData.fallback ? [['โหมดข้อมูล', 'สำรอง', '#f59e0b']] : []),
               ].map(([label, value, color]) => (
                 <div key={label} style={{ background: `${color}12`, border: `1px solid ${color}28`, borderRadius: 999, color, fontSize: '0.74rem', fontWeight: 900, padding: '8px 12px' }}>
                   {label}: {value}
@@ -303,6 +384,14 @@ export default function AIPage() {
             </div>
             <div style={{ color: 'var(--text-sub)', fontSize: '0.76rem', fontWeight: 750, lineHeight: 1.5, marginTop: 12 }}>
               คำนวณจากความร้อน PM2.5 โอกาสฝน และลม เพื่อช่วยจัดลำดับสิ่งที่ควรรับมือก่อน
+            </div>
+            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', marginTop: 14 }}>
+              {riskBreakdown.map((item) => (
+                <div key={item.label} style={{ background: `${item.color}12`, border: `1px solid ${item.color}24`, borderRadius: 12, padding: '9px 8px' }}>
+                  <div style={{ color: item.color, fontSize: '1.1rem', fontWeight: 950, lineHeight: 1 }}>{item.value}</div>
+                  <div style={{ color: 'var(--text-sub)', fontSize: '0.66rem', fontWeight: 850, marginTop: 4 }}>{item.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

@@ -294,6 +294,13 @@ export default function NewsPage() {
       return null;
     }
   });
+  const [feedCachedAt, setFeedCachedAt] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem('air4thai-news-feed-cache') || '{}')?.cachedAt || null;
+    } catch {
+      return null;
+    }
+  });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [loading, setLoading] = useState(!feed);
   const [query, setQuery] = useState('');
@@ -324,7 +331,9 @@ export default function NewsPage() {
         const payload = await response.json();
         if (!active) return;
         setFeed(payload);
-        window.localStorage.setItem('air4thai-news-feed-cache', JSON.stringify({ cachedAt: Date.now(), payload }));
+        const cachedAt = Date.now();
+        setFeedCachedAt(cachedAt);
+        window.localStorage.setItem('air4thai-news-feed-cache', JSON.stringify({ cachedAt, payload }));
       } catch (loadError) {
         if (loadError.name !== 'AbortError' && active) setError(loadError.message || 'ไม่สามารถโหลดข่าวล่าสุดได้');
       } finally {
@@ -416,6 +425,9 @@ export default function NewsPage() {
   const areas = useMemo(() => extractAreas(filteredItems), [filteredItems]);
   const highCount = filteredItems.filter((item) => item.severity === 'high').length;
   const watchCount = filteredItems.filter((item) => item.severity === 'medium').length;
+  const dataMode = error && feed ? 'ใช้ข้อมูล cache' : feed ? 'ข้อมูลล่าสุด' : 'รอข้อมูล';
+  const dataModeColor = error && feed ? '#f59e0b' : feed ? '#16a34a' : '#64748b';
+  const dataUpdatedText = feedCachedAt ? toThaiDate(feedCachedAt) : 'ยังไม่มี cache';
 
   return (
     <main className="hide-scrollbar fade-in" style={{ background: 'linear-gradient(180deg, rgba(224,242,254,0.72), var(--bg-app) 34%, var(--bg-app))', color: 'var(--text-main)', fontFamily: 'Sarabun, sans-serif', minHeight: '100%', overflowX: 'hidden' }}>
@@ -479,6 +491,22 @@ export default function NewsPage() {
             {error}
           </div>
         )}
+
+        <section style={{ alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 14, padding: '12px 14px' }}>
+          <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ alignItems: 'center', background: `${dataModeColor}12`, border: `1px solid ${dataModeColor}24`, borderRadius: 999, color: dataModeColor, display: 'flex', fontSize: '0.74rem', fontWeight: 950, gap: 6, padding: '6px 10px' }}>
+              <Radio size={14} /> {dataMode}
+            </span>
+            <span style={{ color: 'var(--text-sub)', fontSize: '0.74rem', fontWeight: 850 }}>อัปเดต: {dataUpdatedText}</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {['TMD', 'USGS', 'NASA EONET', 'NOAA CPC ENSO'].map((source) => (
+              <button key={source} onClick={() => openExternal(sourceLinks[source])} type="button" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 900, padding: '6px 9px' }}>
+                {source}
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section style={{ display: 'grid', gap: 14, gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px', alignItems: 'start' }}>
           <div style={{ display: 'grid', gap: 14 }}>
