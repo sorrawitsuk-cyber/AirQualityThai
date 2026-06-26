@@ -116,12 +116,16 @@ export default defineConfig(({ mode }) => {
       filename: 'sw.js',
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      includeManifestIcons: false,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest}'],
         globIgnores: [
           '**/AIPage-*.js',
           '**/MapPage-*.js',
           '**/NewsPage-*.js',
+          '**/apple-touch-icon.png',
+          '**/icon-*.png',
+          '**/maskable-icon-*.png',
           'ai-preview.html',
           'manifest.json',
         ],
