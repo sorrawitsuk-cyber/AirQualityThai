@@ -117,7 +117,14 @@ export default defineConfig(({ mode }) => {
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest}'],
+        globIgnores: [
+          '**/AIPage-*.js',
+          '**/MapPage-*.js',
+          '**/NewsPage-*.js',
+          'ai-preview.html',
+          'manifest.json',
+        ],
       },
       manifest: {
         name: 'AirQuality ไทย — ตรวจสอบคุณภาพอากาศ',

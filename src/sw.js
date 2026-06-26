@@ -26,6 +26,35 @@ registerRoute(
 );
 
 registerRoute(
+  ({ request, url }) => url.origin === self.location.origin && request.destination === 'image',
+  new CacheFirst({
+    cacheName: 'local-image-cache',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 24,
+        maxAgeSeconds: 60 * 60 * 24 * 30,
+      }),
+    ],
+  }),
+);
+
+registerRoute(
+  ({ request, url }) => (
+    url.origin === self.location.origin
+    && ['script', 'style'].includes(request.destination)
+  ),
+  new StaleWhileRevalidate({
+    cacheName: 'local-code-cache',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 32,
+        maxAgeSeconds: 60 * 60 * 24 * 7,
+      }),
+    ],
+  }),
+);
+
+registerRoute(
   ({ url }) => url.hostname.includes('firebaseio.com'),
   new NetworkFirst({
     cacheName: 'firebase-cache',

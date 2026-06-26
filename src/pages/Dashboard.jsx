@@ -1,17 +1,18 @@
-import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { WeatherContext } from '../context/WeatherContext';
 import { useWeatherData } from '../hooks/useWeatherData';
 import { useDraggableScroll } from '../hooks/useDraggableScroll';
 import { getAqiTheme, getAlertBanner } from '../utils/weatherHelpers';
 
-import DailyForecast from '../components/Dashboard/DailyForecast';
-import SunriseSunsetArc from '../components/Dashboard/SunriseSunsetArc';
-import ActivityRecommendations from '../components/Dashboard/ActivityRecommendations';
-import TopStats from '../components/Dashboard/TopStats';
-import WeatherRadar from '../components/Dashboard/WeatherRadar';
-import DisasterSummary from '../components/Dashboard/DisasterSummary';
 import dashboardSkyline from '../assets/dashboard-skyline.png';
 import LoadingScreen from '../components/LoadingScreen';
+
+const DailyForecast = lazy(() => import('../components/Dashboard/DailyForecast'));
+const SunriseSunsetArc = lazy(() => import('../components/Dashboard/SunriseSunsetArc'));
+const ActivityRecommendations = lazy(() => import('../components/Dashboard/ActivityRecommendations'));
+const TopStats = lazy(() => import('../components/Dashboard/TopStats'));
+const WeatherRadar = lazy(() => import('../components/Dashboard/WeatherRadar'));
+const DisasterSummary = lazy(() => import('../components/Dashboard/DisasterSummary'));
 
 function normalizeGeoData(data) {
   return Array.isArray(data) ? data : (data?.data || []);
@@ -136,6 +137,27 @@ function getWeatherBackdropOverlay({ isNight, isRaining, isHot, rainProb }) {
   };
 }
 
+function LazyPanelFallback({ minHeight = 220 }) {
+  return (
+    <div
+      style={{
+        minHeight,
+        borderRadius: '18px',
+        border: '1px solid rgba(148,163,184,0.22)',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(241,245,249,0.72))',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#64748b',
+        fontSize: '0.82rem',
+        fontWeight: 900,
+      }}
+    >
+      กำลังเตรียมแผงข้อมูล
+    </div>
+  );
+}
+
 const FAVORITE_LOCATION_KEY = 'airQualityThai.favoriteLocation';
 const RAIN_ALERT_KEY = 'airQualityThai.rainAlertEnabled';
 
@@ -155,6 +177,7 @@ export default function Dashboard() {
   const [radarScan, setRadarScan] = useState(null);
   const [radarScanLoading, setRadarScanLoading] = useState(false);
   const [radarScanError, setRadarScanError] = useState('');
+  const [radarPanelVisible, setRadarPanelVisible] = useState(false);
   const [favoriteLocation, setFavoriteLocation] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(FAVORITE_LOCATION_KEY) || 'null');
@@ -168,6 +191,7 @@ export default function Dashboard() {
   const hourlyScrollRef = useRef(null);
   const mainScrollRef = useRef(null);
   const locationPanelRef = useRef(null);
+  const radarPanelRef = useRef(null);
   const { isDragging: isHourlyDragging, events: hourlyScrollEvents } = useDraggableScroll(hourlyScrollRef);
   const radarLat = weatherData?.coords?.lat;
   const radarLon = weatherData?.coords?.lon;
@@ -193,6 +217,29 @@ export default function Dashboard() {
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [loadingWeather]);
+
+  useEffect(() => {
+    const target = radarPanelRef.current;
+    if (!target || radarPanelVisible) return undefined;
+
+    if (!('IntersectionObserver' in window)) {
+      setRadarPanelVisible(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRadarPanelVisible(true);
+          observer.disconnect();
+        }
+      },
+      { root: mainScrollRef.current, rootMargin: '220px 0px', threshold: 0.01 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loadingWeather, radarPanelVisible]);
 
   useEffect(() => {
     if (amphoeData?.provinces || !selectedProv || geoData.length > 0 || geoError) return;
@@ -316,6 +363,7 @@ export default function Dashboard() {
   useEffect(() => {
     const lat = radarLat;
     const lon = radarLon;
+    if (!radarPanelVisible) return;
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
     const controller = new AbortController();
@@ -352,6 +400,7 @@ export default function Dashboard() {
     radarLon,
     radarWindDir,
     radarWindSpeed,
+    radarPanelVisible,
   ]);
 
   const fetchLocationName = async (lat, lon) => {
@@ -1409,7 +1458,9 @@ export default function Dashboard() {
   );
 
   const rainRadarCard = (
-    <WeatherRadar
+    <div ref={radarPanelRef}>
+    <Suspense fallback={<LazyPanelFallback minHeight={isMobile ? 340 : 560} />}>
+      <WeatherRadar
       coords={coords}
       isMobile={isMobile}
       cardBg={cardBg}
@@ -1417,7 +1468,9 @@ export default function Dashboard() {
       textColor={textColor}
       frameHeightOverride={isMobile ? undefined : '520px'}
       title="เรดาร์ฝน"
-    />
+      />
+    </Suspense>
+    </div>
   );
 
   const supportGrid = (
@@ -1426,22 +1479,26 @@ export default function Dashboard() {
         {todayTimelineCard}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
-        <ActivityRecommendations
-          current={current}
-          chartData={chartData}
-          isMobile={isMobile}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          subTextColor={subTextColor}
-        />
-        <SunriseSunsetArc
-          current={current}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          textColor={textColor}
-          subTextColor={subTextColor}
-          isMobile={isMobile}
-        />
+        <Suspense fallback={<LazyPanelFallback minHeight={180} />}>
+          <ActivityRecommendations
+            current={current}
+            chartData={chartData}
+            isMobile={isMobile}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            subTextColor={subTextColor}
+          />
+        </Suspense>
+        <Suspense fallback={<LazyPanelFallback minHeight={220} />}>
+          <SunriseSunsetArc
+            current={current}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            textColor={textColor}
+            subTextColor={subTextColor}
+            isMobile={isMobile}
+          />
+        </Suspense>
       </div>
     </div>
   );
@@ -1525,37 +1582,43 @@ export default function Dashboard() {
         {isMobile ? mobileOverviewLayout : desktopOverviewLayout}
 
         {/* === SECTION 9: Daily Forecast 7 days (full width) === */}
-        <DailyForecast 
-           daily={daily}
-           isMobile={isMobile}
-           cardBg={cardBg}
-           borderColor={borderColor}
-           textColor={textColor}
-           subTextColor={subTextColor}
-        />
+        <Suspense fallback={<LazyPanelFallback minHeight={280} />}>
+          <DailyForecast
+             daily={daily}
+             isMobile={isMobile}
+             cardBg={cardBg}
+             borderColor={borderColor}
+             textColor={textColor}
+             subTextColor={subTextColor}
+          />
+        </Suspense>
 
         {/* === SECTION 10: Top 5 Stats (collapsible) === */}
-        <TopStats 
-           top5Heat={top5Heat}
-           top5Cool={top5Cool}
-           top5PM25={top5PM25}
-           top5Rain={top5Rain}
-           isMobile={isMobile}
-           cardBg={cardBg}
-           borderColor={borderColor}
-           textColor={textColor}
-           showYesterday={false}
-           compactHeader
-        />
+        <Suspense fallback={<LazyPanelFallback minHeight={260} />}>
+          <TopStats
+             top5Heat={top5Heat}
+             top5Cool={top5Cool}
+             top5PM25={top5PM25}
+             top5Rain={top5Rain}
+             isMobile={isMobile}
+             cardBg={cardBg}
+             borderColor={borderColor}
+             textColor={textColor}
+             showYesterday={false}
+             compactHeader
+          />
+        </Suspense>
 
         {/* === SECTION 11: GISTDA Disaster Summary === */}
-        <DisasterSummary 
-           isMobile={isMobile}
-           cardBg={cardBg}
-           borderColor={borderColor}
-           textColor={textColor}
-           subTextColor={subTextColor}
-        />
+        <Suspense fallback={<LazyPanelFallback minHeight={260} />}>
+          <DisasterSummary
+             isMobile={isMobile}
+             cardBg={cardBg}
+             borderColor={borderColor}
+             textColor={textColor}
+             subTextColor={subTextColor}
+          />
+        </Suspense>
 
         {/* === Footer === */}
         <div style={{ textAlign: 'center', marginTop: '10px', padding: '20px 0', borderTop: `1px solid ${borderColor}`, opacity: 0.7, flexShrink: 0 }}>
