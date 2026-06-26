@@ -3,6 +3,7 @@ import { WeatherContext } from '../context/WeatherContext';
 import { useWeatherData } from '../hooks/useWeatherData';
 import { useDraggableScroll } from '../hooks/useDraggableScroll';
 import { getAqiTheme, getAlertBanner } from '../utils/weatherHelpers';
+import DataStatusBar from '../components/DataStatusBar';
 
 import dashboardSkyline from '../assets/dashboard-skyline.png';
 import LoadingScreen from '../components/LoadingScreen';
@@ -505,7 +506,6 @@ export default function Dashboard() {
 
   const { current, hourly, daily, coords, minutely } = weatherData;
   const weatherDataMode = weatherData.fallback || current?.fallback ? 'ข้อมูลสำรอง' : 'ข้อมูลสด';
-  const weatherDataModeColor = weatherData.fallback || current?.fallback ? '#f59e0b' : '#16a34a';
   const weatherSourceText = weatherData.fallback || current?.fallback
     ? 'ระบบประเมินสำรอง'
     : 'Open-Meteo / Air Quality API';
@@ -863,8 +863,8 @@ export default function Dashboard() {
           backgroundImage: heroBackgroundImage,
           backgroundSize: 'cover',
           backgroundPosition: 'center right',
-          borderRadius: isMobile ? '24px' : '18px',
-          padding: isMobile ? '16px' : '22px',
+          borderRadius: isMobile ? '20px' : '18px',
+          padding: isMobile ? '14px' : '22px',
           color: '#0f172a',
           border: '1px solid rgba(191, 219, 254, 0.9)',
           boxShadow: '0 18px 40px rgba(14, 116, 144, 0.14)',
@@ -877,7 +877,7 @@ export default function Dashboard() {
         }}
       >
         {heroMotifLayer}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', width: '100%', marginBottom: isMobile ? '20px' : '26px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', width: '100%', marginBottom: isMobile ? '14px' : '26px' }}>
           <div style={{ position: 'relative', zIndex: 1, minWidth: 0 }}>
             <button
               type="button"
@@ -909,20 +909,20 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '18px', position: 'relative', zIndex: 1 }}>
-          <div style={{ fontSize: isMobile ? '4.2rem' : '6rem', fontWeight: '900', letterSpacing: 0, lineHeight: 0.9, color: heroTextColor }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '18px', position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: isMobile ? '3.55rem' : '6rem', fontWeight: '900', letterSpacing: 0, lineHeight: 0.9, color: heroTextColor }}>
             {Math.round(current?.temp || 0)}<span style={{ fontSize: isMobile ? '1.45rem' : '2rem', verticalAlign: 'top' }}>°C</span>
           </div>
-          <span style={{ fontSize: isMobile ? '3.1rem' : '4.8rem', lineHeight: 1, filter: 'drop-shadow(0 10px 12px rgba(15,23,42,0.12))' }}>{weatherIcon}</span>
+          <span style={{ fontSize: isMobile ? '2.65rem' : '4.8rem', lineHeight: 1, filter: 'drop-shadow(0 10px 12px rgba(15,23,42,0.12))' }}>{weatherIcon}</span>
         </div>
         <div style={{ position: 'relative', zIndex: 1, marginTop: '9px' }}>
           <div style={{ fontSize: isMobile ? '0.95rem' : '1.08rem', color: heroTextColor, fontWeight: '900' }}>{weatherText}</div>
           <div style={{ fontSize: isMobile ? '0.82rem' : '0.92rem', color: heroSubTextColor, fontWeight: '800', marginTop: '4px' }}>รู้สึกเหมือน {Math.round(current?.feelsLike || 0)}°C</div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: '10px', width: isMobile ? '100%' : '68%', marginTop: isMobile ? '18px' : '28px', position: 'relative', zIndex: 1 }}>
-          {heroForecastCards.map((item) => (
-            <div key={item.label} style={{ background: heroCardSurface, border: '1px solid rgba(226,232,240,0.88)', borderRadius: '14px', padding: '11px 12px', boxShadow: '0 10px 24px rgba(15,23,42,0.06)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: '10px', width: isMobile ? '100%' : '68%', marginTop: isMobile ? '14px' : '28px', position: 'relative', zIndex: 1 }}>
+          {(isMobile ? heroForecastCards.slice(0, 2) : heroForecastCards).map((item) => (
+            <div key={item.label} style={{ background: heroCardSurface, border: '1px solid rgba(226,232,240,0.88)', borderRadius: '14px', padding: isMobile ? '9px 10px' : '11px 12px', boxShadow: '0 10px 24px rgba(15,23,42,0.06)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#64748b', fontSize: '0.66rem', fontWeight: '900' }}>
                 <span style={{ fontSize: '1rem' }}>{item.icon}</span>
                 <span>{item.label}</span>
@@ -1504,7 +1504,7 @@ export default function Dashboard() {
   );
 
   const heroTopSection = (
-    <div style={{ ...surfaceCardStyle, padding: isMobile ? '12px' : '20px' }}>
+    <div style={{ ...surfaceCardStyle, padding: isMobile ? '10px' : '20px' }}>
       {heroCard}
       {quickActionBar}
     </div>
@@ -1563,21 +1563,17 @@ export default function Dashboard() {
             </div>
         )}
 
-        <div style={{ background: 'var(--bg-card)', border: `1px solid ${borderColor}`, borderRadius: isMobile ? '16px' : '18px', padding: isMobile ? '12px' : '14px 16px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '10px', boxShadow: '0 10px 26px rgba(2,6,23,0.06)' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: weatherDataModeColor, background: `${weatherDataModeColor}12`, border: `1px solid ${weatherDataModeColor}28`, borderRadius: '999px', padding: '6px 10px', fontSize: '0.74rem', fontWeight: 950 }}>
-              {weatherDataMode}
-            </span>
-            <span style={{ color: textColor, fontSize: '0.82rem', fontWeight: 900 }}>
-              แหล่งอากาศ: {weatherSourceText}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', color: subTextColor, fontSize: '0.72rem', fontWeight: 800 }}>
-            <span>ระบบ: {lastUpdateText}</span>
-            <span>พิกัด: {coordText}</span>
-            <span>TMD: {tmdAvailable ? 'พร้อมใช้' : 'สำรอง'}</span>
-          </div>
-        </div>
+        <DataStatusBar
+          compact={isMobile}
+          status={weatherData.fallback || current?.fallback ? 'fallback' : 'live'}
+          label={weatherDataMode}
+          items={[
+            { label: 'อัปเดต', value: lastUpdateText, strong: !isMobile },
+            !isMobile && { label: 'พิกัด', value: coordText },
+            !isMobile && { label: 'แหล่งอากาศ', value: weatherSourceText, strong: true },
+            { label: 'TMD', value: tmdAvailable ? 'พร้อมใช้' : 'สำรอง' },
+          ]}
+        />
 
         {isMobile ? mobileOverviewLayout : desktopOverviewLayout}
 

@@ -14,6 +14,7 @@ import {
   ThermometerSun,
   Waves,
 } from 'lucide-react';
+import DataStatusBar from '../components/DataStatusBar';
 
 const sourceLinks = {
   'Open-Meteo': 'https://open-meteo.com/',
@@ -428,7 +429,6 @@ export default function NewsPage() {
   const highCount = filteredItems.filter((item) => item.severity === 'high').length;
   const watchCount = filteredItems.filter((item) => item.severity === 'medium').length;
   const dataMode = error && feed ? 'ใช้ข้อมูล cache' : feed ? 'ข้อมูลล่าสุด' : 'รอข้อมูล';
-  const dataModeColor = error && feed ? '#f59e0b' : feed ? '#16a34a' : '#64748b';
   const dataUpdatedText = feedCachedAt ? toThaiDate(feedCachedAt) : 'ยังไม่มี cache';
 
   return (
@@ -494,21 +494,18 @@ export default function NewsPage() {
           </div>
         )}
 
-        <section style={{ alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 14, padding: '12px 14px' }}>
-          <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ alignItems: 'center', background: `${dataModeColor}12`, border: `1px solid ${dataModeColor}24`, borderRadius: 999, color: dataModeColor, display: 'flex', fontSize: '0.74rem', fontWeight: 950, gap: 6, padding: '6px 10px' }}>
-              <Radio size={14} /> {dataMode}
-            </span>
-            <span style={{ color: 'var(--text-sub)', fontSize: '0.74rem', fontWeight: 850 }}>อัปเดต: {dataUpdatedText}</span>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-            {['TMD', 'USGS', 'NASA EONET', 'NOAA CPC ENSO'].map((source) => (
-              <button key={source} onClick={() => openExternal(sourceLinks[source])} type="button" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 900, padding: '6px 9px' }}>
-                {source}
-              </button>
-            ))}
-          </div>
-        </section>
+        <DataStatusBar
+          compact={isMobile}
+          status={error && feed ? 'cache' : feed ? 'live' : 'waiting'}
+          label={dataMode}
+          style={{ marginBottom: 14 }}
+          items={[
+            { label: 'อัปเดต', value: dataUpdatedText, strong: true },
+            !isMobile && { label: 'เรื่องทั้งหมด', value: `${filteredItems.length} เรื่อง` },
+            !isMobile && { label: 'เฝ้าระวัง', value: `${watchCount} เรื่อง` },
+          ]}
+          sources={isMobile ? ['TMD', 'USGS'] : ['TMD', 'USGS', 'NASA EONET', 'NOAA CPC ENSO']}
+        />
 
         <section style={{ display: 'grid', gap: 14, gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px', alignItems: 'start' }}>
           <div style={{ display: 'grid', gap: 14 }}>

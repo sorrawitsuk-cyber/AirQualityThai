@@ -13,6 +13,7 @@ import {
   ThermometerSun,
   Wind,
 } from 'lucide-react';
+import DataStatusBar from '../components/DataStatusBar';
 import {
   Area,
   AreaChart,
@@ -359,30 +360,30 @@ export default function AIPage() {
             <p style={{ color: 'var(--text-sub)', fontSize: '0.9rem', fontWeight: 750, lineHeight: 1.55, margin: '10px 0 0', maxWidth: 760 }}>
               รวมสถานการณ์ฝน ฝุ่น ความร้อน ลม UV และอันดับจังหวัดที่ต้องจับตาในมุมมองเดียว อัปเดตจากข้อมูลสดและแหล่งข้อมูลภาครัฐที่ระบบเชื่อมต่ออยู่
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-              {[
-                ['อัปเดต', updatedText, '#0284c7'],
-                ['สถานี', `${national?.stationCount || 0} จุด`, '#16a34a'],
-                ['TMD', tmdAvailable ? 'พร้อมใช้' : 'สำรอง', tmdAvailable ? '#16a34a' : '#f59e0b'],
-                ...(dashboardData.fallback ? [['โหมดข้อมูล', 'สำรอง', '#f59e0b']] : []),
-              ].map(([label, value, color]) => (
-                <div key={label} style={{ background: `${color}12`, border: `1px solid ${color}28`, borderRadius: 999, color, fontSize: '0.74rem', fontWeight: 900, padding: '8px 12px' }}>
-                  {label}: {value}
-                </div>
-              ))}
-            </div>
+            <DataStatusBar
+              compact={isMobile}
+              status={dashboardData.fallback || !national?.stationCount ? 'fallback' : 'live'}
+              label={dashboardData.fallback || !national?.stationCount ? 'ข้อมูลประเมินสำรอง' : 'ข้อมูลพร้อมใช้'}
+              style={{ marginTop: 16 }}
+              items={[
+                { label: 'อัปเดต', value: updatedText, strong: true },
+                { label: 'สถานี', value: `${national?.stationCount || 0} จุด` },
+                { label: 'TMD', value: tmdAvailable ? 'พร้อมใช้' : 'สำรอง' },
+              ]}
+              sources={isMobile ? [] : ['Open-Meteo', 'Air4Thai', 'TMD']}
+            />
           </div>
 
-          <div style={{ background: risk.bg, border: `1px solid ${risk.border}`, borderRadius: 18, padding: 18 }}>
+          <div style={{ background: risk.bg, border: `1px solid ${risk.border}`, borderRadius: 18, padding: isMobile ? 14 : 18 }}>
             <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div style={{ color: risk.color, fontSize: '0.8rem', fontWeight: 950 }}>ดัชนีความเสี่ยงรวม</div>
-                <div style={{ color: risk.color, fontSize: '4rem', fontWeight: 950, letterSpacing: 0, lineHeight: 1 }}>{riskScore}</div>
+                <div style={{ color: risk.color, fontSize: isMobile ? '3.1rem' : '4rem', fontWeight: 950, letterSpacing: 0, lineHeight: 1 }}>{riskScore}</div>
                 <div style={{ color: 'var(--text-main)', fontSize: '0.98rem', fontWeight: 950 }}>{risk.label}</div>
               </div>
               <Gauge color={risk.color} size={66} strokeWidth={1.8} />
             </div>
-            <div style={{ color: 'var(--text-sub)', fontSize: '0.76rem', fontWeight: 750, lineHeight: 1.5, marginTop: 12 }}>
+            <div style={{ color: 'var(--text-sub)', fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 650, lineHeight: 1.55, marginTop: 10 }}>
               คำนวณจากความร้อน PM2.5 โอกาสฝน และลม เพื่อช่วยจัดลำดับสิ่งที่ควรรับมือก่อน
             </div>
             <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', marginTop: 14 }}>
