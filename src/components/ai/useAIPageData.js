@@ -7,6 +7,10 @@ const num = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 const round = (value, fallback = 0) => Math.round(num(value, fallback));
+const finiteOrNull = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const stationName = (station) => {
@@ -48,6 +52,7 @@ export function useAIPageData() {
     lastUpdated,
     tmdAvailable,
     darkMode,
+    weatherMeta,
   } = useContext(WeatherContext);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const { weatherData, loadingWeather, fetchWeatherByCoords } = useWeatherData();
@@ -105,12 +110,13 @@ export function useAIPageData() {
       const daily = stationDaily?.[id] || {};
       const temp = round(live.temp, Number.NaN);
       const feelsLike = round(live.feelsLike ?? live.heatIndex ?? live.temp, temp);
-      const pm25 = round(station?.AQILast?.PM25?.value ?? live.pm25, 0);
+      const pmRaw = finiteOrNull(station?.AQILast?.PM25?.value ?? live.pm25);
+      const pm25 = pmRaw !== null && pmRaw > 0 ? Math.round(pmRaw) : null;
       const rain = round(live.rainProb ?? live.rainChance ?? live.rain, 0);
       const wind = round(live.windSpeed ?? live.wind, 0);
       const humidity = round(live.humidity ?? live.rh, 0);
       const heatRisk = clamp((feelsLike - 32) * 5.5, 0, 42);
-      const pmRisk = clamp(pm25 * 0.72, 0, 38);
+      const pmRisk = pm25 !== null ? clamp(pm25 * 0.72, 0, 38) : 0;
       const rainRisk = clamp(rain * 0.22, 0, 16);
       const windRisk = clamp((wind - 12) * 0.9, 0, 10);
       const riskScore = round(heatRisk + pmRisk + rainRisk + windRisk);
@@ -118,12 +124,12 @@ export function useAIPageData() {
       return {
         id, name: stationName(station), temp, feelsLike, pm25, rain, wind, humidity,
         yesterdayTemp: round(yesterdayMax.temp ?? yesterdayMin.temp, Number.NaN),
-        yesterdayPm25: round(yesterdayMax.pm25 ?? yesterdayMin.pm25, 0),
+        yesterdayPm25: finiteOrNull(yesterdayMax.pm25 ?? yesterdayMin.pm25),
         dailyMax: round(daily?.temperature_2m_max?.[0] ?? daily?.tempMax?.[0], Number.NaN),
         dailyRain: round(daily?.precipitation_probability_max?.[0] ?? daily?.rainProb?.[0], 0),
         riskScore, riskMeta: riskMeta(riskScore),
       };
-    }).filter((row) => Number.isFinite(row.temp) || row.pm25 > 0 || row.rain > 0);
+    }).filter((row) => Number.isFinite(row.temp) || row.pm25 !== null || row.rain > 0);
   }, [stationDaily, stationMaxYesterday, stationTemps, stationYesterday, stations]);
 
   const rankings = useMemo(() => {
@@ -136,24 +142,28 @@ export function useAIPageData() {
       heat: by('feelsLike'), cool: by('temp', 'asc'), pm25: by('pm25'), rain: by('rain'),
       risk: [...stationRows].sort((a, b) => b.riskScore - a.riskScore).slice(0, 6),
       yesterdayHeat: [...stationRows].filter((row) => Number.isFinite(row.yesterdayTemp)).sort((a, b) => b.yesterdayTemp - a.yesterdayTemp).slice(0, 5).map((row) => ({ name: row.name, val: row.yesterdayTemp })),
-      yesterdayPm25: [...stationRows].filter((row) => row.yesterdayPm25 > 0).sort((a, b) => b.yesterdayPm25 - a.yesterdayPm25).slice(0, 5).map((row) => ({ name: row.name, val: row.yesterdayPm25 })),
+      yesterdayPm25: [...stationRows].filter((row) => Number.isFinite(row.yesterdayPm25) && row.yesterdayPm25 > 0).sort((a, b) => b.yesterdayPm25 - a.yesterdayPm25).slice(0, 5).map((row) => ({ name: row.name, val: row.yesterdayPm25 })),
     };
   }, [stationRows]);
 
   const national = useMemo(() => {
     const average = (key) => {
       const values = stationRows.map((row) => row[key]).filter((value) => Number.isFinite(value) && value > -50);
-      return values.length ? round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+      return values.length ? round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
     };
+    const validCounts = ['temp', 'feelsLike', 'pm25', 'rain', 'wind', 'humidity'].reduce((acc, key) => {
+      acc[key] = stationRows.filter((row) => Number.isFinite(row[key]) && row[key] > -50).length;
+      return acc;
+    }, {});
     return {
       temp: average('temp'), feelsLike: average('feelsLike'), pm25: average('pm25'),
       rain: average('rain'), wind: average('wind'), humidity: average('humidity'),
-      stationCount: stationRows.length, topRisk: rankings.risk?.[0],
+      stationCount: stationRows.length, topRisk: rankings.risk?.[0], validCounts,
     };
   }, [rankings.risk, stationRows]);
 
   return {
     isMobile, weatherData, loadingWeather, windAnalysis, windLoading, windError, windLastFetch, fetchWindAnalysis,
-    gistdaSummary, lastUpdated, tmdAvailable, darkMode, stationRows, rankings, national,
+    gistdaSummary, lastUpdated, tmdAvailable, darkMode, weatherMeta, stationRows, rankings, national,
   };
 }

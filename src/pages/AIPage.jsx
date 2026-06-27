@@ -36,6 +36,10 @@ const round = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.round(parsed) : fallback;
 };
+const finiteOrNull = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const metricOptions = [
   { id: 'risk', label: 'ความเสี่ยงรวม', key: 'riskScore', color: '#7c3aed', unit: '' },
@@ -166,7 +170,7 @@ function buildFallbackTrendRows(national = {}) {
   const baseTemp = round(national.temp, 32);
   const baseFeels = round(national.feelsLike, baseTemp);
   const baseRain = round(national.rain, 20);
-  const basePm25 = round(national.pm25, 18);
+  const basePm25 = finiteOrNull(national.pm25);
   const baseWind = round(national.wind, 8);
   const now = new Date();
 
@@ -178,7 +182,7 @@ function buildFallbackTrendRows(national = {}) {
       temp: round(baseTemp + dailyWave * 2 - 1),
       feels: round(baseFeels + dailyWave * 2),
       rain: clamp(baseRain + (index % 4 === 0 ? 8 : index % 3 === 0 ? -6 : 0), 0, 100),
-      pm25: Math.max(0, round(basePm25 + (index % 5) - 2)),
+      pm25: basePm25 === null ? null : Math.max(0, round(basePm25 + (index % 5) - 2)),
       wind: Math.max(0, round(baseWind + (index % 3) - 1)),
     };
   });
@@ -202,9 +206,10 @@ function buildFallbackDailyRows(national = {}) {
 }
 
 function getRiskBreakdown({ feelsLike, pm25, rainProb, wind }) {
+  const pmScoreValue = finiteOrNull(pm25) ?? 0;
   return [
     { label: 'ร้อน', value: round(clamp((feelsLike - 32) * 5.5, 0, 42)), color: '#ef4444' },
-    { label: 'ฝุ่น', value: round(clamp(pm25 * 0.72, 0, 38)), color: '#f97316' },
+    { label: 'ฝุ่น', value: round(clamp(pmScoreValue * 0.72, 0, 38)), color: '#f97316' },
     { label: 'ฝน', value: round(clamp(rainProb * 0.22, 0, 16)), color: '#2563eb' },
     { label: 'ลม', value: round(clamp((wind - 12) * 0.9, 0, 10)), color: '#0f766e' },
   ];
@@ -224,6 +229,7 @@ export default function AIPage() {
     stationRows,
     tmdAvailable,
     weatherData,
+    weatherMeta,
     windAnalysis,
     windError,
     windLastFetch,
@@ -234,12 +240,13 @@ export default function AIPage() {
     if (!weatherData) {
       const temp = round(national?.temp, 32);
       const feelsLike = round(national?.feelsLike, temp);
-      const pm25 = round(national?.pm25, 18);
+      const pm25 = finiteOrNull(national?.pm25);
+      const pmForRisk = pm25 ?? 0;
       const rainProb = round(national?.rain, 20);
       const wind = round(national?.wind, 8);
       const humidity = round(national?.humidity, 65);
       const uv = 7;
-      const riskBreakdown = getRiskBreakdown({ feelsLike, pm25, rainProb, wind });
+      const riskBreakdown = getRiskBreakdown({ feelsLike, pm25: pmForRisk, rainProb, wind });
       const riskScore = round(riskBreakdown.reduce((sum, item) => sum + item.value, 0));
 
       return {
@@ -247,7 +254,7 @@ export default function AIPage() {
         feelsLike,
         heat: heatMeta(feelsLike),
         humidity,
-        pm: pmMeta(pm25),
+        pm: pm25 === null ? { label: 'ไม่มีข้อมูล PM2.5', color: '#64748b' } : pmMeta(pm25),
         pm25,
         rainProb,
         risk: riskMeta(riskScore),
@@ -265,13 +272,14 @@ export default function AIPage() {
     const { current, daily, hourly } = weatherData;
     const startIdx = startIndexFromNow(hourly?.time);
     const rainProb = round(daily?.precipitation_probability_max?.[0] ?? current?.rainProb);
-    const pm25 = round(current?.pm25);
+    const pm25 = finiteOrNull(current?.pm25);
+    const pmForRisk = pm25 ?? 0;
     const temp = round(current?.temp);
     const feelsLike = round(current?.feelsLike ?? current?.temp);
     const uv = round(current?.uv);
     const humidity = round(current?.humidity);
     const wind = round(current?.windSpeed);
-    const riskBreakdown = getRiskBreakdown({ feelsLike, pm25, rainProb, wind });
+    const riskBreakdown = getRiskBreakdown({ feelsLike, pm25: pmForRisk, rainProb, wind });
     const riskScore = round(riskBreakdown.reduce((sum, item) => sum + item.value, 0));
 
     const trendRows = (hourly?.time || [])
@@ -284,7 +292,7 @@ export default function AIPage() {
           temp: round(hourly?.temperature_2m?.[rowIndex] ?? temp),
           feels: round(hourly?.apparent_temperature?.[rowIndex] ?? feelsLike),
           rain: round(hourly?.precipitation_probability?.[rowIndex] ?? rainProb),
-          pm25: round(hourly?.pm25?.[rowIndex] ?? pm25),
+          pm25: finiteOrNull(hourly?.pm25?.[rowIndex] ?? pm25),
           wind: round(hourly?.wind_speed_10m?.[rowIndex] ?? wind),
         };
       });
@@ -302,7 +310,7 @@ export default function AIPage() {
       feelsLike,
       heat: heatMeta(feelsLike),
       humidity,
-      pm: pmMeta(pm25),
+      pm: pm25 === null ? { label: 'ไม่มีข้อมูล PM2.5', color: '#64748b' } : pmMeta(pm25),
       pm25,
       rainProb,
       risk: riskMeta(riskScore),
@@ -313,8 +321,14 @@ export default function AIPage() {
       uv,
       uvStatus: getUvStatus(uv),
       wind,
+      fallback: Boolean(weatherData.fallback || weatherData.missing?.pm25),
     };
   }, [national, weatherData]);
+
+  const sourceIsFallback = weatherMeta?.source === 'deterministic-fallback'
+    || weatherMeta?.fallbackSource === 'deterministic-fallback'
+    || weatherMeta?.source === 'unavailable';
+  const dataIsFallback = Boolean(dashboardData.fallback || sourceIsFallback || !national?.stationCount);
 
   const activeConfig = metricOptions.find((item) => item.id === activeMetric) || metricOptions[0];
   const areaRows = useMemo(() => (
@@ -337,6 +351,8 @@ export default function AIPage() {
   }
 
   const { dailyRows, feelsLike, heat, humidity, pm, pm25, rainProb, risk, riskBreakdown, riskScore, temp, trendRows, uv, uvStatus, wind } = dashboardData;
+  const pm25Display = pm25 === null ? '-' : pm25;
+  const nationalPm25Display = national?.pm25 === null || national?.pm25 === undefined ? '-' : national.pm25;
   const updatedText = lastUpdated ? new Date(lastUpdated).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
   const windText = windLastFetch ? windLastFetch.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : 'รอข้อมูล';
   const chartText = { fill: 'var(--text-sub)', fontSize: 11, fontWeight: 800 };
@@ -362,12 +378,13 @@ export default function AIPage() {
             </p>
             <DataStatusBar
               compact={isMobile}
-              status={dashboardData.fallback || !national?.stationCount ? 'fallback' : 'live'}
-              label={dashboardData.fallback || !national?.stationCount ? 'ข้อมูลประเมินสำรอง' : 'ข้อมูลพร้อมใช้'}
+              status={dataIsFallback ? 'fallback' : 'live'}
+              label={dataIsFallback ? 'ข้อมูลประเมินสำรอง' : 'ข้อมูลพร้อมใช้'}
               style={{ marginTop: 16 }}
               items={[
                 { label: 'อัปเดต', value: updatedText, strong: true },
                 { label: 'สถานี', value: `${national?.stationCount || 0} จุด` },
+                { label: 'แหล่งข้อมูล', value: weatherMeta?.source || weatherData?.source || 'Open-Meteo' },
                 { label: 'TMD', value: tmdAvailable ? 'พร้อมใช้' : 'สำรอง' },
               ]}
               sources={isMobile ? [] : ['Open-Meteo', 'Air4Thai', 'TMD']}
@@ -399,7 +416,7 @@ export default function AIPage() {
 
         <section style={{ display: 'grid', gap: 12, gridTemplateColumns: grid4, marginBottom: 14 }}>
           <MetricTile color={heat.color} icon={ThermometerSun} label="รู้สึกเหมือน" note={heat.label} percent={(feelsLike / 45) * 100} unit="°C" value={feelsLike} />
-          <MetricTile color={pm.color} icon={Activity} label="PM2.5" note={pm.label} percent={(pm25 / 75) * 100} value={pm25} />
+          <MetricTile color={pm.color} icon={Activity} label="PM2.5" note={pm.label} percent={pm25 === null ? 0 : (pm25 / 75) * 100} value={pm25Display} />
           <MetricTile color={rainProb >= 50 ? '#2563eb' : '#0f766e'} icon={CloudRain} label="โอกาสฝน" note={windAnalysis?.quickSummary || 'ประเมินจากพยากรณ์รายวันและรายชั่วโมง'} percent={rainProb} unit="%" value={rainProb} />
           <MetricTile color={uvStatus.color} icon={ShieldCheck} label="UV / ความชื้น" note={`UV ${uvStatus.text} · ความชื้น ${humidity}% · ลม ${wind} กม./ชม.`} percent={uv * 10} value={uv} />
         </section>
@@ -509,7 +526,7 @@ export default function AIPage() {
               {[
                 ['อุณหภูมิ', `${national?.temp || temp}°C`, '#ef4444', ((national?.temp || temp) / 42) * 100],
                 ['รู้สึกเหมือน', `${national?.feelsLike || feelsLike}°C`, '#f97316', ((national?.feelsLike || feelsLike) / 45) * 100],
-                ['PM2.5', `${national?.pm25 || pm25}`, '#f59e0b', ((national?.pm25 || pm25) / 75) * 100],
+                ['PM2.5', `${nationalPm25Display}`, '#f59e0b', national?.pm25 === null || national?.pm25 === undefined ? 0 : (national.pm25 / 75) * 100],
                 ['ฝน', `${national?.rain || rainProb}%`, '#2563eb', national?.rain || rainProb],
                 ['ลม', `${national?.wind || wind} กม./ชม.`, '#0f766e', (national?.wind || wind) * 5],
               ].map(([label, value, color, percent]) => (

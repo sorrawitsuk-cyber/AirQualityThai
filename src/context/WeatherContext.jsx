@@ -22,6 +22,11 @@ export const WeatherProvider = ({ children }) => {
   const [tmdAvailable, setTmdAvailable] = useState(false); // 🆕 TMD API status
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [weatherMeta, setWeatherMeta] = useState({
+    source: 'initial',
+    stale: false,
+    fallbackSource: null,
+  });
 
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -60,6 +65,11 @@ export const WeatherProvider = ({ children }) => {
           setAmphoeData(data.amphoeData || null);
           setLastUpdated(data.lastUpdated || null);
           setTmdAvailable(data.tmdAvailable || false);
+          setWeatherMeta({
+            source: data.source || (data.fallbackSource ? 'fallback' : 'unknown'),
+            stale: Boolean(data.stale),
+            fallbackSource: data.fallbackSource || null,
+          });
         }
       } catch (error) {
         if (!cancelled) {
@@ -69,6 +79,15 @@ export const WeatherProvider = ({ children }) => {
           setStationYesterday({});
           setStationMaxYesterday({});
           setStationDaily({});
+          setGistdaSummary(null);
+          setAmphoeData(null);
+          setLastUpdated(null);
+          setTmdAvailable(false);
+          setWeatherMeta({
+            source: 'unavailable',
+            stale: true,
+            fallbackSource: 'initial-empty',
+          });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -85,7 +104,7 @@ export const WeatherProvider = ({ children }) => {
   return (
     <WeatherContext.Provider value={{ 
       stations, stationTemps, stationYesterday, stationMaxYesterday, stationDaily, 
-      gistdaSummary, amphoeData, tmdAvailable,
+      gistdaSummary, amphoeData, tmdAvailable, weatherMeta,
       loading, lastUpdated, 
       darkMode, setDarkMode 
     }}>

@@ -2,6 +2,11 @@ import { useState, useCallback, useRef } from 'react';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+const finiteOrNull = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 function getDailyPm25Max(dates = [], airQualityData = {}) {
   return dates.map((dateStr) => {
     let maxPm = null;
@@ -16,7 +21,8 @@ function getDailyPm25Max(dates = [], airQualityData = {}) {
       });
     }
 
-    return maxPm !== null ? Math.round(maxPm) : Math.round(airQualityData.current?.pm2_5 || 0);
+    const currentPm = finiteOrNull(airQualityData.current?.pm2_5);
+    return maxPm !== null ? Math.round(maxPm) : (currentPm !== null ? Math.round(currentPm) : null);
   });
 }
 
@@ -123,9 +129,10 @@ export function useWeatherData() {
       }
 
       const wData = await wRes.value.json();
-      const aData = aRes.status === 'fulfilled' && aRes.value.ok
+      const airOk = aRes.status === 'fulfilled' && aRes.value.ok;
+      const aData = airOk
         ? await aRes.value.json()
-        : { current: { pm2_5: 0 }, hourly: { pm2_5: [] } };
+        : { current: { pm2_5: null }, hourly: { pm2_5: [] } };
       if (requestId !== requestIdRef.current) return;
 
       if (wData?.current && wData?.hourly && wData?.daily) {
@@ -136,6 +143,10 @@ export function useWeatherData() {
         const currentHourIndex = exactHourIndex >= 0 ? exactHourIndex : Math.max(0, fallbackHourIndex);
         const isDaytime = Number(wData.current?.is_day ?? 1) === 1;
         const currentUv = isDaytime ? Number(wData.hourly?.uv_index?.[currentHourIndex] || 0) : 0;
+        const currentPm25 = finiteOrNull(aData.current?.pm2_5);
+        const hourlyPm25 = Array.isArray(aData.hourly?.pm2_5) && aData.hourly.pm2_5.length
+          ? aData.hourly.pm2_5.map(finiteOrNull)
+          : wData.hourly.time.map(() => currentPm25);
 
         setWeatherData({
           current: {
@@ -147,7 +158,7 @@ export function useWeatherData() {
             pressure: wData.current.surface_pressure,
             visibility: wData.current.visibility,
             uv: Number.isFinite(currentUv) ? Math.round(currentUv * 10) / 10 : 0,
-            pm25: aData.current?.pm2_5 || 0,
+            pm25: currentPm25,
             sunrise: wData.daily.sunrise[0],
             sunset: wData.daily.sunset[0],
             rainProb: wData.hourly.precipitation_probability[currentHourIndex],
@@ -162,7 +173,7 @@ export function useWeatherData() {
             apparent_temperature: wData.hourly.apparent_temperature,
             precipitation_probability: wData.hourly.precipitation_probability,
             precipitation: wData.hourly.precipitation,
-            pm25: aData.hourly?.pm2_5 || wData.hourly.time.map(() => aData.current?.pm2_5 || 0),
+            pm25: hourlyPm25,
             wind_speed_10m: wData.hourly.wind_speed_10m,
             relative_humidity_2m: wData.hourly.relative_humidity_2m,
             uv_index: wData.hourly.uv_index,
@@ -188,7 +199,11 @@ export function useWeatherData() {
             sunset: wData.daily.sunset,
           },
           coords: { lat, lon },
-          fallback: aRes.status !== 'fulfilled' || !aRes.value.ok,
+          fallback: !airOk,
+          source: airOk ? 'open-meteo-weather-air-quality' : 'open-meteo-weather-only',
+          missing: {
+            pm25: !airOk || currentPm25 === null,
+          },
         });
       }
     } catch (err) {

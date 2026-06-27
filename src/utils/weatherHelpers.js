@@ -15,6 +15,7 @@ export const getSunTime = (dateStr) => {
 };
 
 export const getAqiTheme = (pm25) => {
+    if (!Number.isFinite(Number(pm25))) return { bg: '#64748b', text: 'ไม่มีข้อมูล PM2.5' };
     if (pm25 > 75) return { bg: '#ef4444', text: 'มีผลกระทบต่อสุขภาพ' };
     if (pm25 > 37.5) return { bg: '#f97316', text: 'เริ่มมีผลกระทบ' };
     if (pm25 > 25) return { bg: '#eab308', text: 'ปานกลาง' };

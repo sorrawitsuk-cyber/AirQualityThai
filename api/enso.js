@@ -3,17 +3,18 @@ const IRI_ENSO_URL = 'https://iri.columbia.edu/our-expertise/climate/forecasts/e
 const CACHE_TTL_SECONDS = 6 * 60 * 60;
 
 const fallbackOutlook = {
-  updatedAt: 'เม.ย. 2569',
-  status: 'ENSO-neutral',
-  alert: 'Final La Niña Advisory / El Niño Watch',
-  nino34: '-0.2°C',
-  sourceNote: 'NOAA CPC 9 เม.ย. 2569 และ IRI ENSO Quick Look เม.ย. 2569',
-  summary: 'แปซิฟิกเขตร้อนอยู่ในภาวะ ENSO-neutral แต่แนวโน้มเอนเอียงไปทาง El Niño ในช่วงกลางปี 2569',
+  updatedAt: null,
+  sourceUpdatedAt: null,
+  status: 'ไม่ยืนยันล่าสุด',
+  alert: 'รอข้อมูลล่าสุดจาก NOAA/IRI',
+  nino34: null,
+  sourceNote: 'NOAA CPC / IRI ยังไม่พร้อมใช้งาน',
+  summary: 'ไม่สามารถยืนยัน ENSO ล่าสุดจาก NOAA/IRI ได้ในขณะนี้ โปรดใช้เป็นข้อมูลสำรองและตรวจประกาศต้นทางก่อนตัดสินใจ',
+  dataConfidence: 'fallback',
+  fallback: true,
   forecast: [
-    { label: 'ตอนนี้', value: 'เป็นกลาง', detail: 'หลังสิ้นสุด La Niña', color: '#2563eb' },
-    { label: 'เม.ย.-มิ.ย.', value: 'เป็นกลางเด่น', detail: 'NOAA ให้โอกาสเป็นกลางสูง', color: '#0ea5e9' },
-    { label: 'พ.ค.-ก.ค.', value: 'El Niño เริ่มมีโอกาส', detail: 'โอกาสเพิ่มขึ้นช่วงกลางปี', color: '#f97316' },
-    { label: 'ปลายปี', value: 'จับตา El Niño', detail: 'อาจกระทบฝนและความร้อนในไทย', color: '#ef4444' },
+    { label: 'ตอนนี้', value: 'รอตรวจสอบ', detail: 'ยังไม่ยืนยันสถานะล่าสุดจาก NOAA/IRI', color: '#64748b' },
+    { label: '1-3 เดือน', value: 'รอข้อมูลต้นทาง', detail: 'ระบบจะอัปเดตเมื่ออ่านประกาศล่าสุดได้', color: '#64748b' },
   ],
   impacts: [
     { title: 'ฝนและฤดูมรสุม', detail: 'ฝนอาจกระจายตัวไม่สม่ำเสมอ มีทั้งช่วงฝนทิ้งช่วงและฝนหนักเฉพาะจุด ต้องดูประกาศกรมอุตุฯ ควบคู่', color: '#2563eb' },
@@ -66,6 +67,9 @@ function buildOutlook(noaaHtml, iriHtml) {
   const noaa = clean(noaaHtml);
   const iri = clean(iriHtml);
   const combined = `${noaa} ${iri}`;
+  if (!noaa && !iri) {
+    return { ...fallbackOutlook, fetchedAt: new Date().toISOString() };
+  }
 
   const alert = pick(noaa, [
     /ENSO Alert System Status:\s*(.*?)(?=\s+Synopsis|\s+Diagnostic Discussion|$)/i,
@@ -75,7 +79,10 @@ function buildOutlook(noaaHtml, iriHtml) {
   const issued = pick(noaa, [
     /(\d{1,2}\s+[A-Za-z]+\s+20\d{2})\s+ENSO Alert/i,
     /issued\s+(\d{1,2}\s+[A-Za-z]+\s+20\d{2})/i,
-  ]) || 'ล่าสุดจาก NOAA CPC';
+  ]);
+  const sourceUpdatedAt = issued && !Number.isNaN(new Date(issued).getTime())
+    ? new Date(issued).toISOString()
+    : null;
 
   const nino34 = pick(combined, [
     /Ni[ñn]o-?3\.4[^-\d+]*([+-]?\d+(?:\.\d+)?\s*°?C)/i,
@@ -93,10 +100,11 @@ function buildOutlook(noaaHtml, iriHtml) {
 
   return {
     ...fallbackOutlook,
-    updatedAt: issued,
+    updatedAt: issued || null,
+    sourceUpdatedAt,
     alert,
     nino34,
-    sourceNote: `NOAA CPC / IRI อัปเดต ${issued}`,
+    sourceNote: issued ? `NOAA CPC / IRI อัปเดต ${issued}` : 'NOAA CPC / IRI',
     summary: iri.match(/equatorial Pacific[^.]+\./i)?.[0]
       || noaa.match(/ENSO-neutral[^.]+\./i)?.[0]
       || fallbackOutlook.summary,
@@ -107,6 +115,8 @@ function buildOutlook(noaaHtml, iriHtml) {
       { label: 'ปลายปี', value: 'จับตาต่อเนื่อง', detail: 'ผลต่อฝนและความร้อนในไทยอาจชัดขึ้น', color: '#ef4444' },
     ],
     fetchedAt: new Date().toISOString(),
+    fallback: false,
+    dataConfidence: noaa && iri ? 'live' : 'partial',
     sources: [
       { label: 'NOAA CPC ENSO', url: NOAA_ENSO_URL },
       { label: 'IRI ENSO Forecast', url: IRI_ENSO_URL },

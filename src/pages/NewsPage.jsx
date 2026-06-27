@@ -102,6 +102,19 @@ const thaiProvinceNames = [
 ];
 
 const defaultPrefs = { push: true, line: true, email: false };
+const NEWS_LOCAL_TTL_MS = 10 * 60 * 1000;
+const ENSO_LOCAL_TTL_MS = 6 * 60 * 60 * 1000;
+
+function readLocalCache(key, ttlMs) {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(key) || 'null');
+    if (!cached?.payload || !cached?.cachedAt) return null;
+    if (Date.now() - cached.cachedAt > ttlMs) return null;
+    return cached;
+  } catch {
+    return null;
+  }
+}
 
 const asArray = (value) => Array.isArray(value) ? value : [];
 
@@ -166,7 +179,8 @@ function normalizeItem(item, fallback = {}) {
     id: item.id || item.url || `${source}-${title}-${item.publishedAt || item.time || ''}`,
     area,
     color: categories.find((cat) => cat.id === topic)?.color || '#475569',
-    publishedAt: item.publishedAt || item.time || item.updatedAt || new Date().toISOString(),
+    publishedAt: item.publishedAt || item.time || item.updatedAt || null,
+    dateConfidence: item.dateConfidence || (item.publishedAt || item.time || item.updatedAt ? 'source' : 'unknown'),
     raw: item,
     scope: /thailand|thai|tmd|ปภ|กรมอุตุ|tha/i.test(`${source} ${item.country || ''}`) ? 'thai' : 'global',
     severity,
@@ -284,25 +298,13 @@ export default function NewsPage() {
     }
   });
   const [ensoFeed, setEnsoFeed] = useState(() => {
-    try {
-      return JSON.parse(window.localStorage.getItem('air4thai-enso-cache') || '{}')?.payload || null;
-    } catch {
-      return null;
-    }
+    return readLocalCache('air4thai-enso-cache', ENSO_LOCAL_TTL_MS)?.payload || null;
   });
   const [feed, setFeed] = useState(() => {
-    try {
-      return JSON.parse(window.localStorage.getItem('air4thai-news-feed-cache') || '{}')?.payload || null;
-    } catch {
-      return null;
-    }
+    return readLocalCache('air4thai-news-feed-cache', NEWS_LOCAL_TTL_MS)?.payload || null;
   });
   const [feedCachedAt, setFeedCachedAt] = useState(() => {
-    try {
-      return JSON.parse(window.localStorage.getItem('air4thai-news-feed-cache') || '{}')?.cachedAt || null;
-    } catch {
-      return null;
-    }
+    return readLocalCache('air4thai-news-feed-cache', NEWS_LOCAL_TTL_MS)?.cachedAt || null;
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [loading, setLoading] = useState(!feed);
@@ -329,12 +331,15 @@ export default function NewsPage() {
       setError('');
       try {
         const endpoint = refreshToken ? `/api/news?fresh=${refreshToken}` : '/api/news';
-        const response = await fetch(endpoint, { cache: refreshToken ? 'no-store' : 'default', headers: { Accept: 'application/json' }, signal: controller.signal });
+        const response = await fetch(endpoint, { cache: refreshToken ? 'no-store' : 'default', headers: { Accept: 'application/json', 'X-User-Refresh': refreshToken ? '1' : '0' }, signal: controller.signal });
         if (!response.ok) throw new Error(`โหลดข่าวไม่สำเร็จ (${response.status})`);
         const payload = await response.json();
         if (!active) return;
         setFeed(payload);
-        const cachedAt = Date.now();
+        const generatedAt = payload.generatedAt || payload.fetchedAt || payload.updatedAt;
+        const cachedAt = generatedAt && !Number.isNaN(new Date(generatedAt).getTime())
+          ? new Date(generatedAt).getTime()
+          : Date.now();
         setFeedCachedAt(cachedAt);
         window.localStorage.setItem('air4thai-news-feed-cache', JSON.stringify({ cachedAt, payload }));
       } catch (loadError) {
@@ -404,7 +409,7 @@ export default function NewsPage() {
         summary: enso.summary,
         source: 'NOAA CPC ENSO',
         category: 'climate',
-        publishedAt: enso.updatedAt,
+        publishedAt: enso.sourceUpdatedAt || enso.fetchedAt || feed?.generatedAt || null,
         url: sourceLinks['NOAA CPC ENSO'],
       }),
     ]).sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());

@@ -899,13 +899,16 @@ function walkTree(obj, callback, _depth = 0) {
   for (const child of entries) walkTree(child, callback, _depth + 1);
 }
 
-function makeTmdItem(title, summary, link, category, severity = 'normal') {
+function makeTmdItem(title, summary, link, category, severity = 'normal', meta = {}) {
   const cleanedSummary = cleanText(summary || '');
+  const publishedAt = meta.publishedAt || null;
   return enrichItem({
     title: cleanText(title || '').slice(0, 200),
     summary: summarizeForReaders(cleanedSummary),
     rawSummary: cleanedSummary.slice(0, 2500),
-    publishedAt: new Date().toISOString(),
+    publishedAt,
+    dateConfidence: publishedAt ? 'scraped' : 'unknown',
+    scrapedAt: isoNow(),
     link,
     url: link,
     severity,
@@ -1483,7 +1486,8 @@ export default async function handler(req, res) {
 
   const expected = process.env.CRON_SECRET;
   const allowPrivilegedRefresh = Boolean(expected && req.headers.authorization === `Bearer ${expected}`);
-  const bypassCache = allowPrivilegedRefresh && (req.query?._fresh || req.query?.fresh || req.headers['cache-control'] === 'no-cache');
+  const publicManualRefresh = Boolean(req.query?.fresh && req.headers['x-user-refresh'] === '1');
+  const bypassCache = publicManualRefresh || (allowPrivilegedRefresh && (req.query?._fresh || req.query?.fresh || req.headers['cache-control'] === 'no-cache'));
 
   // Return cached response immediately on warm instances (dev + warm Vercel lambdas)
   if (!bypassCache && _newsCache && (Date.now() - _newsCacheAt) < SERVER_CACHE_TTL_MS) {

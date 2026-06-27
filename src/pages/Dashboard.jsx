@@ -19,6 +19,11 @@ function normalizeGeoData(data) {
   return Array.isArray(data) ? data : (data?.data || []);
 }
 
+const finiteOrNull = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const provinceBackdrops = {
   city: {
     label: 'มหานครริมเจ้าพระยา',
@@ -163,7 +168,7 @@ const FAVORITE_LOCATION_KEY = 'airQualityThai.favoriteLocation';
 const RAIN_ALERT_KEY = 'airQualityThai.rainAlertEnabled';
 
 export default function Dashboard() {
-  const { stations, stationTemps, lastUpdated, amphoeData, tmdAvailable } = useContext(WeatherContext);
+  const { stations, stationTemps, lastUpdated, amphoeData, tmdAvailable, weatherMeta } = useContext(WeatherContext);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [locationName, setLocationName] = useState('กำลังระบุตำแหน่ง...');
@@ -505,15 +510,22 @@ export default function Dashboard() {
   );
 
   const { current, hourly, daily, coords, minutely } = weatherData;
-  const weatherDataMode = weatherData.fallback || current?.fallback ? 'ข้อมูลสำรอง' : 'ข้อมูลสด';
-  const weatherSourceText = weatherData.fallback || current?.fallback
-    ? 'ระบบประเมินสำรอง'
+  const currentPm25 = finiteOrNull(current?.pm25);
+  const hasPm25 = currentPm25 !== null;
+  const pm25Display = hasPm25 ? Math.round(currentPm25) : '-';
+  const sourceIsFallback = weatherMeta?.source === 'deterministic-fallback'
+    || weatherMeta?.fallbackSource === 'deterministic-fallback'
+    || weatherMeta?.source === 'unavailable';
+  const isFallbackData = Boolean(weatherData.fallback || current?.fallback || sourceIsFallback);
+  const weatherDataMode = isFallbackData ? 'ข้อมูลสำรอง' : 'ข้อมูลสด';
+  const weatherSourceText = isFallbackData
+    ? (weatherMeta?.source === 'deterministic-fallback' ? 'ระบบประเมินสำรอง' : 'Open-Meteo บางแหล่งไม่พร้อม')
     : 'Open-Meteo / Air Quality API';
   const coordText = Number.isFinite(Number(coords?.lat)) && Number.isFinite(Number(coords?.lon))
     ? `${Number(coords.lat).toFixed(3)}, ${Number(coords.lon).toFixed(3)}`
     : '-';
   
-  const aqiTheme = getAqiTheme(current?.pm25);
+  const aqiTheme = getAqiTheme(currentPm25);
   
   const isRaining = current?.rainProb > 30;
   const isHot = current?.feelsLike >= 38;
@@ -545,7 +557,7 @@ export default function Dashboard() {
       feelsLike: Math.round(hourly?.apparent_temperature?.[rIdx] || 0),
       rain: rainP,
       rainAmount: rainA,
-      pm25: Math.round(hourly?.pm25?.[rIdx] || 0),
+      pm25: finiteOrNull(hourly?.pm25?.[rIdx]),
       icon: icon
     };
   });
@@ -776,7 +788,7 @@ export default function Dashboard() {
     },
   ];
   const heroForecastCards = [
-    { icon: '🌫️', label: 'คุณภาพอากาศ', value: `PM2.5 ${Math.round(current?.pm25 || 0)}`, note: aqiTheme.text },
+    { icon: '🌫️', label: 'คุณภาพอากาศ', value: `PM2.5 ${pm25Display}`, note: aqiTheme.text },
     { icon: '☀️', label: 'รังสี UV', value: `${current?.uv || 0}`, note: current?.uv > 8 ? 'สูงมาก' : current?.uv > 5 ? 'สูง' : current?.uv > 2 ? 'ปานกลาง' : 'ต่ำ' },
   ];
   const highlightMetrics = [
@@ -810,15 +822,15 @@ export default function Dashboard() {
       bg: 'rgba(245,158,11,0.13)',
       priority: 3,
     },
-    current?.pm25 >= 37.5 && {
+    hasPm25 && currentPm25 >= 37.5 && {
       icon: '😷',
       title: 'ใส่หน้ากาก',
-      detail: `PM2.5 ${Math.round(current?.pm25 || 0)}`,
+      detail: `PM2.5 ${pm25Display}`,
       tone: '#f97316',
       bg: 'rgba(249,115,22,0.13)',
       priority: 4,
     },
-    currentRainProb < 35 && current?.pm25 < 37.5 && current?.feelsLike < 38 && {
+    currentRainProb < 35 && hasPm25 && currentPm25 < 37.5 && current?.feelsLike < 38 && {
       icon: '🚶',
       title: 'ออกไปข้างนอกได้',
       detail: 'สภาพอากาศพอเหมาะ',
@@ -1042,9 +1054,11 @@ export default function Dashboard() {
     </div>
   );
 
-  const pmValue = Math.round(current?.pm25 || 0);
+  const pmValue = hasPm25 ? Math.round(currentPm25) : null;
   const uvValue = Number(current?.uv || 0);
-  const pmAdvice = pmValue >= 75
+  const pmAdvice = pmValue === null
+    ? { text: 'ยังไม่มีข้อมูล PM2.5 จากแหล่งอากาศ', tone: '#64748b' }
+    : pmValue >= 75
     ? { text: 'ฝุ่นสูงมาก เลี่ยงกิจกรรมกลางแจ้ง', tone: '#ef4444' }
     : pmValue >= 37.5
       ? { text: 'ฝุ่นเริ่มสูง ใส่หน้ากากเมื่อต้องอยู่นอกอาคาร', tone: '#f97316' }
@@ -1062,7 +1076,7 @@ export default function Dashboard() {
   const healthAdviceBar = (
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: '10px', marginTop: isMobile ? '0' : '12px', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
       {[
-        { icon: '😷', label: `PM2.5 ${pmValue}`, ...pmAdvice },
+        { icon: '😷', label: `PM2.5 ${pmValue === null ? '-' : pmValue}`, ...pmAdvice },
         { icon: '☀️', label: `UV ${uvValue}`, ...uvAdvice },
       ].map((item) => (
         <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: '9px', alignItems: 'center', padding: '10px 12px', borderRadius: '14px', border: `1px solid ${item.tone}33`, background: `linear-gradient(180deg, ${item.tone}10, var(--bg-secondary))`, minWidth: 0 }}>
@@ -1112,9 +1126,9 @@ export default function Dashboard() {
     },
     {
       label: 'PM2.5',
-      value: `${Math.round(current?.pm25 || 0)}`,
-      tone: current?.pm25 >= 50 ? '#ef4444' : current?.pm25 >= 25 ? '#f59e0b' : '#16a34a',
-      bg: current?.pm25 >= 50 ? 'rgba(239,68,68,0.12)' : current?.pm25 >= 25 ? 'rgba(245,158,11,0.14)' : 'rgba(22,163,74,0.1)',
+      value: `${pm25Display}`,
+      tone: !hasPm25 ? '#64748b' : currentPm25 >= 50 ? '#ef4444' : currentPm25 >= 25 ? '#f59e0b' : '#16a34a',
+      bg: !hasPm25 ? 'rgba(100,116,139,0.12)' : currentPm25 >= 50 ? 'rgba(239,68,68,0.12)' : currentPm25 >= 25 ? 'rgba(245,158,11,0.14)' : 'rgba(22,163,74,0.1)',
     },
     {
       label: 'พรุ่งนี้',
@@ -1133,7 +1147,7 @@ export default function Dashboard() {
         ? `วันนี้ฝนเด่นช่วง ${chartData.find((item) => item.rain >= 45)?.time || 'บ่าย-เย็น'}`
         : 'ฝนระยะใกล้ยังไม่เด่นมาก',
     current?.feelsLike >= 38 ? `อากาศร้อน รู้สึกเหมือน ${Math.round(current?.feelsLike || 0)}°` : `อุณหภูมิประมาณ ${Math.round(current?.temp || 0)}°`,
-    current?.pm25 >= 37.5 ? 'ฝุ่นเริ่มสูง ควรลดเวลานอกอาคาร' : 'คุณภาพอากาศยังพอใช้',
+    !hasPm25 ? 'ยังไม่มีข้อมูล PM2.5 ล่าสุด' : currentPm25 >= 37.5 ? 'ฝุ่นเริ่มสูง ควรลดเวลานอกอาคาร' : 'คุณภาพอากาศยังพอใช้',
     tomorrowRainProb >= 40 ? `พรุ่งนี้มีโอกาสฝน ${tomorrowRainProb}%` : 'พรุ่งนี้ยังวางแผนกลางแจ้งได้',
   ].join(' · ');
 
@@ -1565,12 +1579,13 @@ export default function Dashboard() {
 
         <DataStatusBar
           compact={isMobile}
-          status={weatherData.fallback || current?.fallback ? 'fallback' : 'live'}
+          status={isFallbackData ? 'fallback' : 'live'}
           label={weatherDataMode}
           items={[
             { label: 'อัปเดต', value: lastUpdateText, strong: !isMobile },
             !isMobile && { label: 'พิกัด', value: coordText },
             !isMobile && { label: 'แหล่งอากาศ', value: weatherSourceText, strong: true },
+            !isMobile && { label: 'source', value: weatherMeta?.source || 'unknown' },
             { label: 'TMD', value: tmdAvailable ? 'พร้อมใช้' : 'สำรอง' },
           ]}
         />
