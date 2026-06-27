@@ -216,6 +216,19 @@ function Panel({ children, style }) {
   );
 }
 
+function EventMetaRow({ item, compact = false, showDate = true, showSource = true }) {
+  const confidenceLabel = item.dateConfidence === 'unknown' ? 'เวลาไม่ชัดเจน' : item.dateConfidence === 'source' ? 'เวลาจากต้นทาง' : item.dateConfidence;
+  return (
+    <div style={{ alignItems: 'center', color: 'var(--text-sub)', display: 'flex', flexWrap: 'wrap', fontSize: compact ? '0.66rem' : '0.7rem', fontWeight: 850, gap: 6, marginTop: compact ? 8 : 10 }}>
+      {showSource && <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, padding: compact ? '4px 7px' : '5px 8px' }}>{item.source}</span>}
+      {showDate && <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, padding: compact ? '4px 7px' : '5px 8px' }}>{toThaiDate(item.publishedAt)}</span>}
+      {item.dateConfidence === 'unknown' && (
+        <span style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 999, color: '#b45309', padding: compact ? '4px 7px' : '5px 8px' }}>{confidenceLabel}</span>
+      )}
+    </div>
+  );
+}
+
 function EventCard({ item, onOpen }) {
   const meta = severityMeta(item.severity);
   return (
@@ -228,7 +241,7 @@ function EventCard({ item, onOpen }) {
         border: '1px solid var(--border-color)',
         borderRadius: 14,
         cursor: 'pointer',
-        minHeight: 176,
+        minHeight: 156,
         padding: 14,
         textAlign: 'left',
       }}
@@ -242,7 +255,7 @@ function EventCard({ item, onOpen }) {
       <div style={{ alignItems: 'center', color: item.color, display: 'flex', fontSize: '0.72rem', fontWeight: 900, gap: 6, marginTop: 12 }}>
         <MapPin size={14} /> {item.area}
       </div>
-      <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 800, marginTop: 8 }}>{item.source}</div>
+      <EventMetaRow compact item={item} showDate={false} />
     </button>
   );
 }
@@ -267,16 +280,17 @@ function StoryLane({ isMobile, lane, onOpen, rows }) {
 
       {lead ? (
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'minmax(240px, 0.85fr) minmax(0, 1.15fr)' }}>
-          <button onClick={() => onOpen(lead)} type="button" style={{ background: `linear-gradient(145deg, ${lane.color}1f, var(--bg-secondary))`, border: `1px solid ${lane.color}2a`, borderRadius: 16, cursor: 'pointer', minHeight: 230, padding: 16, textAlign: 'left' }}>
+          <button onClick={() => onOpen(lead)} type="button" style={{ background: `linear-gradient(145deg, ${lane.color}1f, var(--bg-secondary))`, border: `1px solid ${lane.color}2a`, borderRadius: 16, cursor: 'pointer', minHeight: isMobile ? 180 : 210, padding: 16, textAlign: 'left' }}>
             <div style={{ color: lane.color, fontSize: '0.74rem', fontWeight: 950, marginBottom: 9 }}>เรื่องนำของหมวด</div>
             <h3 style={{ color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 950, lineHeight: 1.3, margin: 0 }}>{lead.title}</h3>
             <p style={{ color: 'var(--text-sub)', fontSize: '0.82rem', fontWeight: 750, lineHeight: 1.55, margin: '10px 0 0' }}>{lead.summary}</p>
             <div style={{ alignItems: 'center', color: lane.color, display: 'flex', fontSize: '0.76rem', fontWeight: 900, gap: 7, marginTop: 14 }}>
               <Radio size={15} /> {lead.source} · {lead.area}
             </div>
+            <EventMetaRow item={lead} showSource={false} />
           </button>
           <div style={{ display: 'grid', gap: 10, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
-            {rows.slice(1, 5).map((item, index) => <EventCard key={`${item.id}-${index}`} item={item} onOpen={onOpen} />)}
+            {rows.slice(1, isMobile ? 4 : 5).map((item, index) => <EventCard key={`${item.id}-${index}`} item={item} onOpen={onOpen} />)}
           </div>
         </div>
       ) : (
@@ -580,7 +594,7 @@ export default function NewsPage() {
             </div>
             <div className="modal-body">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                {[selectedItem.source, selectedItem.area, toThaiDate(selectedItem.publishedAt)].map((value) => (
+                {[selectedItem.source, selectedItem.area, toThaiDate(selectedItem.publishedAt), selectedItem.dateConfidence === 'unknown' ? 'เวลาไม่ชัดเจน' : null].filter(Boolean).map((value) => (
                   <span key={value} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, color: 'var(--text-sub)', fontSize: '0.72rem', fontWeight: 850, padding: '6px 10px' }}>{value}</span>
                 ))}
               </div>

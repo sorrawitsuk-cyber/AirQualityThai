@@ -1558,27 +1558,19 @@ export default function MapPage() {
 
   const mobileDockButtons = [
     {
-      id: 'layer',
-      icon: '🧩',
-      label: 'ชั้นข้อมูล',
-      value: activeModeObj?.name || '-',
-      color: activeModeObj?.color || '#0ea5e9',
-      disabled: false,
-    },
-    {
-      id: 'time',
-      icon: activeTimeKey === 'yesterday' ? '🕘' : activeTimeKey === 'tomorrow' ? '🔮' : activeTimeKey === 'today' ? '📅' : '🟢',
-      label: 'วันที่',
-      value: activeTimeOption?.sub || activeTimeOption?.label || '-',
-      color: activeTimeOption?.color || '#22c55e',
-      disabled: false,
-    },
-    {
       id: 'category',
-      icon: activeCategoryOption?.icon || '🗺️',
-      label: 'เครื่องมือ',
+      icon: activeCategoryOption?.icon || 'แผนที่',
+      label: 'ชุดข้อมูล',
       value: activeCategoryOption?.shortLabel || activeCategoryOption?.label || '-',
       color: activeCategoryOption?.color || '#0ea5e9',
+      disabled: false,
+    },
+    {
+      id: 'layer',
+      icon: '🧩',
+      label: 'ตัวชี้วัด',
+      value: activeModeObj?.name || '-',
+      color: activeModeObj?.color || '#0ea5e9',
       disabled: false,
     },
     {
@@ -1590,13 +1582,13 @@ export default function MapPage() {
       disabled: false,
     },
     {
-      id: 'windy',
-      icon: '🌀',
-      label: 'Windy',
-      value: activeWindyModeObj.label,
-      color: activeWindyModeObj.color,
+      id: 'filter',
+      icon: '⚙️',
+      label: 'เครื่องมือ',
+      value: showWindyMap ? `Windy ${activeWindyModeObj.label}` : basemapStyle,
+      color: '#0ea5e9',
       disabled: false,
-    }
+    },
   ];
   const mobileBottomNavHeight = 70;
   const mobileDockGap = 14;
@@ -2184,15 +2176,60 @@ export default function MapPage() {
 
                       {/* === FILTER PANEL dropdown === */}
                       {activePanel === 'filter' && (
-                        <div className="fade-in" style={{ position: 'fixed', left: '12px', right: '12px', bottom: mobilePanelBottom, background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003 }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '10px' }}>⚙️ ตัวกรองแผนที่</div>
-                          <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '2px' }}>
+                        <div className="fade-in custom-scrollbar" style={{ position: 'fixed', left: '12px', right: '12px', bottom: mobilePanelBottom, background: 'var(--bg-nav-blur)', backdropFilter: 'blur(14px)', padding: '14px', borderRadius: '18px', border: `1px solid ${borderColor}`, boxShadow: '0 12px 30px rgba(0,0,0,0.25)', zIndex: 1003, maxHeight: '64vh', overflowY: 'auto' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '10px' }}>⚙️ เครื่องมือแผนที่</div>
+                          <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', marginBottom: '7px' }}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: textColor }}>ช่วงเวลา</div>
+                              <span style={{ color: activeTimeOption?.color, fontSize: '0.62rem', fontWeight: 900 }}>{activeTimeOption?.sub}</span>
+                            </div>
+                            <div style={{ display: 'grid', gap: '7px', marginBottom: '12px' }}>
+                              {timeModeSections.map(section => (
+                                <div key={section.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '6px' }}>
+                                  {section.options.map(opt => {
+                                    const active = activeTimeKey === opt.id;
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        onClick={() => handleTimeOptionSelect(opt.id)}
+                                        type="button"
+                                        style={{ background: active ? opt.color : 'var(--bg-secondary)', border: `1px solid ${active ? opt.color : borderColor}`, borderRadius: '10px', color: active ? '#fff' : textColor, cursor: 'pointer', fontFamily: 'Kanit', fontSize: '0.68rem', fontWeight: 900, minWidth: 0, padding: '8px 9px', textAlign: 'left' }}
+                                      >
+                                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                        <div style={{ fontSize: '0.58rem', opacity: 0.78, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
                             <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: textColor, marginBottom: '6px' }}>รูปแบบแผนที่</div>
                             <select value={basemapStyle} onChange={(e) => setBasemapStyle(e.target.value)} style={{ width: '100%', background: 'var(--bg-secondary)', color: textColor, border: `1px solid ${borderColor}`, padding: '6px', borderRadius: '8px', fontSize: '0.75rem', outline: 'none', fontFamily: 'Kanit' }}>
                               <option value="dark">สีเข้ม (Dark)</option><option value="light">สีสว่าง (Light)</option><option value="osm">ถนน (Street)</option><option value="satellite">ดาวเทียม</option>
                             </select>
                             <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: textColor, marginTop: '8px', marginBottom: '4px' }}>ความทึบ</div>
                             <input type="range" min="0.1" max="1" step="0.1" value={polyOpacity} onChange={(e) => setPolyOpacity(parseFloat(e.target.value))} style={{ width: '100%', accentColor: activeModeObj?.color }} />
+                            <button onClick={() => setShowWindyMap((value) => !value)} type="button" style={{ alignItems: 'center', background: showWindyMap ? activeWindyModeObj.color : 'var(--bg-secondary)', border: `1px solid ${showWindyMap ? activeWindyModeObj.color : borderColor}`, borderRadius: 10, color: showWindyMap ? '#fff' : textColor, cursor: 'pointer', display: 'flex', fontFamily: 'Kanit', fontSize: '0.74rem', fontWeight: 900, justifyContent: 'space-between', marginTop: 10, padding: '9px 10px', width: '100%' }}>
+                              <span>Windy overlay</span>
+                              <span>{showWindyMap ? activeWindyModeObj.label : 'ปิดอยู่'}</span>
+                            </button>
+                            <div className="hide-scrollbar" style={{ display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
+                              {WINDY_MODES.map(mode => {
+                                const active = activeWindyMode === mode.id;
+                                return (
+                                  <button
+                                    key={mode.id}
+                                    onClick={() => { setActiveWindyMode(mode.id); setShowWindyMap(true); }}
+                                    type="button"
+                                    title={mode.note}
+                                    style={{ alignItems: 'center', background: active ? mode.color : 'var(--bg-secondary)', border: `1px solid ${active ? mode.color : borderColor}`, borderRadius: '999px', color: active ? '#fff' : textColor, cursor: 'pointer', display: 'inline-flex', flexShrink: 0, fontFamily: 'Kanit', fontSize: '0.66rem', fontWeight: 900, gap: '4px', padding: '7px 9px', whiteSpace: 'nowrap' }}
+                                  >
+                                    <span>{mode.icon}</span>
+                                    {mode.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
                               <button onClick={handleExportCsv} disabled={!exportRows.length} style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '10px', padding: '9px 10px', fontSize: '0.74rem', fontWeight: 900, fontFamily: 'Kanit', cursor: exportRows.length ? 'pointer' : 'default', opacity: exportRows.length ? 1 : 0.55 }}>
                                 ⬇️ CSV
@@ -2655,7 +2692,7 @@ export default function MapPage() {
 
       {/* POPUP 1: DIAGNOSTIC MODAL */}
       {selectedHotspot && selectedHotspot.type === 'risk' && (
-        <div role="dialog" aria-modal="true" aria-label="วิเคราะห์ความเสี่ยงรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
+        <div role="dialog" aria-modal="true" aria-label="วิเคราะห์ความเสี่ยงรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: isMobile ? 'rgba(15,23,42,0.34)' : 'rgba(0,0,0,0.62)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? '12px 10px calc(12px + env(safe-area-inset-bottom))' : '20px' }} onClick={() => setSelectedHotspot(null)}>
             <div className="fade-in" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '420px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
                 <button autoFocus aria-label="ปิด" onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                 
@@ -2701,7 +2738,7 @@ export default function MapPage() {
 
       {/* POPUP 1.5: GISTDA DASHBOARD MODAL */}
       {selectedHotspot && selectedHotspot.type === 'gistda' && (
-        <div role="dialog" aria-modal="true" aria-label="รายงาน GISTDA รายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
+        <div role="dialog" aria-modal="true" aria-label="รายงาน GISTDA รายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: isMobile ? 'rgba(15,23,42,0.34)' : 'rgba(0,0,0,0.62)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? '12px 10px calc(12px + env(safe-area-inset-bottom))' : '20px' }} onClick={() => setSelectedHotspot(null)}>
             <div className="fade-in" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '420px', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
                 <button autoFocus aria-label="ปิด" onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                 
@@ -2735,7 +2772,7 @@ export default function MapPage() {
 
       {/* POPUP 1.8: ARCHIVE HISTORY MODAL */}
       {selectedHotspot && selectedHotspot.type === 'rain' && (
-        <div role="dialog" aria-modal="true" aria-label="ข้อมูลย้อนหลังจริงรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
+        <div role="dialog" aria-modal="true" aria-label="ข้อมูลย้อนหลังจริงรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: isMobile ? 'rgba(15,23,42,0.34)' : 'rgba(0,0,0,0.62)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? '12px 10px calc(12px + env(safe-area-inset-bottom))' : '20px' }} onClick={() => setSelectedHotspot(null)}>
           <div className="fade-in custom-scrollbar" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: '20px', borderRadius: '20px', width: '100%', maxWidth: '430px', maxHeight: '90vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
             <button autoFocus aria-label="ปิด" onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold', zIndex: 1 }}>✕</button>
             <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: `1px solid ${borderColor}` }}>
@@ -2774,8 +2811,8 @@ export default function MapPage() {
 
       {/* POPUP 2: WEATHER DASHBOARD MODAL */}
       {selectedHotspot && selectedHotspot.type === 'basic' && (
-        <div role="dialog" aria-modal="true" aria-label="ข้อมูลสภาพอากาศรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
-          <div className="fade-in custom-scrollbar" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: '20px', borderRadius: '20px', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
+        <div role="dialog" aria-modal="true" aria-label="ข้อมูลสภาพอากาศรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: isMobile ? 'rgba(15,23,42,0.34)' : 'rgba(0,0,0,0.62)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? '12px 10px calc(12px + env(safe-area-inset-bottom))' : '20px' }} onClick={() => setSelectedHotspot(null)}>
+          <div className="fade-in custom-scrollbar" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: isMobile ? '16px' : '20px', borderRadius: isMobile ? '20px 20px 0 0' : '20px', width: '100%', maxWidth: '440px', maxHeight: isMobile ? '82vh' : '90vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
               <button autoFocus aria-label="ปิด" onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold', zIndex: 1 }}>✕</button>
 
               <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: `1px solid ${borderColor}` }}>
@@ -2900,7 +2937,7 @@ export default function MapPage() {
 
       {/* POPUP 2.5: YESTERDAY STATS MODAL */}
       {selectedHotspot && selectedHotspot.type === 'yesterday' && (
-        <div role="dialog" aria-modal="true" aria-label="สถิติเมื่อวานรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setSelectedHotspot(null)}>
+        <div role="dialog" aria-modal="true" aria-label="สถิติเมื่อวานรายจังหวัด" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: isMobile ? 'rgba(15,23,42,0.34)' : 'rgba(0,0,0,0.62)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? '12px 10px calc(12px + env(safe-area-inset-bottom))' : '20px' }} onClick={() => setSelectedHotspot(null)}>
           <div className="fade-in custom-scrollbar" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: '20px', borderRadius: '20px', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
               <button autoFocus aria-label="ปิด" onClick={() => setSelectedHotspot(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold', zIndex: 1 }}>✕</button>
 
@@ -2935,7 +2972,7 @@ export default function MapPage() {
 
       {/* POPUP 3: แหล่งอ้างอิงทางวิชาการ */}
       {showReferenceModal && (
-        <div role="dialog" aria-modal="true" aria-label="แหล่งอ้างอิงทางวิชาการ" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setShowReferenceModal(false)}>
+        <div role="dialog" aria-modal="true" aria-label="แหล่งอ้างอิงทางวิชาการ" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: isMobile ? 'rgba(15,23,42,0.34)' : 'rgba(0,0,0,0.62)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? '12px 10px calc(12px + env(safe-area-inset-bottom))' : '20px' }} onClick={() => setShowReferenceModal(false)}>
             <div className="fade-in custom-scrollbar" onKeyDown={handleFocusTrap} tabIndex="-1" style={{ background: cardBg, padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '550px', maxHeight: '85vh', overflowY: 'auto', border: `1px solid ${borderColor}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative', outline: 'none' }} onClick={e => e.stopPropagation()}>
                 <button autoFocus aria-label="ปิด" onClick={() => setShowReferenceModal(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'var(--bg-secondary)', border: 'none', width: '30px', height: '30px', borderRadius: '50%', color: textColor, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                 
