@@ -450,6 +450,17 @@ export default function NewsPage() {
   const areas = useMemo(() => extractAreas(filteredItems), [filteredItems]);
   const highCount = filteredItems.filter((item) => item.severity === 'high').length;
   const watchCount = filteredItems.filter((item) => item.severity === 'medium').length;
+  const categoryDigest = useMemo(() => {
+    return categories
+      .filter((category) => category.id !== 'all')
+      .map((category) => ({
+        ...category,
+        count: filteredItems.filter((item) => category.id === item.topic || (category.id === 'rain' && ['rain', 'flood', 'weather'].includes(item.topic))).length,
+      }))
+      .filter((category) => category.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, isMobile ? 4 : 6);
+  }, [filteredItems, isMobile]);
   const dataMode = error && feed ? 'ใช้ข้อมูล cache' : feed ? 'ข้อมูลล่าสุด' : 'รอข้อมูล';
   const dataUpdatedText = feedCachedAt ? toThaiDate(feedCachedAt) : 'ยังไม่มี cache';
 
@@ -528,6 +539,35 @@ export default function NewsPage() {
           ]}
           sources={isMobile ? ['TMD', 'USGS'] : ['TMD', 'USGS', 'NASA EONET', 'NOAA CPC ENSO']}
         />
+
+        <section style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, display: 'grid', gap: 10, gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', marginBottom: 14, padding: isMobile ? 12 : 14 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 950, marginBottom: 7 }}>ภาพรวมที่ควรอ่านก่อน</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {categoryDigest.length ? categoryDigest.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <span key={category.id} style={{ alignItems: 'center', background: `${category.color}10`, border: `1px solid ${category.color}22`, borderRadius: 999, color: category.color, display: 'inline-flex', fontSize: '0.72rem', fontWeight: 900, gap: 6, padding: '6px 9px' }}>
+                    <Icon size={13} /> {category.label} {category.count}
+                  </span>
+                );
+              }) : (
+                <span style={{ color: 'var(--text-sub)', fontSize: '0.78rem', fontWeight: 850 }}>ยังไม่มีหมวดที่ตรงกับตัวกรอง</span>
+              )}
+            </div>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: 'var(--text-sub)', fontSize: '0.68rem', fontWeight: 950, marginBottom: 7 }}>พื้นที่ที่ถูกกล่าวถึง</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {areas.slice(0, isMobile ? 3 : 5).map((area) => (
+                <span key={area.name} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 850, padding: '6px 9px' }}>
+                  {area.name} <span style={{ color: 'var(--text-sub)' }}>{area.count}</span>
+                </span>
+              ))}
+              {!areas.length && <span style={{ color: 'var(--text-sub)', fontSize: '0.78rem', fontWeight: 850 }}>ยังไม่พบพื้นที่จากข่าวที่กรองอยู่</span>}
+            </div>
+          </div>
+        </section>
 
         <section style={{ display: 'grid', gap: 14, gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px', alignItems: 'start' }}>
           <div style={{ display: 'grid', gap: 14 }}>

@@ -1107,8 +1107,8 @@ export default function MapPage() {
   // ===== National & regional PM2.5 (must be before early returns) =====
   const nationalMetric = useMemo(() => {
     const vals = allMapData.map(st => st.displayVal).filter(v => v != null && !Number.isNaN(v));
-    const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
-    const color = mapCategory === 'rain'
+    const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : null;
+    const color = avg === null ? (darkMode ? '#64748b' : '#94a3b8') : mapCategory === 'rain'
       ? getRainColor(avg, activeRainMode)
       : isWeatherDataCategory
       ? getBasicColor(avg, activeBasicMode)
@@ -1117,7 +1117,9 @@ export default function MapPage() {
         : mapCategory === 'yesterday'
           ? getYesterdayColor(avg, activeYesterdayMode)
           : getGistdaColor(avg, activeGistdaMode);
-    const label = mapCategory === 'basic' && activeBasicMode === 'pm25'
+    const label = avg === null
+      ? 'ไม่มีข้อมูล'
+      : mapCategory === 'basic' && activeBasicMode === 'pm25'
       ? getPm25QualityText(avg).text
       : mapCategory === 'rain'
         ? `ค่าจริงเฉลี่ย ${activeModeObj?.name || 'ฝน'}`
@@ -1129,16 +1131,16 @@ export default function MapPage() {
             ? `ย้อนหลัง ${activeModeObj?.name}`
             : 'ข้อมูล GISTDA';
     return { avg, count: vals.length, color, label };
-  }, [allMapData, mapCategory, isWeatherDataCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, activeModeObj, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
+  }, [allMapData, mapCategory, isWeatherDataCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, activeModeObj, darkMode, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor, getPm25QualityText]);
   const regionalMetric = useMemo(() => {
     return Object.entries(REGION_GROUPS).map(([name, provs]) => {
       const sts = allMapData.filter(st => provs.includes(st.areaTH.replace('จังหวัด', '').trim()));
       const vals = sts.map(st => st.displayVal).filter(v => v != null && !Number.isNaN(v));
-      const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
+      const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : null;
       const windDirection = activeBasicMode === 'wind'
         ? getAverageWindDirection(sts.map(st => stationTemps[st.stationID]?.windDir))
         : null;
-      const color = mapCategory === 'rain'
+      const color = avg === null ? (darkMode ? '#64748b' : '#94a3b8') : mapCategory === 'rain'
         ? getRainColor(avg, activeRainMode)
         : isWeatherDataCategory
         ? getBasicColor(avg, activeBasicMode)
@@ -1149,7 +1151,7 @@ export default function MapPage() {
             : getGistdaColor(avg, activeGistdaMode);
       return { name, avg, color, trend: 0, windDirection };
     });
-  }, [allMapData, mapCategory, isWeatherDataCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, stationTemps, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor]);
+  }, [allMapData, mapCategory, isWeatherDataCategory, activeBasicMode, activeRainMode, activeYesterdayMode, activeGistdaMode, stationTemps, darkMode, getBasicColor, getRainColor, getRiskColor, getYesterdayColor, getGistdaColor]);
   const sparkline7d = useMemo(() => {
     const pointCount = mapCategory === 'forecast' ? 7 : 8;
     return Array.from({ length: pointCount }, (_, i) => {
@@ -1393,6 +1395,26 @@ export default function MapPage() {
     const y = Number.isFinite(lat) ? Math.min(92, Math.max(8, 92 - ((lat - 5) / 16) * 84)) : 50;
     return { ...st, x, y, rank: index + 1 };
   });
+  const mapQuickInsights = [
+    reportTopRows[0] && {
+      label: reportSortAscending ? 'ค่าต่ำสุดเด่น' : 'ค่าสูงสุดเด่น',
+      value: `จ.${reportTopRows[0].areaTH.replace('จังหวัด', '')}`,
+      detail: formatReportValue(reportTopRows[0].displayVal),
+      color: reportTopRows[0].color || activeModeObj?.color || '#0ea5e9',
+    },
+    {
+      label: 'ข้อมูลที่ใช้ได้',
+      value: `${nationalMetric.count}/${stations.length || 77}`,
+      detail: 'จังหวัด',
+      color: nationalMetric.count >= 60 ? '#22c55e' : nationalMetric.count >= 30 ? '#f59e0b' : '#ef4444',
+    },
+    reportRegionFocus && {
+      label: reportSortAscending ? 'ภูมิภาคค่าต่ำ' : 'ภูมิภาคเด่น',
+      value: reportRegionFocus.name,
+      detail: formatReportValue(reportRegionFocus.avg),
+      color: reportRegionFocus.color || activeModeObj?.color || '#0ea5e9',
+    },
+  ].filter(Boolean);
 
   const handlePrintReport = () => {
     window.print();
@@ -1871,11 +1893,25 @@ export default function MapPage() {
           {!isMobile && (
             <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0, overflowY: 'auto', minHeight: 0 }} className="custom-scrollbar">
 
+              {/* Quick insights */}
+              <div style={{ background: cardBg, borderRadius: '14px', border: `1px solid ${borderColor}`, padding: '12px' }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 900, color: subTextColor, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>อ่านแผนที่เร็ว</div>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  {mapQuickInsights.map((item) => (
+                    <div key={`${item.label}-${item.value}`} style={{ borderLeft: `3px solid ${item.color}`, background: darkMode ? `${item.color}12` : `${item.color}0f`, borderRadius: '10px', padding: '8px 9px' }}>
+                      <div style={{ color: subTextColor, fontSize: '0.6rem', fontWeight: 900, marginBottom: '3px' }}>{item.label}</div>
+                      <div style={{ color: textColor, fontSize: '0.82rem', fontWeight: 950, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</div>
+                      <div style={{ color: item.color, fontSize: '0.68rem', fontWeight: 900, marginTop: '2px' }}>{item.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* National metric card */}
               <div style={{ background: cardBg, borderRadius: '14px', border: `1px solid ${borderColor}`, padding: '12px' }}>
                 <div style={{ fontSize: '0.65rem', fontWeight: 900, color: subTextColor, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{activeModeObj?.name} ทั่วประเทศ (เฉลี่ย)</div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '2rem', fontWeight: 900, color: nationalMetric.color, lineHeight: 1 }}>{nationalMetric.avg}</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 900, color: nationalMetric.color, lineHeight: 1 }}>{formatReportValue(nationalMetric.avg, '')}</span>
                   <span style={{ fontSize: '0.7rem', color: subTextColor, fontWeight: 'bold', marginBottom: '4px' }}>{activeModeObj?.unit || 'หน่วย'}</span>
                   <span style={{ fontSize: '0.65rem', fontWeight: 900, background: nationalMetric.color + '22', color: nationalMetric.color, border: `1px solid ${nationalMetric.color}44`, borderRadius: '20px', padding: '2px 7px', marginBottom: '4px' }}>{nationalMetric.label}</span>
                 </div>
@@ -1910,8 +1946,8 @@ export default function MapPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '0.68rem', fontWeight: 900, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
-                        <div style={{ height: '4px', borderRadius: '2px', background: r.color, width: `${Math.min(100, (r.avg / (activeBasicMode === 'humidity' ? 100 : 150)) * 100)}%`, minWidth: '4px', transition: 'width 0.5s' }} />
-                        <span style={{ fontSize: '0.62rem', color: r.color, fontWeight: 900 }}>{r.avg}</span>
+                        <div style={{ height: '4px', borderRadius: '2px', background: r.color, width: r.avg === null ? '4px' : `${Math.min(100, (r.avg / (activeBasicMode === 'humidity' ? 100 : 150)) * 100)}%`, minWidth: '4px', transition: 'width 0.5s' }} />
+                        <span style={{ fontSize: '0.62rem', color: r.color, fontWeight: 900 }}>{r.avg === null ? '--' : r.avg}</span>
                         <span style={{ fontSize: '0.58rem', color: subTextColor }}>–</span>
                       </div>
                       {activeBasicMode === 'wind' && r.windDirection && (
