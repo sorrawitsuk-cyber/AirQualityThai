@@ -116,6 +116,9 @@ const getProvinceKey = (stationOrName = '') => {
 // 🩺 คำแนะนำเชิงปฏิบัติตามสถานการณ์
 const getActionableAdvice = (pm25, temp, rain, uv, wind) => {
     const tips = [];
+    if (![pm25, temp, rain, uv, wind].some(isFiniteMetric)) {
+        return [{ icon: 'ℹ️', text: 'ข้อมูลพื้นที่นี้ยังไม่พอสำหรับให้คำแนะนำเฉพาะจุด', color: '#64748b' }];
+    }
     if (pm25 > 75) tips.push({ icon: '😷', text: 'สวมหน้ากาก N95 เมื่อออกกลางแจ้ง', color: '#ef4444' });
     else if (pm25 >= 37.6) tips.push({ icon: '😷', text: 'ผู้ป่วยโรคทางเดินหายใจควรหลีกเลี่ยงกิจกรรมกลางแจ้ง', color: '#f97316' });
     if (temp > 39) tips.push({ icon: '🥤', text: 'ดื่มน้ำบ่อยๆ หลีกเลี่ยงแดดจัด เสี่ยงลมแดด', color: '#ef4444' });
@@ -125,6 +128,19 @@ const getActionableAdvice = (pm25, temp, rain, uv, wind) => {
     if (wind > 40) tips.push({ icon: '⚠️', text: 'ลมแรงมาก ยึดของให้แน่น ระวังวัตถุปลิวมา', color: '#ef4444' });
     if (tips.length === 0) tips.push({ icon: '✅', text: 'สภาพอากาศเหมาะแก่การทำกิจกรรมปกติ', color: '#22c55e' });
     return tips;
+};
+
+const isFiniteMetric = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+const metricOrNull = (value) => isFiniteMetric(value) ? Number(value) : null;
+const roundedMetricOrNull = (value, decimals = 0) => {
+    const numeric = metricOrNull(value);
+    if (numeric === null) return null;
+    const factor = 10 ** decimals;
+    return Math.round(numeric * factor) / factor;
+};
+const formatMetric = (value, unit = '', decimals = 0) => {
+    const rounded = roundedMetricOrNull(value, decimals);
+    return rounded === null ? '--' : `${rounded}${unit ? ` ${unit}` : ''}`;
 };
 
 export default function MapPage() {
@@ -395,36 +411,35 @@ export default function MapPage() {
     if (isNowMode || !daily.temp) {
         const data = stationTemps[station.stationID] || {};
         switch(mode) {
-            case 'pm25': return station.AQILast?.PM25?.value || 0;
-            case 'temp': return Math.round(data.temp || 0);
-            case 'heat': return Math.round(data.feelsLike || 0);
-            case 'humidity': return Math.round(data.humidity || 0);
-            case 'rain': return data.rainProb || 0;
-            case 'wind': return Math.round(data.windSpeed || 0);
-            case 'uv': return data.uv || 0;
-            case 'pressure': return Math.round(data.pressure || 0);
-            default: return 0;
+            case 'pm25': return roundedMetricOrNull(station.AQILast?.PM25?.value);
+            case 'temp': return roundedMetricOrNull(data.temp);
+            case 'heat': return roundedMetricOrNull(data.feelsLike);
+            case 'humidity': return roundedMetricOrNull(data.humidity);
+            case 'rain': return roundedMetricOrNull(data.rainProb);
+            case 'wind': return roundedMetricOrNull(data.windSpeed);
+            case 'uv': return roundedMetricOrNull(data.uv);
+            case 'pressure': return roundedMetricOrNull(data.pressure);
+            default: return null;
         }
     } else {
         const idx = effectiveTimeMode === 'tomorrow' ? 8 : 7;
-        const roundOrNull = (value) => value === null || value === undefined || Number.isNaN(value) ? null : Math.round(value);
         const currentData = stationTemps[station.stationID] || {};
         switch(mode) {
-            case 'pm25': return roundOrNull(daily.pm25?.[idx]);
-            case 'temp': return roundOrNull(daily.temp?.[idx]);
-            case 'heat': return roundOrNull(daily.heat?.[idx]);
-            case 'humidity': return roundOrNull(daily.humidity?.[idx] ?? currentData.humidity);
+            case 'pm25': return roundedMetricOrNull(daily.pm25?.[idx]);
+            case 'temp': return roundedMetricOrNull(daily.temp?.[idx]);
+            case 'heat': return roundedMetricOrNull(daily.heat?.[idx]);
+            case 'humidity': return roundedMetricOrNull(daily.humidity?.[idx] ?? currentData.humidity);
             case 'rain': return daily.rain?.[idx] ?? null;
-            case 'wind': return roundOrNull(daily.wind?.[idx]);
+            case 'wind': return roundedMetricOrNull(daily.wind?.[idx]);
             case 'uv': return daily.uv?.[idx] ?? null;
-            case 'pressure': return roundOrNull(daily.pressure?.[idx]);
+            case 'pressure': return roundedMetricOrNull(daily.pressure?.[idx]);
             default: return null;
         }
     }
   }, [stationTemps, stationDaily, isNowMode, effectiveTimeMode]);
 
   const getBasicColor = useCallback((val, mode) => {
-    if (val === null || val === undefined || val === '' || val === 0) return darkMode ? '#1a3050' : '#b8d9f5';
+    if (val === null || val === undefined || val === '' || Number.isNaN(Number(val))) return darkMode ? '#1a3050' : '#b8d9f5';
     if (mode === 'pm25') return val > 75 ? '#ef4444' : val >= 37.6 ? '#f97316' : val >= 25.1 ? '#eab308' : val >= 15.1 ? '#22c55e' : '#0ea5e9';
     if (mode === 'temp' || mode === 'heat' || mode === 'maxTemp' || mode === 'minTemp') return val > 39 ? '#ef4444' : val >= 35 ? '#f97316' : val >= 29 ? '#eab308' : val >= 23 ? '#22c55e' : '#3b82f6';
     if (mode === 'rain') return val > 70 ? '#1e3a8a' : val > 40 ? '#3b82f6' : val > 10 ? '#60a5fa' : '#94a3b8';
@@ -531,64 +546,71 @@ export default function MapPage() {
   }, [activeRainMode, darkMode]);
 
   const calculateRisk = useCallback((station) => {
-      let pm25 = 0, temp = 0, feelsLike = 0, wind = 0, rain = 0, uv = 0, hum = 50;
+      let pm25 = null, temp = null, feelsLike = null, wind = null, rain = null, uv = null, hum = null;
       let humEstimated = false;
       const daily = stationDaily[station.stationID] || {};
 
       if (isNowMode || !daily.temp) {
           const data = stationTemps[station.stationID] || {};
-          pm25 = station.AQILast?.PM25?.value || 0;
-          temp = data.temp || 0;
-          feelsLike = data.feelsLike || temp;
-          wind = data.windSpeed || 0;
-          rain = data.rainProb || 0;
-          uv = data.uv || 0;
-          hum = data.humidity || 50;
+          pm25 = metricOrNull(station.AQILast?.PM25?.value);
+          temp = metricOrNull(data.temp);
+          feelsLike = metricOrNull(data.feelsLike) ?? temp;
+          wind = metricOrNull(data.windSpeed);
+          rain = metricOrNull(data.rainProb);
+          uv = metricOrNull(data.uv);
+          hum = metricOrNull(data.humidity);
       } else {
           const idx = timeMode === 'tomorrow' ? 8 : 7;
-          pm25 = daily.pm25?.[idx] || 0;
-          temp = daily.temp?.[idx] || 0;
-          feelsLike = daily.heat?.[idx] || temp;
-          wind = daily.wind?.[idx] || 0;
-          rain = daily.rain?.[idx] || 0;
-          uv = daily.uv?.[idx] || 0;
-          if (daily.humidity?.[idx]) {
-              hum = daily.humidity[idx];
+          pm25 = metricOrNull(daily.pm25?.[idx]);
+          temp = metricOrNull(daily.temp?.[idx]);
+          feelsLike = metricOrNull(daily.heat?.[idx]) ?? temp;
+          wind = metricOrNull(daily.wind?.[idx]);
+          rain = metricOrNull(daily.rain?.[idx]);
+          uv = metricOrNull(daily.uv?.[idx]);
+          if (isFiniteMetric(daily.humidity?.[idx])) {
+              hum = Number(daily.humidity[idx]);
           } else {
               const currentData = stationTemps[station.stationID] || {};
-              hum = currentData.humidity || 50;
-              humEstimated = true;
+              hum = metricOrNull(currentData.humidity);
+              humEstimated = hum !== null;
           }
       }
 
-      const nPm = Math.min(pm25 / 75 * 10, 10);
-      const nTemp = Math.max(0, Math.min((temp - 28) / 12 * 10, 10));
-      const nHeat = Math.max(0, Math.min((feelsLike - 28) / 12 * 10, 10));
-      const nWind = Math.min(wind / 40 * 10, 10);
-      const nRain = Math.min(rain / 80 * 10, 10);
-      const nUv = Math.min(uv / 11 * 10, 10);
-      const nHumDry = Math.max(0, 10 - (hum / 100 * 10));
-      const nHumWet = Math.min(hum / 100 * 10, 10);
-      const nNoRain = Math.max(0, 10 - (rain / 100 * 10));
+      const riskOrNull = (value, compute) => value === null ? null : compute(value);
+      const nPm = riskOrNull(pm25, value => Math.min(value / 75 * 10, 10));
+      const nTemp = riskOrNull(temp, value => Math.max(0, Math.min((value - 28) / 12 * 10, 10)));
+      const nHeat = riskOrNull(feelsLike, value => Math.max(0, Math.min((value - 28) / 12 * 10, 10)));
+      const nWind = riskOrNull(wind, value => Math.min(value / 40 * 10, 10));
+      const nRain = riskOrNull(rain, value => Math.min(value / 80 * 10, 10));
+      const nUv = riskOrNull(uv, value => Math.min(value / 11 * 10, 10));
+      const nHumDry = riskOrNull(hum, value => Math.max(0, 10 - (value / 100 * 10)));
+      const nHumWet = riskOrNull(hum, value => Math.min(value / 100 * 10, 10));
+      const nNoRain = riskOrNull(rain, value => Math.max(0, 10 - (value / 100 * 10)));
+      const weightedScore = (entries) => {
+          const usable = entries.filter(entry => Number.isFinite(entry.risk));
+          const weightSum = usable.reduce((sum, entry) => sum + entry.weight, 0);
+          if (!usable.length || !weightSum) return null;
+          return usable.reduce((sum, entry) => sum + (entry.risk * entry.weight), 0) / weightSum;
+      };
 
       let score = 0;
       let factors = [];
 
       if (activeRiskMode === 'respiratory') {
-          score = (nPm * 0.6) + (nHumWet * 0.2) + (nHeat * 0.2);
           factors = [{ label: 'มลพิษฝุ่น PM2.5', val: pm25, unit: 'µg/m³', risk: nPm, weight: 60, color: '#f97316' }, { label: `ความชื้นสัมพัทธ์สูง${humEstimated ? ' (ค่าประมาณ)' : ''}`, val: hum, unit: '%', risk: nHumWet, weight: 20, color: '#3b82f6' }, { label: 'ดัชนีความร้อน', val: feelsLike, unit: '°C', risk: nHeat, weight: 20, color: '#ef4444' }];
+          score = weightedScore(factors);
       } else if (activeRiskMode === 'outdoor') {
-          score = (nRain * 0.4) + (nWind * 0.3) + (nTemp * 0.2) + (nUv * 0.1);
           factors = [{ label: 'โอกาสเกิดฝนตก', val: rain, unit: '%', risk: nRain, weight: 40, color: '#3b82f6' }, { label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 30, color: '#0ea5e9' }, { label: 'อุณหภูมิอากาศ', val: temp, unit: '°C', risk: nTemp, weight: 20, color: '#ef4444' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'ดัชนี', risk: nUv, weight: 10, color: '#a855f7' }];
+          score = weightedScore(factors);
       } else if (activeRiskMode === 'wildfire') {
-          score = (nWind * 0.35) + (nHumDry * 0.30) + (nNoRain * 0.20) + (nTemp * 0.15);
           factors = [{ label: 'ความเร็วลมกระโชก', val: wind, unit: 'km/h', risk: nWind, weight: 35, color: '#0ea5e9' }, { label: `ความแห้งแล้งของอากาศ${humEstimated ? ' (ประมาณ)' : ''}`, val: hum, unit: '%', risk: nHumDry, weight: 30, color: '#eab308' }, { label: 'ไม่มีฝนตก (เชื้อเพลิงแห้ง)', val: rain, unit: '%', risk: nNoRain, weight: 20, color: '#94a3b8' }, { label: 'อุณหภูมิอากาศ', val: temp, unit: '°C', risk: nTemp, weight: 15, color: '#ef4444' }];
+          score = weightedScore(factors);
       } else if (activeRiskMode === 'heatstroke') {
-          score = (nHeat * 0.45) + (nHumWet * 0.30) + (nUv * 0.25);
           factors = [{ label: 'ดัชนีความร้อน (feels like)', val: feelsLike, unit: '°C', risk: nHeat, weight: 45, color: '#ef4444' }, { label: `ความชื้นสัมพัทธ์สูง${humEstimated ? ' (ประมาณ)' : ''} (เหงื่อไม่ระเหย)`, val: hum, unit: '%', risk: nHumWet, weight: 30, color: '#3b82f6' }, { label: 'ความเข้มรังสี UV', val: uv, unit: 'ดัชนี', risk: nUv, weight: 25, color: '#a855f7' }];
+          score = weightedScore(factors);
       }
 
-      return { score: Math.min(Math.round(score * 10) / 10, 10), factors, humEstimated };
+      return { score: score === null ? null : Math.min(Math.round(score * 10) / 10, 10), factors, humEstimated };
   }, [activeRiskMode, stationTemps, stationDaily, isNowMode, timeMode]);
 
   const getRiskColor = useCallback((score) => {
@@ -601,6 +623,7 @@ export default function MapPage() {
   }, [darkMode]);
 
   const getRiskLabel = (score) => {
+      if (score === null || score === undefined || Number.isNaN(Number(score))) return 'ข้อมูลไม่พอ';
       if (score >= 8) return 'ความเสี่ยงสูงมาก';
       if (score >= 6) return 'ควรเฝ้าระวัง';
       if (score >= 4) return 'ปานกลาง';
@@ -775,7 +798,7 @@ export default function MapPage() {
               setSelectedHotspot({ type: 'gistda', station, val, color: mapDataNode.color });
           } else {
               const data = stationTemps[station.stationID] || {};
-              const pm25 = station.AQILast?.PM25?.value || 0;
+              const pm25 = roundedMetricOrNull(station.AQILast?.PM25?.value);
               setSelectedHotspot({ type: 'basic', station, data, pm25 });
           }
       } else if (mapCategory === 'yesterday') {
@@ -801,12 +824,12 @@ export default function MapPage() {
           const data = isNowMode ? currentData : {
               temp: daily.temp?.[idx], feelsLike: daily.heat?.[idx],
               rainProb: daily.rain?.[idx], windSpeed: daily.wind?.[idx], uv: daily.uv?.[idx],
-              humidity: daily.humidity?.[idx] || currentData.humidity,
-              pressure: daily.pressure?.[idx] || currentData.pressure,
+              humidity: daily.humidity?.[idx] ?? currentData.humidity,
+              pressure: daily.pressure?.[idx] ?? currentData.pressure,
               windDirection: currentData.windDir,
               windDir: currentData.windDir,
           };
-          const pm25 = isNowMode ? (station.AQILast?.PM25?.value || 0) : (daily.pm25?.[idx] || 0);
+          const pm25 = isNowMode ? roundedMetricOrNull(station.AQILast?.PM25?.value) : roundedMetricOrNull(daily.pm25?.[idx]);
           const summary7 = get7DaySummary(station);
           setSelectedHotspot({ type: 'basic', station, data, pm25, summary7 });
       }
@@ -946,12 +969,13 @@ export default function MapPage() {
   };
 
   const getPm25QualityText = useCallback((val) => {
+      if (!isFiniteMetric(val)) return { text: 'ไม่มีข้อมูล', color: subTextColor };
       if (val > 75) return { text: 'มีผลกระทบต่อสุขภาพ', color: '#ef4444' };
       if (val >= 37.6) return { text: 'เริ่มมีผลกระทบเล็กน้อย', color: '#f97316' };
       if (val >= 25.1) return { text: 'ปานกลาง', color: '#eab308' };
       if (val >= 15.1) return { text: 'คุณภาพดี', color: '#22c55e' };
       return { text: 'คุณภาพดีมาก', color: '#0ea5e9' };
-  }, []);
+  }, [subTextColor]);
 
   const getDynamicLegendContent = () => {
     if (mapCategory === 'rain') {
@@ -1219,7 +1243,11 @@ export default function MapPage() {
   );
 
   const hasRealtimeData = (stations?.length || 0) > 0 && Object.keys(stationTemps || {}).length > 0;
-  const showRealtimeDataWarning = !loading && !hasRealtimeData;
+  const lastUpdatedTime = lastUpdated ? new Date(lastUpdated).getTime() : NaN;
+  const nowDataAgeHours = Number.isFinite(lastUpdatedTime) ? (Date.now() - lastUpdatedTime) / 36e5 : null;
+  const isNowDataStale = nowDataAgeHours === null || nowDataAgeHours > 3;
+  const nowFreshnessText = isNowDataStale ? 'ควรตรวจสอบเวลาข้อมูล' : 'ข้อมูลล่าสุด';
+  const showRealtimeDataWarning = !loading && (!hasRealtimeData || isNowDataStale);
 
   const mapCategoryOptions = [
     { id: 'basic', label: 'ข้อมูลปัจจุบัน', shortLabel: 'ปัจจุบัน', icon: '🟢', color: '#22c55e', desc: 'PM2.5 อุณหภูมิ ฝน ลม', useFor: 'ดูค่าล่าสุดจากสถานีและข้อมูลอากาศที่ระบบมีตอนนี้' },
@@ -1264,12 +1292,12 @@ export default function MapPage() {
   const activeDataSourceMeta = mapCategory === 'rain'
     ? { label: 'Archive', icon: '📈', color: '#2563eb', detail: historyLoading ? 'กำลังโหลดสถิติย้อนหลังจริง' : historyError ? 'รอข้อมูลย้อนหลังจาก archive' : `Open-Meteo Archive ถึง ${historyWeather?.period?.endDate || getDateLabel(-(historyWeather?.period?.archiveLagDays || 5))}` }
     : mapCategory === 'basic'
-    ? { label: 'Now', icon: '🟢', color: '#22c55e', detail: `ข้อมูลตอนนี้ ${nowDataTimeText} จาก AIR4Thai${tmdAvailable ? ' + TMD' : ''}` }
+    ? { label: isNowDataStale ? 'Now · ตรวจเวลา' : 'Now', icon: isNowDataStale ? '🟡' : '🟢', color: isNowDataStale ? '#f59e0b' : '#22c55e', detail: `${nowFreshnessText} ${nowDataTimeText} จาก AIR4Thai${tmdAvailable ? ' + TMD' : ''}` }
     : mapCategory === 'forecast'
       ? { label: 'Forecast', icon: '🔮', color: '#a855f7', detail: `ข้อมูลพยากรณ์พรุ่งนี้ ${getDateLabel(1)} จาก TMD/Open-Meteo` }
     : mapCategory === 'risk'
       ? (timeMode === 'now'
-          ? { label: 'วิเคราะห์สด', icon: '⚠️', color: '#8b5cf6', detail: 'คำนวณจากข้อมูลล่าสุด' }
+          ? { label: isNowDataStale ? 'วิเคราะห์ · ตรวจเวลา' : 'วิเคราะห์สด', icon: '⚠️', color: isNowDataStale ? '#f59e0b' : '#8b5cf6', detail: `${nowFreshnessText} ${nowDataTimeText}` }
           : timeMode === 'tomorrow'
             ? { label: 'วิเคราะห์พรุ่งนี้', icon: '🔮', color: '#a855f7', detail: 'คำนวณจากค่าพยากรณ์' }
             : { label: 'วิเคราะห์วันนี้', icon: '📅', color: '#0ea5e9', detail: 'คำนวณจากภาพรวมวันนี้' })
@@ -2003,9 +2031,9 @@ export default function MapPage() {
                       pointerEvents: 'none',
                     }}
                   >
-                    <div style={{ fontSize: '0.82rem', fontWeight: 900, marginBottom: '3px' }}>แสดงแผนที่ฐานได้แล้ว</div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 900, marginBottom: '3px' }}>{hasRealtimeData ? 'ตรวจสอบเวลาข้อมูลล่าสุด' : 'แสดงแผนที่ฐานได้แล้ว'}</div>
                     <div style={{ fontSize: '0.72rem', color: subTextColor, lineHeight: 1.45 }}>
-                      ข้อมูล realtime ยังโหลดไม่ได้จาก Firebase จึงซ่อนหมุดและค่าสถานีชั่วคราว
+                      {hasRealtimeData ? `ข้อมูลล่าสุดที่ระบบมีคือ ${nowDataTimeText} ควรเทียบกับประกาศต้นทางก่อนตัดสินใจ` : 'ข้อมูล realtime ยังโหลดไม่ได้จาก Firebase จึงซ่อนหมุดและค่าสถานีชั่วคราว'}
                     </div>
                   </div>
                 )}
@@ -2703,14 +2731,15 @@ export default function MapPage() {
 
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '20px' }}>
                     <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: selectedHotspot.color, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: `4px solid ${cardBg}`, outline: `2px solid ${selectedHotspot.color}`, flexShrink: 0 }}>
-                        <span style={{ fontSize: '1.8rem', fontWeight: '900', lineHeight: 1 }}>{selectedHotspot.riskScore}</span>
+                        <span style={{ fontSize: '1.8rem', fontWeight: '900', lineHeight: 1 }}>{selectedHotspot.riskScore ?? '--'}</span>
                         <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>คะแนน</span>
                     </div>
                     <div>
                         <div style={{ fontSize: '1rem', fontWeight: 'bold', color: selectedHotspot.color }}>{activeModeObj?.name}</div>
                         <div style={{ fontSize: '0.85rem', color: textColor, marginTop: '5px' }}>สถานะ: <span style={{fontWeight:'bold'}}>{getRiskLabel(selectedHotspot.riskScore)}</span></div>
                         <div style={{ fontSize: '0.7rem', color: subTextColor, marginTop: '5px', lineHeight: 1.4 }}>
-                            {selectedHotspot.riskScore >= 8 ? '⚠️ วิกฤต: หลีกเลี่ยงกิจกรรมกลางแจ้งทั้งหมด ติดตามประกาศจากหน่วยงานที่เกี่ยวข้อง' :
+                            {selectedHotspot.riskScore == null ? 'ข้อมูลปัจจัยเสี่ยงของพื้นที่นี้ยังไม่พอสำหรับคำนวณคะแนน จึงไม่สรุปว่าเป็นภาวะปกติ' :
+                             selectedHotspot.riskScore >= 8 ? '⚠️ วิกฤต: หลีกเลี่ยงกิจกรรมกลางแจ้งทั้งหมด ติดตามประกาศจากหน่วยงานที่เกี่ยวข้อง' :
                              selectedHotspot.riskScore >= 6 ? '🟠 ควรเฝ้าระวัง: จำกัดกิจกรรมกลางแจ้ง ไม่เกิน 2 ชั่วโมง กลุ่มเสี่ยงควรอยู่ในอาคาร' :
                              selectedHotspot.riskScore >= 4 ? '🟡 ปานกลาง: สามารถทำกิจกรรมได้ แต่ควรดื่มน้ำเพียงพอและพักเป็นระยะ' :
                              '✅ สถานการณ์ปกติ: สามารถทำกิจกรรมกลางแจ้งได้ตามปกติ'}
@@ -2724,10 +2753,10 @@ export default function MapPage() {
                         <div key={i}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '5px', color: textColor }}>
                                 <span style={{fontWeight: 'bold'}}>{factor.label} <span style={{color:subTextColor, fontWeight:'normal'}}>(สัดส่วน {factor.weight}%)</span></span>
-                                <span>{factor.val} <span style={{color:subTextColor}}>{factor.unit}</span></span>
+                                <span>{factor.val ?? '--'} <span style={{color:subTextColor}}>{factor.val == null ? '' : factor.unit}</span></span>
                             </div>
                             <div style={{ width: '100%', height: '6px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
-                                <div style={{ width: `${(factor.risk / 10) * 100}%`, height: '100%', background: factor.color, borderRadius: '10px', transition: 'width 1s ease-out' }}></div>
+                                <div style={{ width: `${Number.isFinite(factor.risk) ? (factor.risk / 10) * 100 : 0}%`, height: '100%', background: factor.color, borderRadius: '10px', transition: 'width 1s ease-out' }}></div>
                             </div>
                         </div>
                     ))}
@@ -2826,29 +2855,29 @@ export default function MapPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.pm25, 'pm25')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>😷 PM2.5</span>
-                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.pm25, 'pm25') }}>{selectedHotspot.pm25} <span style={{fontSize: '0.65rem', color: subTextColor, fontWeight:'normal'}}>µg/m³</span></span>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: getPm25QualityText(selectedHotspot.pm25).color }}>{getPm25QualityText(selectedHotspot.pm25).text}</span>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.pm25, 'pm25') }}>{formatMetric(selectedHotspot.pm25, 'µg/m³')}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: isFiniteMetric(selectedHotspot.pm25) ? getPm25QualityText(selectedHotspot.pm25).color : subTextColor }}>{isFiniteMetric(selectedHotspot.pm25) ? getPm25QualityText(selectedHotspot.pm25).text : 'ไม่มีข้อมูล'}</span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.temp, 'temp')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🌡️ อุณหภูมิ</span>
-                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.temp, 'temp') }}>{Math.round(selectedHotspot.data.temp || 0)}°C</span>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.temp, 'temp') }}>{formatMetric(selectedHotspot.data.temp, '°C')}</span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.feelsLike, 'heat')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🥵 ความร้อน</span>
-                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.feelsLike, 'heat') }}>{Math.round(selectedHotspot.data.feelsLike || 0)}°C</span>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.feelsLike, 'heat') }}>{formatMetric(selectedHotspot.data.feelsLike, '°C')}</span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.humidity, 'humidity')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>💧 ความชื้นสัมพัทธ์</span>
-                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.humidity, 'humidity') }}>{Math.round(selectedHotspot.data.humidity || 0)} <span style={{fontSize: '0.65rem', color: subTextColor, fontWeight:'normal'}}>%</span></span>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.humidity, 'humidity') }}>{formatMetric(selectedHotspot.data.humidity, '%')}</span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.rainProb, 'rain')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>☔ โอกาสฝน</span>
-                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.rainProb, 'rain') }}>{Math.round(selectedHotspot.data.rainProb || 0)} <span style={{fontSize: '0.65rem', color: subTextColor, fontWeight:'normal'}}>%</span></span>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.rainProb, 'rain') }}>{formatMetric(selectedHotspot.data.rainProb, '%')}</span>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.windSpeed, 'wind')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>🌬️ ลม{timeMode === 'now' ? '/ทิศ' : ''}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.windSpeed, 'wind') }}>{Math.round(selectedHotspot.data.windSpeed || 0)} <span style={{fontSize: '0.65rem', color: subTextColor, fontWeight:'normal'}}>km/h</span></span>
+                          <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.windSpeed, 'wind') }}>{formatMetric(selectedHotspot.data.windSpeed, 'km/h')}</span>
                           {timeMode === 'now' && (selectedHotspot.data.windDirection ?? selectedHotspot.data.windDir) !== undefined && (
                               <span style={{ fontSize: '1rem' }}>{getWindDirection(selectedHotspot.data.windDirection ?? selectedHotspot.data.windDir).arrow}</span>
                           )}
@@ -2856,7 +2885,7 @@ export default function MapPage() {
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: `4px solid ${getBasicColor(selectedHotspot.data.uv, 'uv')}` }}>
                       <span style={{ fontSize: '0.75rem', color: subTextColor, fontWeight: 'bold' }}>☀️ UV</span>
-                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.uv, 'uv') }}>{Math.round(selectedHotspot.data.uv || 0)} <span style={{fontSize: '0.65rem', color: textColor, fontWeight:'normal'}}>{getUvText(selectedHotspot.data.uv)}</span></span>
+                      <span style={{ fontSize: '1.3rem', fontWeight: '900', color: getBasicColor(selectedHotspot.data.uv, 'uv') }}>{formatMetric(selectedHotspot.data.uv)} <span style={{fontSize: '0.65rem', color: textColor, fontWeight:'normal'}}>{isFiniteMetric(selectedHotspot.data.uv) ? getUvText(selectedHotspot.data.uv) : 'ไม่มีข้อมูล'}</span></span>
                   </div>
               </div>
 
@@ -2920,10 +2949,10 @@ export default function MapPage() {
                   <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: textColor, marginBottom: '8px' }}>💡 คำแนะนำ</div>
                   {getActionableAdvice(
                       selectedHotspot.pm25,
-                      selectedHotspot.data.temp || 0,
-                      selectedHotspot.data.rainProb || 0,
-                      selectedHotspot.data.uv || 0,
-                      selectedHotspot.data.windSpeed || 0
+                      selectedHotspot.data.temp,
+                      selectedHotspot.data.rainProb,
+                      selectedHotspot.data.uv,
+                      selectedHotspot.data.windSpeed
                   ).map((tip, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: textColor, marginBottom: '4px' }}>
                           <span>{tip.icon}</span>

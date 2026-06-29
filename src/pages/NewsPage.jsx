@@ -35,6 +35,7 @@ const sourceLinks = {
 
 const fallbackEnso = {
   status: 'ENSO-neutral',
+  isFallback: true,
   alert: 'ติดตามสัญญาณแปซิฟิก',
   nino34: '-',
   updatedAt: 'รอข้อมูลล่าสุด',
@@ -392,11 +393,12 @@ export default function NewsPage() {
   }, []);
 
   const enso = ensoFeed || fallbackEnso;
+  const hasLiveEnso = Boolean(ensoFeed && !ensoFeed.isFallback);
   const allItems = useMemo(() => {
     if (!feed) return [];
     const weatherCards = asArray(feed.weather?.days).slice(0, 5).map((day) => normalizeItem({
       title: `พยากรณ์ ${toThaiDate(day.time)}`,
-      summary: `${day.label || 'สภาพอากาศ'} สูงสุด ${day.max ?? '-'}°C ต่ำสุด ${day.min ?? '-'}°C โอกาสฝน ${day.rainChance ?? 0}%`,
+      summary: `${day.label || 'สภาพอากาศ'} สูงสุด ${day.max ?? '-'}°C ต่ำสุด ${day.min ?? '-'}°C โอกาสฝน ${day.rainChance ?? 'ไม่ระบุ'}${day.rainChance == null ? '' : '%'}`,
       source: 'Open-Meteo',
       category: 'weather',
       publishedAt: day.time,
@@ -419,15 +421,16 @@ export default function NewsPage() {
       ...asArray(feed.global?.climate).map((item) => normalizeItem(item, { source: 'NASA Climate / WMO' })),
       ...weatherCards,
       normalizeItem({
-        title: `ENSO: ${enso.status || 'ติดตามสัญญาณภูมิอากาศ'}`,
-        summary: enso.summary,
-        source: 'NOAA CPC ENSO',
+        title: hasLiveEnso ? `ENSO: ${enso.status || 'ติดตามสัญญาณภูมิอากาศ'}` : 'ENSO: รอข้อมูลล่าสุด',
+        summary: hasLiveEnso ? enso.summary : `${enso.summary} (การ์ดนี้เป็นข้อความสำรองระหว่างรอข้อมูลล่าสุด ไม่ใช่ประกาศ NOAA ล่าสุด)`,
+        source: hasLiveEnso ? 'NOAA CPC ENSO' : 'ระบบสำรอง ENSO',
         category: 'climate',
-        publishedAt: enso.sourceUpdatedAt || enso.fetchedAt || feed?.generatedAt || null,
-        url: sourceLinks['NOAA CPC ENSO'],
+        publishedAt: hasLiveEnso ? (enso.sourceUpdatedAt || enso.fetchedAt || null) : null,
+        dateConfidence: hasLiveEnso ? undefined : 'unknown',
+        url: hasLiveEnso ? sourceLinks['NOAA CPC ENSO'] : sourceLinks['NOAA CPC ENSO'],
       }),
     ]).sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
-  }, [enso, feed]);
+  }, [enso, feed, hasLiveEnso]);
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
