@@ -864,6 +864,192 @@ function normalizeSourceStatus(label, result, count = 0) {
   };
 }
 
+function topicFromItem(item = {}) {
+  const text = `${item.category || ''} ${item.eventType || ''} ${item.title || ''} ${item.summary || ''} ${item.rawSummary || ''}`.toLowerCase();
+  if (/earthquake|แผ่นดินไหว/.test(text) || item.category === 'earthquake') return 'quake';
+  if (/enso|el nino|la nina|climate|ภูมิอากาศ|เอลนีโญ|ลานีญา/.test(text) || item.category === 'climate') return 'climate';
+  if (/storm|typhoon|cyclone|tropical|พายุ|มรสุม|ลมแรง/.test(text)) return 'storm';
+  if (/flood|flash flood|rain|ฝน|น้ำท่วม|น้ำป่า|น้ำหลาก/.test(text)) return 'rain';
+  if (/wildfire|fire|ไฟป่า|hotspot/.test(text)) return 'fire';
+  if (/pm2\.?5|aqi|haze|smoke|air quality|ฝุ่น|หมอกควัน/.test(text)) return 'air';
+  if (/warning|alert|เตือน|ภัย/.test(text)) return 'warning';
+  return 'news';
+}
+
+function eventSeverityScore(level) {
+  if (level === 'high') return 3;
+  if (level === 'medium') return 2;
+  return 1;
+}
+
+function eventSeverityFromScore(score) {
+  if (score >= 3) return 'high';
+  if (score >= 2) return 'medium';
+  return 'normal';
+}
+
+function sourceAuthorityScore(source = '') {
+  const text = source.toLowerCase();
+  if (/tmd|usgs|gdacs|nasa|wmo|ddpm|ปภ|กรมอุตุ/.test(text)) return 20;
+  if (/reliefweb|thai pbs|noaa|iri/.test(text)) return 14;
+  if (/open-meteo/.test(text)) return 8;
+  return 6;
+}
+
+function normalizeEventArea(value = '') {
+  return cleanText(value)
+    .replace(/^จังหวัด\s*/i, '')
+    .replace(/^จ\.\s*/i, '')
+    .slice(0, 80);
+}
+
+function extractEventAreas(item = {}) {
+  const areas = new Set();
+  if (item.area) areas.add(normalizeEventArea(item.area));
+  if (item.country) areas.add(normalizeEventArea(item.country));
+
+  const text = `${item.title || ''} ${item.summary || ''} ${item.rawSummary || ''}`;
+  const provinceMatches = text.match(/(?:จังหวัด|จ\.)\s*[\u0E00-\u0E7F]{2,24}/g) || [];
+  provinceMatches.slice(0, 4).forEach((match) => areas.add(normalizeEventArea(match)));
+
+  if (/ประเทศไทย|ไทย|Thailand/i.test(text) || /TMD|DDPM|ปภ|Thai/i.test(item.source || '')) areas.add('ประเทศไทย');
+  return [...areas].filter(Boolean).slice(0, 5);
+}
+
+function eventTimeBucket(item = {}) {
+  const parsed = parseDateValue(item.publishedAt || item.time || item.updatedAt || item.scrapedAt);
+  if (!parsed) return 'unknown';
+  const hours = item.category === 'climate' ? 24 * 14 : 72;
+  return Math.floor(parsed.getTime() / (hours * 60 * 60 * 1000));
+}
+
+function keywordFingerprint(item = {}) {
+  const topic = topicFromItem(item);
+  const text = cleanText(`${item.title || ''} ${item.summary || ''}`).toLowerCase();
+  const important = text
+    .replace(/[^\p{L}\p{N}\s.-]/gu, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length >= 3)
+    .filter((token) => !['the', 'and', 'for', 'with', 'from', 'weather', 'forecast', 'update'].includes(token))
+    .slice(0, 6);
+  return important.length ? important.join('-') : topic;
+}
+
+function eventKeyForItem(item = {}) {
+  const topic = topicFromItem(item);
+  const area = extractEventAreas(item)[0] || item.country || 'global';
+  return `${topic}:${normalizeEventArea(area).toLowerCase()}:${eventTimeBucket(item)}:${keywordFingerprint(item).slice(0, 44)}`;
+}
+
+function lifecycleForCluster(items = [], topic = 'news', severity = 'normal') {
+  const newestHours = Math.min(...items.map((item) => hoursSince(item.publishedAt || item.time || item.updatedAt || item.scrapedAt) ?? 9999));
+  if (topic === 'climate') return 'monitoring';
+  if (newestHours <= 6) return 'new';
+  if (severity === 'high' && newestHours <= 48) return 'impacting';
+  if (severity !== 'normal' && newestHours <= 96) return 'watch';
+  if (newestHours > 168) return 'archive';
+  return 'tracking';
+}
+
+function confidenceForCluster(items = []) {
+  const sources = [...new Set(items.map((item) => item.source).filter(Boolean))];
+  const hasTime = items.some((item) => parseDateValue(item.publishedAt || item.time || item.updatedAt || item.scrapedAt));
+  const hasArea = items.some((item) => extractEventAreas(item).length);
+  const officialScore = Math.max(0, ...sources.map(sourceAuthorityScore));
+  const score = 42
+    + Math.min(24, sources.length * 8)
+    + Math.min(18, officialScore)
+    + (hasTime ? 8 : 0)
+    + (hasArea ? 8 : 0);
+  return Math.max(45, Math.min(96, score));
+}
+
+function confidenceLabel(score) {
+  if (score >= 82) return 'high';
+  if (score >= 64) return 'medium';
+  return 'low';
+}
+
+function buildEventTimeline(items = []) {
+  const sorted = [...items]
+    .filter((item) => item.title)
+    .sort((a, b) => (parseDateValue(a.publishedAt || a.time || a.updatedAt || a.scrapedAt)?.getTime() || 0) - (parseDateValue(b.publishedAt || b.time || b.updatedAt || b.scrapedAt)?.getTime() || 0));
+  const compact = [];
+  sorted.forEach((item, index) => {
+    const when = item.publishedAt || item.time || item.updatedAt || item.scrapedAt || null;
+    const label = index === 0 ? 'first_signal' : item.severity === 'high' ? 'impact_update' : 'source_update';
+    compact.push({
+      label,
+      title: cleanText(item.title).slice(0, 160),
+      source: item.source || 'source',
+      at: when,
+      url: item.url || item.link || null,
+    });
+  });
+  return compact.slice(-5);
+}
+
+function buildNewsEvents(items = []) {
+  const clusters = new Map();
+  items.filter(Boolean).forEach((item) => {
+    const normalized = enrichItem(item);
+    const key = eventKeyForItem(normalized);
+    if (!clusters.has(key)) clusters.set(key, []);
+    clusters.get(key).push(normalized);
+  });
+
+  return [...clusters.values()]
+    .map((cluster) => {
+      const sorted = prioritizeItems(cluster, cluster.length);
+      const lead = sorted[0];
+      const topic = topicFromItem(lead);
+      const severity = eventSeverityFromScore(Math.max(...sorted.map((item) => eventSeverityScore(item.severity))));
+      const areas = [...new Set(sorted.flatMap(extractEventAreas))].slice(0, 6);
+      const sources = [...new Set(sorted.map((item) => item.source).filter(Boolean))];
+      const confidence = confidenceForCluster(sorted);
+      const publishedDates = sorted
+        .map((item) => parseDateValue(item.publishedAt || item.time || item.updatedAt || item.scrapedAt))
+        .filter(Boolean)
+        .sort((a, b) => b.getTime() - a.getTime());
+      return {
+        id: eventKeyForItem(lead),
+        title: lead.title,
+        summary: lead.summary || lead.rawSummary || lead.title,
+        topic,
+        severity,
+        lifecycle: lifecycleForCluster(sorted, topic, severity),
+        confidence,
+        confidenceLabel: confidenceLabel(confidence),
+        sourceCount: sources.length,
+        sources,
+        areas,
+        primaryArea: areas[0] || lead.country || 'หลายพื้นที่',
+        publishedAt: publishedDates[publishedDates.length - 1]?.toISOString() || lead.publishedAt || null,
+        updatedAt: publishedDates[0]?.toISOString() || lead.updatedAt || lead.publishedAt || null,
+        url: lead.url || lead.link || null,
+        visual: lead.visual || buildVisual(lead.category || topic, severity),
+        timeline: buildEventTimeline(sorted),
+        items: sorted.slice(0, 5).map((item) => ({
+          title: item.title,
+          summary: item.summary,
+          source: item.source,
+          category: item.category,
+          severity: item.severity,
+          publishedAt: item.publishedAt || item.time || item.updatedAt || item.scrapedAt || null,
+          url: item.url || item.link || null,
+        })),
+      };
+    })
+    .sort((a, b) => {
+      const severityDiff = eventSeverityScore(b.severity) - eventSeverityScore(a.severity);
+      if (severityDiff) return severityDiff;
+      const confidenceDiff = b.confidence - a.confidence;
+      if (confidenceDiff) return confidenceDiff;
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+    })
+    .slice(0, 18);
+}
+
 // ─── TMD Web Scraping ─────────────────────────────────────────────────────────
 
 function extractNextData(html) {
@@ -1636,10 +1822,27 @@ export default async function handler(req, res) {
     ? { ...deterministicDigest, headline: aiDigest.headline, bullets: aiDigest.bullets, mode: 'ai' }
     : { ...deterministicDigest, mode: 'rule-based' };
 
+  const events = buildNewsEvents([
+    ...topStories,
+    ...thaiWarnings,
+    ...thaiStorms,
+    ...thaiEarthquakes,
+    ...thaiDisasters,
+    ...thaiPbsItems,
+    ...prioritizeItems(ddpmRaw.map(enrichItem), 8),
+    ...prioritizeItems(tmdEqRaw.map(enrichItem), 8),
+    ...globalAlerts,
+    ...globalEarthquakes,
+    ...globalDisasters,
+    ...climateItems,
+    ...eonetItems,
+  ]);
+
   const payload = {
     generatedAt: isoNow(),
     digest,
     weather,
+    events,
     topStories,
     thailand: {
       forecast: tmd.forecast,

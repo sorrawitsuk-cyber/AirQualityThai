@@ -193,6 +193,51 @@ function normalizeItem(item, fallback = {}) {
   };
 }
 
+function lifecycleMeta(value) {
+  if (value === 'new') return { label: 'สัญญาณใหม่', color: '#2563eb', bg: 'rgba(37,99,235,0.12)' };
+  if (value === 'impacting') return { label: 'กำลังกระทบ', color: '#dc2626', bg: 'rgba(220,38,38,0.12)' };
+  if (value === 'watch') return { label: 'เฝ้าระวัง', color: '#d97706', bg: 'rgba(217,119,6,0.12)' };
+  if (value === 'monitoring') return { label: 'ติดตามแนวโน้ม', color: '#0f766e', bg: 'rgba(15,118,110,0.12)' };
+  if (value === 'archive') return { label: 'เก็บเป็นบริบท', color: '#64748b', bg: 'rgba(100,116,139,0.12)' };
+  return { label: 'กำลังติดตาม', color: '#475569', bg: 'rgba(71,85,105,0.12)' };
+}
+
+function confidenceMeta(score = 0) {
+  if (score >= 82) return { label: 'มั่นใจสูง', color: '#16a34a' };
+  if (score >= 64) return { label: 'มั่นใจปานกลาง', color: '#d97706' };
+  return { label: 'ต้องตรวจต่อ', color: '#64748b' };
+}
+
+function normalizeEvent(event = {}) {
+  if (!event.title) return null;
+  const topic = event.topic || inferTopic(event);
+  const severity = event.severity || severityOf(event);
+  const color = categories.find((cat) => cat.id === topic)?.color || '#475569';
+  const sources = asArray(event.sources).filter(Boolean);
+  const items = asArray(event.items).map((item) => normalizeItem(item)).filter(Boolean);
+  return {
+    id: event.id || `${topic}-${event.title}-${event.updatedAt || event.publishedAt || ''}`,
+    area: event.primaryArea || asArray(event.areas)[0] || extractAreas(items)[0]?.name || 'หลายพื้นที่',
+    areas: asArray(event.areas),
+    color,
+    confidence: Number(event.confidence || 0),
+    items,
+    lifecycle: event.lifecycle || 'tracking',
+    publishedAt: event.publishedAt || event.updatedAt || null,
+    raw: event,
+    severity,
+    source: sources[0] || items[0]?.source || 'หลายแหล่งข้อมูล',
+    sourceCount: event.sourceCount || sources.length || new Set(items.map((item) => item.source)).size || 1,
+    sources,
+    summary: String(event.summary || event.title).trim(),
+    timeline: asArray(event.timeline),
+    title: String(event.title).trim(),
+    topic,
+    updatedAt: event.updatedAt || event.publishedAt || null,
+    url: event.url || items[0]?.url || null,
+  };
+}
+
 function dedupe(items = []) {
   const seen = new Set();
   return items.filter((item) => {
@@ -261,6 +306,66 @@ function EventCard({ item, onOpen }) {
   );
 }
 
+function IntelligenceCard({ event, onOpen }) {
+  const life = lifecycleMeta(event.lifecycle);
+  const confidence = confidenceMeta(event.confidence);
+  return (
+    <button
+      onClick={() => onOpen(event)}
+      type="button"
+      style={{
+        background: `linear-gradient(145deg, ${event.color}12, var(--bg-card))`,
+        border: `1px solid ${event.color}24`,
+        borderRadius: 14,
+        cursor: 'pointer',
+        minHeight: 164,
+        padding: 14,
+        textAlign: 'left',
+      }}
+    >
+      <div style={{ alignItems: 'center', display: 'flex', gap: 8, justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ background: life.bg, borderRadius: 999, color: life.color, fontSize: '0.68rem', fontWeight: 950, padding: '5px 9px' }}>{life.label}</span>
+        <span style={{ color: confidence.color, fontSize: '0.68rem', fontWeight: 950 }}>{confidence.label} {event.confidence || '-'}</span>
+      </div>
+      <h3 style={{ color: 'var(--text-main)', fontSize: '0.98rem', fontWeight: 950, lineHeight: 1.35, margin: 0 }}>{event.title}</h3>
+      <p style={{ color: 'var(--text-sub)', display: '-webkit-box', fontSize: '0.78rem', fontWeight: 750, lineHeight: 1.5, margin: '8px 0 0', overflow: 'hidden', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2 }}>{event.summary}</p>
+      <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+        <span style={{ alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, color: event.color, display: 'inline-flex', fontSize: '0.7rem', fontWeight: 900, gap: 5, padding: '5px 8px' }}><MapPin size={13} /> {event.area}</span>
+        <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, color: 'var(--text-sub)', fontSize: '0.7rem', fontWeight: 850, padding: '5px 8px' }}>{event.sourceCount} แหล่ง</span>
+      </div>
+    </button>
+  );
+}
+
+function EventIntelligencePanel({ events, isMobile, onOpen }) {
+  if (!events.length) return null;
+  const lead = events[0];
+  return (
+    <Panel style={{ marginBottom: 14, padding: isMobile ? 14 : 18 }}>
+      <div style={{ alignItems: 'flex-start', display: 'flex', gap: 12, justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div style={{ alignItems: 'center', color: '#2563eb', display: 'flex', fontSize: '0.72rem', fontWeight: 950, gap: 7, marginBottom: 5 }}>
+            <Radio size={15} /> Event Intelligence
+          </div>
+          <h2 style={{ color: 'var(--text-main)', fontSize: '1.08rem', fontWeight: 950, lineHeight: 1.25, margin: 0 }}>รวมข่าวให้เป็นเหตุการณ์ที่ตรวจต่อได้</h2>
+          <p style={{ color: 'var(--text-sub)', fontSize: '0.76rem', fontWeight: 750, lineHeight: 1.45, margin: '5px 0 0' }}>จัดกลุ่มจากเวลา พื้นที่ ประเภทภัย และแหล่งข้อมูล เพื่อให้เห็นว่าเรื่องไหนคือเหตุการณ์เดียวกัน</p>
+        </div>
+        <span style={{ background: 'rgba(37,99,235,0.1)', borderRadius: 999, color: '#2563eb', flex: '0 0 auto', fontSize: '0.72rem', fontWeight: 950, padding: '6px 10px' }}>{events.length} เหตุการณ์</span>
+      </div>
+
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr' : 'minmax(260px, 0.85fr) repeat(2, minmax(0, 1fr))' }}>
+        <button onClick={() => onOpen(lead)} type="button" style={{ background: `linear-gradient(145deg, ${lead.color}20, var(--bg-secondary))`, border: `1px solid ${lead.color}30`, borderRadius: 14, cursor: 'pointer', minHeight: 178, padding: 16, textAlign: 'left' }}>
+          <div style={{ color: lead.color, fontSize: '0.74rem', fontWeight: 950, marginBottom: 8 }}>เหตุการณ์นำ</div>
+          <h3 style={{ color: 'var(--text-main)', fontSize: '1.08rem', fontWeight: 950, lineHeight: 1.32, margin: 0 }}>{lead.title}</h3>
+          <p style={{ color: 'var(--text-sub)', fontSize: '0.8rem', fontWeight: 750, lineHeight: 1.5, margin: '9px 0 0' }}>{lead.summary}</p>
+          <div style={{ color: lead.color, fontSize: '0.74rem', fontWeight: 900, marginTop: 12 }}>{lead.area} · {lead.sourceCount} แหล่งยืนยัน</div>
+        </button>
+        {events.slice(1, isMobile ? 3 : 5).map((event) => <IntelligenceCard key={event.id} event={event} onOpen={onOpen} />)}
+      </div>
+    </Panel>
+  );
+}
+
 function StoryLane({ isMobile, lane, onOpen, rows }) {
   const Icon = lane.icon;
   const lead = rows[0];
@@ -325,6 +430,7 @@ export default function NewsPage() {
   const [loading, setLoading] = useState(!feed);
   const [query, setQuery] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [error, setError] = useState('');
 
@@ -441,6 +547,16 @@ export default function NewsPage() {
     });
   }, [activeCategory, allItems, query]);
 
+  const eventClusters = useMemo(() => asArray(feed?.events).map((event) => normalizeEvent(event)).filter(Boolean), [feed]);
+  const filteredEvents = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return eventClusters.filter((event) => {
+      const categoryMatch = activeCategory === 'all' || event.topic === activeCategory || (activeCategory === 'rain' && ['rain', 'flood', 'weather'].includes(event.topic));
+      const queryMatch = !q || itemText(event).toLowerCase().includes(q) || event.sources.join(' ').toLowerCase().includes(q);
+      return categoryMatch && queryMatch;
+    });
+  }, [activeCategory, eventClusters, query]);
+
   const lanes = useMemo(() => laneMeta.map((lane) => ({
     ...lane,
     rows: filteredItems.filter((item) => lane.topics.includes(item.topic)).slice(0, 8),
@@ -536,9 +652,12 @@ export default function NewsPage() {
             { label: 'อัปเดต', value: dataUpdatedText, strong: true },
             !isMobile && { label: 'เรื่องทั้งหมด', value: `${filteredItems.length} เรื่อง` },
             !isMobile && { label: 'เฝ้าระวัง', value: `${watchCount} เรื่อง` },
+            !isMobile && { label: 'เหตุการณ์รวม', value: `${filteredEvents.length} เหตุการณ์` },
           ]}
           sources={isMobile ? ['TMD', 'USGS'] : ['TMD', 'USGS', 'NASA EONET', 'NOAA CPC ENSO']}
         />
+
+        <EventIntelligencePanel events={filteredEvents} isMobile={isMobile} onOpen={setSelectedEvent} />
 
         <section style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, display: 'grid', gap: 10, gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', marginBottom: 14, padding: isMobile ? 12 : 14 }}>
           <div style={{ minWidth: 0 }}>
@@ -624,6 +743,64 @@ export default function NewsPage() {
           </aside>
         </section>
       </div>
+
+      {selectedEvent && (
+        <div className="modal-overlay" onClick={() => setSelectedEvent(null)}>
+          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <div style={{ background: `linear-gradient(135deg, ${selectedEvent.color}, #0f172a)`, color: '#fff', padding: 22 }}>
+              <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 999, fontSize: '0.74rem', fontWeight: 950, padding: '5px 10px' }}>{lifecycleMeta(selectedEvent.lifecycle).label}</span>
+                <button onClick={() => setSelectedEvent(null)} type="button" style={{ background: 'rgba(255,255,255,0.2)', border: 0, borderRadius: 999, color: '#fff', cursor: 'pointer', fontSize: '1.2rem', height: 34, width: 34 }}>×</button>
+              </div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 950, lineHeight: 1.35, margin: '12px 0 0' }}>{selectedEvent.title}</h2>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {[selectedEvent.area, `${selectedEvent.sourceCount} แหล่งข้อมูล`, `${confidenceMeta(selectedEvent.confidence).label} ${selectedEvent.confidence || '-'}`, toThaiDate(selectedEvent.updatedAt || selectedEvent.publishedAt)].filter(Boolean).map((value) => (
+                  <span key={value} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 999, color: 'var(--text-sub)', fontSize: '0.72rem', fontWeight: 850, padding: '6px 10px' }}>{value}</span>
+                ))}
+              </div>
+              <p style={{ color: 'var(--text-main)', fontSize: '0.94rem', fontWeight: 750, lineHeight: 1.7, margin: 0 }}>{selectedEvent.summary}</p>
+
+              {selectedEvent.timeline.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <h3 style={{ color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 950, margin: '0 0 10px' }}>ไทม์ไลน์เหตุการณ์</h3>
+                  <div style={{ display: 'grid', gap: 9 }}>
+                    {selectedEvent.timeline.map((row, index) => (
+                      <button key={`${row.title}-${index}`} onClick={() => row.url && openExternal(row.url)} type="button" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 12, color: 'var(--text-main)', cursor: row.url ? 'pointer' : 'default', padding: 11, textAlign: 'left' }}>
+                        <div style={{ color: selectedEvent.color, fontSize: '0.7rem', fontWeight: 950 }}>{row.source || 'source'} · {toThaiDate(row.at)}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 850, lineHeight: 1.45, marginTop: 4 }}>{row.title}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedEvent.items.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <h3 style={{ color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 950, margin: '0 0 10px' }}>ข่าวที่ถูกรวมในเหตุการณ์นี้</h3>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {selectedEvent.items.map((item) => (
+                      <button key={item.id} onClick={() => { setSelectedEvent(null); setSelectedItem(item); }} type="button" style={{ alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: 12, color: 'var(--text-main)', cursor: 'pointer', display: 'flex', gap: 10, justifyContent: 'space-between', padding: 10, textAlign: 'left' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 850, lineHeight: 1.35 }}>{item.title}</span>
+                        <ExternalLink color="var(--text-sub)" size={14} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', gap: 10, justifyContent: 'flex-end', padding: 16 }}>
+              <button onClick={() => setSelectedEvent(null)} type="button" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 900, padding: '10px 14px' }}>ปิด</button>
+              {selectedEvent.url && (
+                <button onClick={() => openExternal(selectedEvent.url)} type="button" style={{ alignItems: 'center', background: selectedEvent.color, border: 0, borderRadius: 12, color: '#fff', cursor: 'pointer', display: 'flex', fontSize: '0.84rem', fontWeight: 900, gap: 8, padding: '10px 14px' }}>
+                  เปิดต้นทาง <ExternalLink size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedItem && (
         <div className="modal-overlay" onClick={() => setSelectedItem(null)}>
