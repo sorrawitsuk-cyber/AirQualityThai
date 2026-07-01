@@ -4,10 +4,47 @@ import Layout from './components/Layout';
 import { WeatherProvider } from './context/WeatherContext';
 import LoadingScreen from './components/LoadingScreen';
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const MapPage = lazy(() => import('./pages/MapPage'));
-const AIPage = lazy(() => import('./pages/AIPage'));
-const NewsPage = lazy(() => import('./pages/NewsPage'));
+const CHUNK_RELOAD_KEY = 'air4thai-chunk-reload-attempted';
+
+function isChunkLoadError(error) {
+  return /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError|dynamically imported module/i.test(error?.message || String(error || ''));
+}
+
+async function recoverFromStaleChunk() {
+  if (typeof window === 'undefined') return false;
+  if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === '1') return false;
+  window.sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+
+  try {
+    if ('caches' in window) {
+      const names = await window.caches.keys();
+      await Promise.all(names.filter((name) => /workbox|precache|local-code|vite|air4thai/i.test(name)).map((name) => window.caches.delete(name)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.update().catch(() => null)));
+    }
+  } catch {
+    // Reload is still the safest recovery path when a mobile browser has stale chunks.
+  }
+
+  window.location.reload();
+  return true;
+}
+
+function lazyWithRetry(loader) {
+  return lazy(() => loader().catch(async (error) => {
+    if (isChunkLoadError(error) && await recoverFromStaleChunk()) {
+      return new Promise(() => {});
+    }
+    throw error;
+  }));
+}
+
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const MapPage = lazyWithRetry(() => import('./pages/MapPage'));
+const AIPage = lazyWithRetry(() => import('./pages/AIPage'));
+const NewsPage = lazyWithRetry(() => import('./pages/NewsPage'));
 
 function RouteFallback() {
   return <LoadingScreen title="กำลังเปิดหน้า" subtitle="เตรียมข้อมูลล่าสุดให้พร้อมแสดงผล" />;
@@ -25,6 +62,7 @@ class RouteErrorBoundary extends React.Component {
 
   componentDidCatch(error) {
     console.error('Route chunk failed:', error);
+    if (isChunkLoadError(error)) recoverFromStaleChunk();
   }
 
   render() {

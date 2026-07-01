@@ -43,12 +43,13 @@ registerRoute(
     url.origin === self.location.origin
     && ['script', 'style'].includes(request.destination)
   ),
-  new StaleWhileRevalidate({
+  new NetworkFirst({
     cacheName: 'local-code-cache',
+    networkTimeoutSeconds: 4,
     plugins: [
       new ExpirationPlugin({
         maxEntries: 32,
-        maxAgeSeconds: 60 * 60 * 24 * 7,
+        maxAgeSeconds: 60 * 60 * 24,
       }),
     ],
   }),
